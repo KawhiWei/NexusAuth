@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <ItemGroup>
+        <PackageReference Include="Luck.AutoDependencyInjection" />
+        <PackageReference Include="Luck.AspNetCore" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\NexusAuth.Application\NexusAuth.Application.csproj" />
+        <ProjectReference Include="..\NexusAuth.Persistence\NexusAuth.Persistence.csproj" />
+        <ProjectReference Include="..\NexusAuth.Shared\NexusAuth.Shared.csproj" />
+    </ItemGroup>
+
+</Project>

@@ -1,0 +1,8 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <ItemGroup>
+        <PackageReference Include="Luck.Framework" />
+        <PackageReference Include="Luck.AutoDependencyInjection" />
+    </ItemGroup>
+
+</Project>

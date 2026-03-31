@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Demo App - NexusAuth OAuth2 Integration</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
+            line-height: 1.6;
+        }
+
+        .navbar {
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 0 24px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .navbar h1 { font-size: 18px; font-weight: 600; }
+
+        .navbar .actions { display: flex; gap: 12px; align-items: center; }
+
+        .navbar .user-info {
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-primary { background: #3b82f6; color: #fff; }
+        .btn-primary:hover { background: #2563eb; }
+
+        .btn-danger { background: #ef4444; color: #fff; }
+        .btn-danger:hover { background: #dc2626; }
+
+        .btn-secondary { background: #475569; color: #fff; }
+        .btn-secondary:hover { background: #334155; }
+
+        .container {
+            max-width: 800px;
+            margin: 32px auto;
+            padding: 0 24px;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .card h2 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #334155;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-ok { background: #dcfce7; color: #166534; }
+        .status-no { background: #fef2f2; color: #991b1b; }
+
+        .token-display {
+            background: #f1f5f9;
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
+            font-size: 12px;
+            word-break: break-all;
+            max-height: 120px;
+            overflow-y: auto;
+            margin-top: 8px;
+            color: #475569;
+        }
+
+        .claims-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+
+        .claims-table th, .claims-table td {
+            text-align: left;
+            padding: 8px 12px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 13px;
+        }
+
+        .claims-table th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #64748b;
+        }
+
+        .claims-table td:first-child {
+            font-family: 'SF Mono', 'Consolas', monospace;
+            color: #7c3aed;
+        }
+
+        .welcome {
+            text-align: center;
+            padding: 48px 24px;
+        }
+
+        .welcome h2 {
+            font-size: 24px;
+            margin-bottom: 12px;
+            color: #1e293b;
+        }
+
+        .welcome p {
+            color: #64748b;
+            margin-bottom: 24px;
+        }
+
+        .flow-diagram {
+            background: #f1f5f9;
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'SF Mono', 'Consolas', monospace;
+            font-size: 12px;
+            line-height: 1.8;
+            white-space: pre;
+            overflow-x: auto;
+            color: #475569;
+            text-align: left;
+            margin: 16px 0;
+        }
+
+        .api-result {
+            margin-top: 12px;
+        }
+
+        .hidden { display: none; }
+
+        .action-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <h1>Demo App</h1>
+    <div class="actions">
+        <span class="user-info" id="nav-user"></span>
+        <button class="btn btn-primary" id="btn-login" onclick="startLogin()">Login with NexusAuth</button>
+        <button class="btn btn-danger hidden" id="btn-logout" onclick="logout()">Logout</button>
+    </div>
+</nav>
+
+<div class="container">
+    <div id="view-guest">
+        <div class="card welcome">
+            <h2>NexusAuth OAuth2 Demo</h2>
+            <p>This demo application demonstrates the OAuth2 Authorization Code + PKCE flow with NexusAuth SSO.</p>
+            <div class="flow-diagram">Demo App                     NexusAuth (localhost:5100)
+--------                     -------------------------
+    |                                |
+    |  1. Click "Login"              |
+    |  ----------------------------->|
+    |     GET /connect/authorize     |
+    |     ?response_type=code        |
+    |     &client_id=demo-app        |
+    |     &redirect_uri=...          |
+    |     &code_challenge=...        |
+    |     &code_challenge_method=S256|
+    |                                |
+    |  2. NexusAuth login page       |
+    |  <-----------------------------|
+    |     (if not already logged in) |
+    |                                |
+    |  3. User signs in              |
+    |  ----------------------------->|
+    |                                |
+    |  4. Redirect with code         |
+    |  <-----------------------------|
+    |     ?code=xxx&state=yyy        |
+    |                                |
+    |  5. Exchange code for tokens   |
+    |  ----------------------------->|
+    |     POST /connect/token        |
+    |     grant_type=authorization_code
+    |     code=xxx                   |
+    |     code_verifier=zzz          |
+    |                                |
+    |  6. Access Token + Refresh     |
+    |  <-----------------------------|
+    |     { access_token, refresh_token }</div>
+            <button class="btn btn-primary" onclick="startLogin()">Login with NexusAuth</button>
+        </div>
+    </div>
+
+    <div id="view-auth" class="hidden">
+        <div class="card">
+            <h2>Authentication Status <span class="status status-ok">Authenticated</span></h2>
+            <p style="margin-top:8px; font-size:14px; color:#64748b;">You are logged in via NexusAuth OAuth2.</p>
+        </div>
+
+        <div class="card">
+            <h2>Access Token</h2>
+            <div class="token-display" id="token-display"></div>
+        </div>
+
+        <div class="card">
+            <h2>Protected API: /api/me</h2>
+            <p style="font-size:14px; color:#64748b;">Call the protected endpoint using your access token.</p>
+            <div class="action-row">
+                <button class="btn btn-secondary" onclick="callProtectedApi()">Call /api/me</button>
+                <button class="btn btn-secondary" onclick="refreshToken()">Refresh Token</button>
+            </div>
+            <div class="api-result" id="api-result"></div>
+        </div>
+
+        <div class="card hidden" id="claims-card">
+            <h2>JWT Claims</h2>
+            <table class="claims-table">
+                <thead><tr><th>Claim</th><th>Value</th></tr></thead>
+                <tbody id="claims-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    function getAccessToken() { return localStorage.getItem('access_token'); }
+    function getRefreshToken() { return localStorage.getItem('refresh_token'); }
+
+    function isLoggedIn() { return !!getAccessToken(); }
+
+    function updateUI() {
+        const loggedIn = isLoggedIn();
+        document.getElementById('view-guest').classList.toggle('hidden', loggedIn);
+        document.getElementById('view-auth').classList.toggle('hidden', !loggedIn);
+        document.getElementById('btn-login').classList.toggle('hidden', loggedIn);
+        document.getElementById('btn-logout').classList.toggle('hidden', !loggedIn);
+
+        if (loggedIn) {
+            const token = getAccessToken();
+            document.getElementById('token-display').textContent = token;
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                const name = payload.sub || payload.name || 'User';
+                document.getElementById('nav-user').textContent = name;
+            } catch {
+                document.getElementById('nav-user').textContent = '';
+            }
+        } else {
+            document.getElementById('nav-user').textContent = '';
+        }
+    }
+
+    async function startLogin() {
+        try {
+            const resp = await fetch('/api/login');
+            const data = await resp.json();
+            console.log(data)
+            window.location.href = data.authorizeUrl;
+        } catch (e) {
+            alert('Failed to start login: ' + e.message);
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        updateUI();
+        document.getElementById('api-result').innerHTML = '';
+        document.getElementById('claims-card').classList.add('hidden');
+    }
+
+    async function callProtectedApi() {
+        const resultDiv = document.getElementById('api-result');
+        resultDiv.innerHTML = '<p style="color:#64748b;font-size:13px;margin-top:12px;">Loading...</p>';
+
+        try {
+            const resp = await fetch('/api/me', {
+                headers: { 'Authorization': 'Bearer ' + getAccessToken() }
+            });
+
+            const data = await resp.json();
+
+            if (resp.ok) {
+                resultDiv.innerHTML = '<div class="token-display" style="margin-top:12px;max-height:200px;">' +
+                    JSON.stringify(data, null, 2) + '</div>';
+
+                if (data.claims) {
+                    const tbody = document.getElementById('claims-body');
+                    tbody.innerHTML = '';
+                    for (const [key, value] of Object.entries(data.claims)) {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = '<td>' + escapeHtml(key) + '</td><td>' + escapeHtml(value) + '</td>';
+                        tbody.appendChild(tr);
+                    }
+                    document.getElementById('claims-card').classList.remove('hidden');
+                }
+            } else {
+                resultDiv.innerHTML = '<div class="token-display" style="margin-top:12px;color:#dc2626;">' +
+                    JSON.stringify(data, null, 2) + '</div>';
+            }
+        } catch (e) {
+            resultDiv.innerHTML = '<p style="color:#dc2626;font-size:13px;margin-top:12px;">Error: ' + e.message + '</p>';
+        }
+    }
+
+    async function refreshToken() {
+        const rt = getRefreshToken();
+        if (!rt) {
+            alert('No refresh token available.');
+            return;
+        }
+
+        try {
+            const resp = await fetch('/api/refresh', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: rt })
+            });
+
+            const data = await resp.json();
+
+            if (data.access_token) {
+                localStorage.setItem('access_token', data.access_token);
+                if (data.refresh_token) localStorage.setItem('refresh_token', data.refresh_token);
+                updateUI();
+                alert('Token refreshed successfully!');
+            } else {
+                alert('Refresh failed: ' + JSON.stringify(data));
+            }
+        } catch (e) {
+            alert('Refresh error: ' + e.message);
+        }
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    updateUI();
+</script>
+
+</body>
+</html>

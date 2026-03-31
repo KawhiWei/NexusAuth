@@ -1,0 +1,163 @@
+@page
+@model NexusAuth.Host.Pages.Account.LoginModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login - NexusAuth</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: #1f2937;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 400px;
+            padding: 0 16px;
+        }
+
+        .login-card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            padding: 40px 32px;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .login-header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 8px;
+        }
+
+        .login-header p {
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 6px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            font-size: 14px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .error-message {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 10px 16px;
+            font-size: 15px;
+            font-weight: 500;
+            color: #fff;
+            background: #3b82f6;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-login:hover {
+            background: #2563eb;
+        }
+
+        .btn-login:active {
+            background: #1d4ed8;
+        }
+
+        .client-info {
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 12px;
+            color: #9ca3af;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <h1>NexusAuth</h1>
+                <p>Sign in to continue</p>
+            </div>
+
+            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+            {
+                <div class="error-message">@Model.ErrorMessage</div>
+            }
+
+            <form method="post">
+                <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="Username" value="@Model.Username"
+                           placeholder="Enter your username" required autofocus />
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="Password"
+                           placeholder="Enter your password" required />
+                </div>
+
+                <button type="submit" class="btn-login">Sign In</button>
+            </form>
+
+            @if (!string.IsNullOrEmpty(Model.ClientName))
+            {
+                <div class="client-info">
+                    Authorizing for <strong>@Model.ClientName</strong>
+                </div>
+            }
+        </div>
+    </div>
+</body>
+</html>

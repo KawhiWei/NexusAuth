@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <ItemGroup>
+        <PackageReference Include="Luck.EntityFrameworkCore" />
+        <PackageReference Include="Luck.EntityFrameworkCore.PostgreSQL" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\NexusAuth.Domain\NexusAuth.Domain.csproj" />
+    </ItemGroup>
+
+</Project>

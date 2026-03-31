@@ -1,0 +1,9 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <ItemGroup>
+        <PackageReference Include="Luck.DDD.Domain" />
+        <PackageReference Include="Luck.Framework" />
+        <PackageReference Include="BCrypt.Net-Next" />
+    </ItemGroup>
+
+</Project>

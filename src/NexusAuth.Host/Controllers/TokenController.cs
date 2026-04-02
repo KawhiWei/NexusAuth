@@ -8,13 +8,19 @@ public class TokenController : ControllerBase
 {
     private readonly IAuthorizationService _authorizationService;
     private readonly ITokenService _tokenService;
+    private readonly IDeviceAuthorizationService _deviceAuthorizationService;
+    private readonly IClientService _clientService;
 
     public TokenController(
         IAuthorizationService authorizationService,
-        ITokenService tokenService)
+        ITokenService tokenService,
+        IDeviceAuthorizationService deviceAuthorizationService,
+        IClientService clientService)
     {
         _authorizationService = authorizationService;
         _tokenService = tokenService;
+        _deviceAuthorizationService = deviceAuthorizationService;
+        _clientService = clientService;
     }
 
     /// <summary>
@@ -32,6 +38,7 @@ public class TokenController : ControllerBase
         [FromForm(Name = "code_verifier")] string? codeVerifier = null,
         [FromForm] string? scope = null,
         [FromForm(Name = "refresh_token")] string? refreshToken = null,
+        [FromForm(Name = "device_code")] string? deviceCode = null,
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(grantType))
@@ -42,6 +49,7 @@ public class TokenController : ControllerBase
             "authorization_code" => await HandleAuthorizationCodeAsync(code, redirectUri, codeVerifier, ct),
             "client_credentials" => await HandleClientCredentialsAsync(clientId, clientSecret, scope, ct),
             "refresh_token" => await HandleRefreshTokenAsync(refreshToken, ct),
+            "urn:ietf:params:oauth:grant-type:device_code" => await HandleDeviceCodeAsync(clientId, clientSecret, deviceCode, ct),
             _ => BadRequest(new { error = "unsupported_grant_type", error_description = $"Grant type '{grantType}' is not supported." }),
         };
     }
@@ -63,15 +71,33 @@ public class TokenController : ControllerBase
         if (!result.IsSuccess)
             return BadRequest(new { error = "invalid_grant", error_description = result.Error });
 
-        var accessToken = await _tokenService.IssueAccessTokenAsync(result.ClientId, result.Scope, result.UserId, ct);
+        var accessTokenResult = await _tokenService.IssueAccessTokenWithMetadataAsync(result.ClientId, result.Scope, result.UserId, ct);
         var refreshToken = await _tokenService.IssueRefreshTokenAsync(result.ClientId, result.UserId, result.Scope, ct);
+        var includeIdToken = result.Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains("openid", StringComparer.Ordinal);
+        string? idToken = null;
+        if (includeIdToken)
+        {
+            // 中文注释：授权码里已经保存了 OIDC 上下文，这里在换 token 时继续带到 id_token 里。
+            idToken = await _tokenService.IssueIdTokenAsync(
+                result.ClientId,
+                result.UserId,
+                result.Nonce,
+                accessTokenResult.AccessToken,
+                result.ClaimsJson,
+                result.AuthenticatedAt,
+                result.Acr,
+                result.Amr,
+                ct);
+        }
 
         return Ok(new
         {
-            access_token = accessToken,
+            access_token = accessTokenResult.AccessToken,
             token_type = "Bearer",
             refresh_token = refreshToken,
             scope = result.Scope,
+            id_token = idToken,
+            expires_in = 3600,
         });
     }
 
@@ -122,6 +148,45 @@ public class TokenController : ControllerBase
             access_token = result.AccessToken,
             token_type = "Bearer",
             refresh_token = result.RefreshToken,
+        });
+    }
+
+    private async Task<IActionResult> HandleDeviceCodeAsync(
+        string? clientId,
+        string? clientSecret,
+        string? deviceCode,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(clientId))
+            return BadRequest(new { error = "invalid_request", error_description = "client_id is required." });
+
+        if (string.IsNullOrWhiteSpace(deviceCode))
+            return BadRequest(new { error = "invalid_request", error_description = "device_code is required." });
+
+        var result = await _deviceAuthorizationService.PollAsync(clientId, clientSecret, deviceCode, ct);
+        if (!result.IsSuccess)
+        {
+            if (result.ErrorCode is "authorization_pending" or "slow_down" or "access_denied" or "expired_token")
+                return BadRequest(new { error = result.ErrorCode, error_description = result.Error, interval = result.Interval > 0 ? (int?)result.Interval : null });
+
+            return BadRequest(new { error = "invalid_grant", error_description = result.Error });
+        }
+
+        var accessTokenResult = await _tokenService.IssueAccessTokenWithMetadataAsync(result.ClientId!, result.Scope!, result.UserId, ct);
+        var refreshToken = await _tokenService.IssueRefreshTokenAsync(result.ClientId!, result.UserId, result.Scope!, ct);
+        var includeIdToken = result.Scope!.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains("openid", StringComparer.Ordinal);
+        string? idToken = null;
+        if (includeIdToken)
+            idToken = await _tokenService.IssueIdTokenAsync(result.ClientId!, result.UserId, null, accessTokenResult.AccessToken, ct: ct);
+
+        return Ok(new
+        {
+            access_token = accessTokenResult.AccessToken,
+            token_type = "Bearer",
+            refresh_token = refreshToken,
+            scope = result.Scope,
+            id_token = idToken,
+            expires_in = 3600,
         });
     }
 }

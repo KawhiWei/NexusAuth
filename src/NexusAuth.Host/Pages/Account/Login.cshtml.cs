@@ -8,6 +8,10 @@ namespace NexusAuth.Host.Pages.Account;
 
 public class LoginModel : PageModel
 {
+    private const string AuthTimeClaimType = "auth_time";
+    private const string AmrClaimType = "amr";
+    private const string AcrClaimType = "acr";
+
     private readonly IUserService _userService;
     private readonly IClientService _clientService;
 
@@ -69,6 +73,10 @@ public class LoginModel : PageModel
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Name, user.Username),
+            // 中文注释：记录认证时间与认证方式，供 OIDC 的 max_age、auth_time、amr、acr 扩展使用。
+            new(AuthTimeClaimType, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()),
+            new(AmrClaimType, "pwd"),
+            new(AcrClaimType, "urn:nexusauth:acr:pwd"),
         };
 
         var identity = new ClaimsIdentity(claims, AppWebModule.AuthenticationScheme);

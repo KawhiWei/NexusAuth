@@ -1,29 +1,37 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DemoApp.Api", "src\DemoApp.Api\DemoApp.Api.csproj", "{3B85B964-B2EA-409D-A629-951E56A9A132}"
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Demo.Bff", "src\Demo.Bff\Demo.Bff.csproj", "{90A676C7-2D93-4317-9088-401F6608F580}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Demo.Web", "Demo.Web", "{5483AE4E-1A1B-4C27-93F9-55097124F624}"
+	ProjectSection(SolutionItems) = preProject
+		src\Demo.Web\index.html = src\Demo.Web\index.html
+		src\Demo.Web\package.json = src\Demo.Web\package.json
+		src\Demo.Web\src\App.tsx = src\Demo.Web\src\App.tsx
+		src\Demo.Web\src\main.tsx = src\Demo.Web\src\main.tsx
+		src\Demo.Web\src\styles.css = src\Demo.Web\src\styles.css
+		src\Demo.Web\tsconfig.json = src\Demo.Web\tsconfig.json
+		src\Demo.Web\vite.config.ts = src\Demo.Web\vite.config.ts
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Demo Items", "Demo Items", "{2D0D6A0E-40E9-413F-9601-4A1A9C2AB2F7}"
+	ProjectSection(SolutionItems) = preProject
+		schema.sql = schema.sql
+		seed.sql = seed.sql
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
-		Debug|x64 = Debug|x64
-		Debug|x86 = Debug|x86
 		Release|Any CPU = Release|Any CPU
-		Release|x64 = Release|x64
-		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{3B85B964-B2EA-409D-A629-951E56A9A132}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3B85B964-B2EA-409D-A629-951E56A9A132}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{3B85B964-B2EA-409D-A629-951E56A9A132}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{3B85B964-B2EA-409D-A629-951E56A9A132}.Debug|x64.Build.0 = Debug|Any CPU
-		{3B85B964-B2EA-409D-A629-951E56A9A132}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{3B85B964-B2EA-409D-A629-951E56A9A132}.Debug|x86.Build.0 = Debug|Any CPU
-		{3B85B964-B2EA-409D-A629-951E56A9A132}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3B85B964-B2EA-409D-A629-951E56A9A132}.Release|Any CPU.Build.0 = Release|Any CPU
-		{3B85B964-B2EA-409D-A629-951E56A9A132}.Release|x64.ActiveCfg = Release|Any CPU
-		{3B85B964-B2EA-409D-A629-951E56A9A132}.Release|x64.Build.0 = Release|Any CPU
-		{3B85B964-B2EA-409D-A629-951E56A9A132}.Release|x86.ActiveCfg = Release|Any CPU
-		{3B85B964-B2EA-409D-A629-951E56A9A132}.Release|x86.Build.0 = Release|Any CPU
+		{90A676C7-2D93-4317-9088-401F6608F580}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{90A676C7-2D93-4317-9088-401F6608F580}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{90A676C7-2D93-4317-9088-401F6608F580}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{90A676C7-2D93-4317-9088-401F6608F580}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

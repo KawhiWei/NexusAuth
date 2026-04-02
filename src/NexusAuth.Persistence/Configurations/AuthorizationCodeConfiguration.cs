@@ -45,6 +45,25 @@ public class AuthorizationCodeConfiguration : IEntityTypeConfiguration<Authoriza
             .HasColumnName("code_challenge_method")
             .HasMaxLength(10);
 
+        builder.Property(a => a.Nonce)
+            .HasColumnName("nonce")
+            .HasMaxLength(256);
+
+        builder.Property(a => a.ClaimsJson)
+            .HasColumnName("claims_json")
+            .HasColumnType("text");
+
+        builder.Property(a => a.AuthenticatedAt)
+            .HasColumnName("authenticated_at");
+
+        builder.Property(a => a.Acr)
+            .HasColumnName("acr")
+            .HasMaxLength(128);
+
+        builder.Property(a => a.Amr)
+            .HasColumnName("amr")
+            .HasMaxLength(256);
+
         builder.Property(a => a.IsUsed)
             .HasColumnName("is_used")
             .IsRequired()

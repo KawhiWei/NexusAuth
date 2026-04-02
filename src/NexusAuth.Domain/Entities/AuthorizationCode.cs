@@ -19,6 +19,16 @@ public class AuthorizationCode : EntityWithIdentity<Guid>
 
     public string? CodeChallengeMethod { get; private set; }
 
+    public string? Nonce { get; private set; }
+
+    public string? ClaimsJson { get; private set; }
+
+    public DateTimeOffset? AuthenticatedAt { get; private set; }
+
+    public string? Acr { get; private set; }
+
+    public string? Amr { get; private set; }
+
     public bool IsUsed { get; private set; }
 
     public DateTimeOffset ExpiresAt { get; private set; }
@@ -38,7 +48,12 @@ public class AuthorizationCode : EntityWithIdentity<Guid>
         string redirectUri,
         string scope,
         string? codeChallenge = null,
-        string? codeChallengeMethod = null)
+        string? codeChallengeMethod = null,
+        string? nonce = null,
+        string? claimsJson = null,
+        DateTimeOffset? authenticatedAt = null,
+        string? acr = null,
+        string? amr = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
         ArgumentException.ThrowIfNullOrWhiteSpace(redirectUri);
@@ -55,6 +70,11 @@ public class AuthorizationCode : EntityWithIdentity<Guid>
             Scope = scope,
             CodeChallenge = codeChallenge,
             CodeChallengeMethod = codeChallengeMethod,
+            Nonce = nonce,
+            ClaimsJson = claimsJson,
+            AuthenticatedAt = authenticatedAt,
+            Acr = acr,
+            Amr = amr,
             IsUsed = false,
             ExpiresAt = now.AddMinutes(10),
             CreatedAt = now,

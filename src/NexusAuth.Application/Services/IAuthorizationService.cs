@@ -11,6 +11,11 @@ public interface IAuthorizationService : IScopedDependency
         string scope,
         string? codeChallenge = null,
         string? codeChallengeMethod = null,
+        string? nonce = null,
+        string? claimsJson = null,
+        DateTimeOffset? authenticatedAt = null,
+        string? acr = null,
+        string? amr = null,
         CancellationToken ct = default);
 
     Task<AuthorizationCodeResult> ValidateAndConsumeCodeAsync(
@@ -24,4 +29,6 @@ public interface IAuthorizationService : IScopedDependency
         string rawClientSecret,
         string scope,
         CancellationToken ct = default);
+
+    OidcRequestedClaims ParseRequestedClaims(string? claimsJson);
 }

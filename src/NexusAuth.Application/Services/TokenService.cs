@@ -1,6 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Cryptography;
 using System.Security.Claims;
-using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NexusAuth.Domain.Entities;
@@ -11,14 +11,23 @@ namespace NexusAuth.Application.Services;
 public class TokenService : ITokenService
 {
     private readonly IRefreshTokenRepository _refreshTokenRepository;
+    private readonly ITokenBlacklistRepository _tokenBlacklistRepository;
+    private readonly IUserRepository _userRepository;
     private readonly JwtOptions _jwtOptions;
+    private readonly ITokenSigningCredentialsProvider _signingCredentialsProvider;
 
     public TokenService(
         IRefreshTokenRepository refreshTokenRepository,
-        IOptions<JwtOptions> jwtOptions)
+        ITokenBlacklistRepository tokenBlacklistRepository,
+        IUserRepository userRepository,
+        IOptions<JwtOptions> jwtOptions,
+        ITokenSigningCredentialsProvider signingCredentialsProvider)
     {
         _refreshTokenRepository = refreshTokenRepository;
+        _tokenBlacklistRepository = tokenBlacklistRepository;
+        _userRepository = userRepository;
         _jwtOptions = jwtOptions.Value;
+        _signingCredentialsProvider = signingCredentialsProvider;
     }
 
     public Task<string> IssueAccessTokenAsync(
@@ -27,18 +36,30 @@ public class TokenService : ITokenService
         Guid? userId = null,
         CancellationToken ct = default)
     {
+        return IssueAccessTokenWithMetadataAsync(clientId, scope, userId, ct)
+            .ContinueWith(t => t.Result.AccessToken, ct);
+    }
+
+    public async Task<TokenIssueResult> IssueAccessTokenWithMetadataAsync(
+        string clientId,
+        string scope,
+        Guid? userId = null,
+        CancellationToken ct = default)
+    {
         var now = DateTime.UtcNow;
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.SigningKey));
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var jti = Guid.NewGuid().ToString();
 
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, userId?.ToString() ?? clientId),
             new("client_id", clientId),
             new("scope", scope),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(JwtRegisteredClaimNames.Jti, jti),
             new(JwtRegisteredClaimNames.Iat, new DateTimeOffset(now).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
         };
+
+        if (userId.HasValue)
+            claims.Add(new("token_use", "access_token"));
 
         var token = new JwtSecurityToken(
             issuer: _jwtOptions.Issuer,
@@ -46,10 +67,84 @@ public class TokenService : ITokenService
             claims: claims,
             notBefore: now,
             expires: now.AddMinutes(_jwtOptions.AccessTokenLifetimeMinutes),
-            signingCredentials: credentials);
+            signingCredentials: _signingCredentialsProvider.GetSigningCredentials());
+
+        token.Header[JwtHeaderParameterNames.Kid] = _signingCredentialsProvider.KeyId;
 
         var jwt = new JwtSecurityTokenHandler().WriteToken(token);
-        return Task.FromResult(jwt);
+        return await Task.FromResult(new TokenIssueResult(jwt, jti, token.ValidTo));
+    }
+
+    public async Task<string> IssueIdTokenAsync(
+        string clientId,
+        Guid userId,
+        string? nonce,
+        string accessToken,
+        string? claimsJson = null,
+        DateTimeOffset? authenticatedAt = null,
+        string? acr = null,
+        string? amr = null,
+        CancellationToken ct = default)
+    {
+        var user = await _userRepository.FindByIdAsync(userId, ct)
+                   ?? throw new InvalidOperationException("User not found for id_token issuance.");
+        var requestedClaims = OidcRequestedClaims.Parse(claimsJson);
+
+        var now = DateTime.UtcNow;
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new("client_id", clientId),
+            new("token_use", "id_token"),
+            new("preferred_username", user.Username),
+            new("name", user.Nickname),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(JwtRegisteredClaimNames.Iat, new DateTimeOffset(now).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+            new("at_hash", ComputeTokenHash(accessToken)),
+        };
+
+        // 中文注释：只要是 OIDC 认证结果，auth_time 对 RP 做会话时效判断很有价值，直接带上。
+        if (authenticatedAt.HasValue)
+            claims.Add(new("auth_time", authenticatedAt.Value.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
+
+        if (!string.IsNullOrWhiteSpace(acr))
+            claims.Add(new("acr", acr));
+
+        if (!string.IsNullOrWhiteSpace(amr))
+        {
+            foreach (var method in amr.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                claims.Add(new("amr", method));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(user.Email)
+            && (requestedClaims.RequestsIdTokenClaim("email") || requestedClaims.RequestsIdTokenClaim("email_verified")))
+        {
+            claims.Add(new("email", user.Email));
+            claims.Add(new("email_verified", "false", ClaimValueTypes.Boolean));
+        }
+
+        if (!string.IsNullOrWhiteSpace(user.PhoneNumber)
+            && (requestedClaims.RequestsIdTokenClaim("phone_number") || requestedClaims.RequestsIdTokenClaim("phone_number_verified")))
+        {
+            claims.Add(new("phone_number", user.PhoneNumber));
+            claims.Add(new("phone_number_verified", "false", ClaimValueTypes.Boolean));
+        }
+
+        if (!string.IsNullOrWhiteSpace(nonce))
+            claims.Add(new("nonce", nonce));
+
+        var token = new JwtSecurityToken(
+            issuer: _jwtOptions.Issuer,
+            audience: clientId,
+            claims: claims,
+            notBefore: now,
+            expires: now.AddMinutes(_jwtOptions.AccessTokenLifetimeMinutes),
+            signingCredentials: _signingCredentialsProvider.GetSigningCredentials());
+
+        token.Header[JwtHeaderParameterNames.Kid] = _signingCredentialsProvider.KeyId;
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     public async Task<string> IssueRefreshTokenAsync(
@@ -114,7 +209,96 @@ public class TokenService : ITokenService
     {
         await _refreshTokenRepository.RevokeAllForUserAsync(userId, ct);
     }
+
+    public async Task<TokenIntrospectionResult> IntrospectAsync(string token, CancellationToken ct = default)
+    {
+        var handler = new JwtSecurityTokenHandler();
+        if (!handler.CanReadToken(token))
+            return TokenIntrospectionResult.Inactive();
+
+        try
+        {
+            var principal = handler.ValidateToken(
+                token,
+                _signingCredentialsProvider.CreateTokenValidationParameters(_jwtOptions.Issuer, _jwtOptions.Audience),
+                out var validatedToken);
+
+            var jwt = (JwtSecurityToken)validatedToken;
+            var jti = GetClaimValue(principal, JwtRegisteredClaimNames.Jti, ClaimTypes.SerialNumber);
+            if (!string.IsNullOrWhiteSpace(jti) && await _tokenBlacklistRepository.ExistsActiveAsync(jti, DateTimeOffset.UtcNow, ct))
+                return TokenIntrospectionResult.Inactive();
+
+            return TokenIntrospectionResult.Success(
+                GetClaimValue(principal, JwtRegisteredClaimNames.Sub, ClaimTypes.NameIdentifier),
+                principal.FindFirst("client_id")?.Value,
+                principal.FindFirst("scope")?.Value,
+                new DateTimeOffset(jwt.ValidTo).ToUnixTimeSeconds(),
+                jwt.Issuer,
+                principal.FindFirst("token_use")?.Value);
+        }
+        catch
+        {
+            return TokenIntrospectionResult.Inactive();
+        }
+    }
+
+    public async Task RevokeAccessTokenAsync(string accessToken, CancellationToken ct = default)
+    {
+        var handler = new JwtSecurityTokenHandler();
+        if (!handler.CanReadToken(accessToken))
+            return;
+
+        try
+        {
+            var principal = handler.ValidateToken(
+                accessToken,
+                _signingCredentialsProvider.CreateTokenValidationParameters(_jwtOptions.Issuer, _jwtOptions.Audience),
+                out var validatedToken);
+
+            var jti = GetClaimValue(principal, JwtRegisteredClaimNames.Jti, ClaimTypes.SerialNumber);
+            if (string.IsNullOrWhiteSpace(jti))
+                return;
+
+            var existing = await _tokenBlacklistRepository.FindByJtiAsync(jti, ct);
+            if (existing is not null)
+                return;
+
+            var jwt = (JwtSecurityToken)validatedToken;
+            var entry = TokenBlacklistEntry.Create(
+                jti,
+                principal.FindFirst("token_use")?.Value ?? "access_token",
+                GetClaimValue(principal, JwtRegisteredClaimNames.Sub, ClaimTypes.NameIdentifier),
+                jwt.ValidTo);
+
+            await _tokenBlacklistRepository.AddAsync(entry, ct);
+        }
+        catch
+        {
+            // OAuth revocation should not leak token validity details.
+        }
+    }
+
+    private static string ComputeTokenHash(string token)
+    {
+        var hash = SHA256.HashData(System.Text.Encoding.ASCII.GetBytes(token));
+        var leftHalf = hash[..(hash.Length / 2)];
+        return Base64UrlEncoder.Encode(leftHalf);
+    }
+
+    private static string? GetClaimValue(ClaimsPrincipal principal, params string[] claimTypes)
+    {
+        foreach (var claimType in claimTypes)
+        {
+            var value = principal.FindFirst(claimType)?.Value;
+            if (!string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        return null;
+    }
 }
+
+public record TokenIssueResult(string AccessToken, string Jti, DateTime ExpiresAtUtc);
 
 public record RefreshResult(
     bool IsSuccess,
@@ -127,4 +311,19 @@ public record RefreshResult(
 
     public static RefreshResult Failure(string error)
         => new(false, null, null, error);
+}
+
+public record TokenIntrospectionResult(
+    bool Active,
+    string? Subject,
+    string? ClientId,
+    string? Scope,
+    long? Exp,
+    string? Issuer,
+    string? TokenUse)
+{
+    public static TokenIntrospectionResult Inactive() => new(false, null, null, null, null, null, null);
+
+    public static TokenIntrospectionResult Success(string? subject, string? clientId, string? scope, long? exp, string? issuer, string? tokenUse)
+        => new(true, subject, clientId, scope, exp, issuer, tokenUse);
 }

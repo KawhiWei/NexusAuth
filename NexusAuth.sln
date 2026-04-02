@@ -19,14 +19,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Host", "src\NexusAuth.Host\NexusAuth.Host.csproj", "{F758C060-689F-445D-BD0A-7CE7C78B4467}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "demo", "demo", "{058B75EF-D7CE-42EA-88D1-1804EF99DC4F}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Demo Items", "Demo Items", "{19EA1330-4B8B-4F36-81F3-3D7825783D92}"
-	ProjectSection(SolutionItems) = preProject
-		demo\seed.sql = demo\seed.sql
-		demo\schema.sql = demo\schema.sql
-	EndProjectSection
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -103,6 +95,5 @@ Global
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{F758C060-689F-445D-BD0A-7CE7C78B4467} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
-		{19EA1330-4B8B-4F36-81F3-3D7825783D92} = {058B75EF-D7CE-42EA-88D1-1804EF99DC4F}
 	EndGlobalSection
 EndGlobal

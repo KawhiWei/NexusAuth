@@ -19,4 +19,6 @@ public interface IUserService : IScopedDependency
         string identifier,
         string rawPassword,
         CancellationToken ct = default);
+
+    Task<User?> FindByIdAsync(Guid id, CancellationToken ct = default);
 }

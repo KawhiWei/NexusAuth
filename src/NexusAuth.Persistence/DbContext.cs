@@ -21,6 +21,10 @@ public class DbContext(DbContextOptions options) : LuckDbContextBase(options)
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public DbSet<DeviceAuthorization> DeviceAuthorizations => Set<DeviceAuthorization>();
+
+    public DbSet<TokenBlacklistEntry> TokenBlacklistEntries => Set<TokenBlacklistEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

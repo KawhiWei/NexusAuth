@@ -1,0 +1,46 @@
+@page "/device"
+@model NexusAuth.Host.Pages.Device.IndexModel
+@{
+    ViewData["Title"] = "Device Verification";
+}
+
+<h2>Authorize Device</h2>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <p>@Model.StatusMessage</p>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <p style="color: red">@Model.ErrorMessage</p>
+}
+
+@if (Model.Session is null)
+{
+    <form method="post">
+        <div>
+            <label asp-for="UserCode">User Code</label>
+            <input asp-for="UserCode" />
+        </div>
+        <button type="submit">Continue</button>
+    </form>
+}
+else
+{
+    <p>Client: <strong>@Model.Session.ClientId</strong></p>
+    <p>Scopes: <strong>@Model.Session.Scope</strong></p>
+
+    @if (Model.Session.IsPending)
+    {
+        <form method="post" asp-page-handler="Approve">
+            <input type="hidden" asp-for="UserCode" />
+            <button type="submit">Approve</button>
+        </form>
+
+        <form method="post" asp-page-handler="Deny">
+            <input type="hidden" asp-for="UserCode" />
+            <button type="submit">Deny</button>
+        </form>
+    }
+}

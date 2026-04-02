@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using NexusAuth.Domain.Entities;
 using NexusAuth.Domain.Repositories;
 
@@ -9,16 +10,19 @@ public class AuthorizationService : IAuthorizationService
 {
     private readonly IAuthorizationCodeRepository _codeRepository;
     private readonly IOAuthClientRepository _clientRepository;
-    private readonly IApiResourceRepository _apiResourceRepository;
+    private readonly IClientService _clientService;
+    private readonly ISecurityPolicyService _securityPolicyService;
 
     public AuthorizationService(
         IAuthorizationCodeRepository codeRepository,
         IOAuthClientRepository clientRepository,
-        IApiResourceRepository apiResourceRepository)
+        IClientService clientService,
+        ISecurityPolicyService securityPolicyService)
     {
         _codeRepository = codeRepository;
         _clientRepository = clientRepository;
-        _apiResourceRepository = apiResourceRepository;
+        _clientService = clientService;
+        _securityPolicyService = securityPolicyService;
     }
 
     public async Task<string> GenerateCodeAsync(
@@ -28,19 +32,51 @@ public class AuthorizationService : IAuthorizationService
         string scope,
         string? codeChallenge = null,
         string? codeChallengeMethod = null,
+        string? nonce = null,
+        string? claimsJson = null,
+        DateTimeOffset? authenticatedAt = null,
+        string? acr = null,
+        string? amr = null,
         CancellationToken ct = default)
     {
+        var scopeValidation = await _clientService.ValidateScopesAsync(clientId, scope, allowIdentityScopes: true, ct);
+        if (!scopeValidation.IsSuccess)
+            throw new InvalidOperationException(scopeValidation.Error);
+
+        if (!string.IsNullOrWhiteSpace(claimsJson))
+        {
+            // 中文注释：授权阶段先校验 claims JSON 格式，避免无效请求进入后续流程。
+            ParseRequestedClaims(claimsJson);
+        }
+
         var code = AuthorizationCode.Create(
             clientId,
             userId,
             redirectUri,
-            scope,
+            scopeValidation.NormalizedScope!,
             codeChallenge,
-            codeChallengeMethod);
+            codeChallengeMethod,
+            nonce,
+            claimsJson,
+            authenticatedAt,
+            acr,
+            amr);
 
         await _codeRepository.AddAsync(code, ct);
 
         return code.Code;
+    }
+
+    public OidcRequestedClaims ParseRequestedClaims(string? claimsJson)
+    {
+        try
+        {
+            return OidcRequestedClaims.Parse(claimsJson);
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("OIDC claims parameter is not valid JSON.", ex);
+        }
     }
 
     public async Task<AuthorizationCodeResult> ValidateAndConsumeCodeAsync(
@@ -63,6 +99,10 @@ public class AuthorizationService : IAuthorizationService
         if (authCode.RedirectUri != redirectUri)
             return AuthorizationCodeResult.Failure("Redirect URI mismatch.");
 
+        var clientPolicy = _securityPolicyService.CheckClient(authCode.ClientId);
+        if (!clientPolicy.IsSuccess)
+            return AuthorizationCodeResult.Failure(clientPolicy.Error ?? "Client is blocked by security policy.");
+
         // PKCE verification
         if (authCode.CodeChallenge is not null)
         {
@@ -76,7 +116,15 @@ public class AuthorizationService : IAuthorizationService
         authCode.MarkAsUsed();
         await _codeRepository.MarkUsedAsync(authCode.Id, ct);
 
-        return AuthorizationCodeResult.Success(authCode.UserId, authCode.ClientId, authCode.Scope);
+        return AuthorizationCodeResult.Success(
+            authCode.UserId,
+            authCode.ClientId,
+            authCode.Scope,
+            authCode.Nonce,
+            authCode.ClaimsJson,
+            authCode.AuthenticatedAt,
+            authCode.Acr,
+            authCode.Amr);
     }
 
     public async Task<ClientCredentialsResult> ValidateClientCredentialsAsync(
@@ -85,30 +133,24 @@ public class AuthorizationService : IAuthorizationService
         string scope,
         CancellationToken ct = default)
     {
-        var client = await _clientRepository.FindByClientIdAsync(clientId, ct);
+        var authentication = await _clientService.AuthenticateClientAsync(clientId, rawClientSecret, requireSecret: true, ct);
+        if (!authentication.IsSuccess)
+            return ClientCredentialsResult.Failure(authentication.Error ?? "Invalid client.");
 
-        if (client is null || !client.IsActive)
-            return ClientCredentialsResult.Failure("Invalid client.");
+        var client = authentication.Client!;
 
-        if (!client.VerifyClientSecret(rawClientSecret))
-            return ClientCredentialsResult.Failure("Invalid client secret.");
+        var clientPolicy = _securityPolicyService.CheckClient(clientId);
+        if (!clientPolicy.IsSuccess)
+            return ClientCredentialsResult.Failure(clientPolicy.Error ?? "Client is blocked by security policy.");
 
         if (!client.IsGrantTypeAllowed("client_credentials"))
             return ClientCredentialsResult.Failure("Client is not allowed to use client_credentials grant type.");
 
-        // Validate scopes
-        var requestedScopes = scope.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        foreach (var s in requestedScopes)
-        {
-            if (!client.AllowedScopes.Contains(s))
-                return ClientCredentialsResult.Failure($"Scope '{s}' is not allowed for this client.");
+        var scopeValidation = await _clientService.ValidateScopesAsync(clientId, scope, allowIdentityScopes: false, ct);
+        if (!scopeValidation.IsSuccess)
+            return ClientCredentialsResult.Failure(scopeValidation.Error ?? "Invalid scope.");
 
-            var resource = await _apiResourceRepository.FindByNameAsync(s, ct);
-            if (resource is null || !resource.IsActive)
-                return ClientCredentialsResult.Failure($"Scope '{s}' does not correspond to an active API resource.");
-        }
-
-        return ClientCredentialsResult.Success(clientId, scope);
+        return ClientCredentialsResult.Success(clientId, scopeValidation.NormalizedScope!);
     }
 
     private static bool VerifyPkce(string codeVerifier, string codeChallenge, string? codeChallengeMethod)
@@ -135,13 +177,26 @@ public record AuthorizationCodeResult(
     Guid UserId,
     string ClientId,
     string Scope,
+    string? Nonce,
+    string? ClaimsJson,
+    DateTimeOffset? AuthenticatedAt,
+    string? Acr,
+    string? Amr,
     string? Error)
 {
-    public static AuthorizationCodeResult Success(Guid userId, string clientId, string scope)
-        => new(true, userId, clientId, scope, null);
+    public static AuthorizationCodeResult Success(
+        Guid userId,
+        string clientId,
+        string scope,
+        string? nonce,
+        string? claimsJson,
+        DateTimeOffset? authenticatedAt,
+        string? acr,
+        string? amr)
+        => new(true, userId, clientId, scope, nonce, claimsJson, authenticatedAt, acr, amr, null);
 
     public static AuthorizationCodeResult Failure(string error)
-        => new(false, Guid.Empty, string.Empty, string.Empty, error);
+        => new(false, Guid.Empty, string.Empty, string.Empty, null, null, null, null, null, error);
 }
 
 public record ClientCredentialsResult(

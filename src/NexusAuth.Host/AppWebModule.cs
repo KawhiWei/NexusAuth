@@ -2,6 +2,7 @@ using Luck.AppModule;
 using Luck.AutoDependencyInjection;
 using Luck.Framework.Infrastructure;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http;
 using NexusAuth.Application.Services;
 using NexusAuth.Persistence;
 
@@ -21,18 +22,8 @@ public class AppWebModule : LuckAppModule
         var configuration = services.GetConfiguration();
 
         services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
-
-        // CORS: allow the demo app (and other configured origins) to call NexusAuth APIs
-        var allowedOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-        services.AddCors(options =>
-        {
-            options.AddDefaultPolicy(policy =>
-            {
-                policy.WithOrigins(allowedOrigins)
-                      .AllowAnyHeader()
-                      .AllowAnyMethod();
-            });
-        });
+        services.Configure<NexusAuthSecurityOptions>(configuration.GetSection("Security"));
+        services.AddSingleton<ITokenSigningCredentialsProvider, RsaTokenSigningCredentialsProvider>();
 
         // Cookie Authentication for SSO login session
         services.AddAuthentication(AuthenticationScheme)
@@ -64,7 +55,6 @@ public class AppWebModule : LuckAppModule
     {
         var app = context.GetApplicationBuilder();
         app.UseRouting();
-        app.UseCors();
         app.UseAuthentication();
         app.UseAuthorization();
 

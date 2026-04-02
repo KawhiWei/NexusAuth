@@ -253,6 +253,13 @@ paket-files/
 .idea/
 *.sln.iml
 
+# Additional workspace ignores
+bin/
+obj/
+node_modules/
+yarn.lock
+.npm-cache/
+
 # CodeRush
 .cr/
 
@@ -260,4 +267,3 @@ paket-files/
 __pycache__/
 *.pyc
 ./.github
-

@@ -66,4 +66,9 @@ public class UserService : IUserService
 
         return user.VerifyPassword(rawPassword) ? user : null;
     }
+
+    public Task<User?> FindByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        return _userRepository.FindByIdAsync(id, ct);
+    }
 }

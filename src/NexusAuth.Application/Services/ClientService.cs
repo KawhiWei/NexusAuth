@@ -6,10 +6,14 @@ namespace NexusAuth.Application.Services;
 public class ClientService : IClientService
 {
     private readonly IOAuthClientRepository _clientRepository;
+    private readonly IApiResourceRepository _apiResourceRepository;
 
-    public ClientService(IOAuthClientRepository clientRepository)
+    public ClientService(
+        IOAuthClientRepository clientRepository,
+        IApiResourceRepository apiResourceRepository)
     {
         _clientRepository = clientRepository;
+        _apiResourceRepository = apiResourceRepository;
     }
 
     public async Task<OAuthClient> RegisterClientAsync(
@@ -79,5 +83,74 @@ public class ClientService : IClientService
                 "code_challenge is required for this client (PKCE).");
 
         return ClientValidationResult.Success();
+    }
+
+    public async Task<ClientAuthenticationResult> AuthenticateClientAsync(
+        string clientId,
+        string? rawClientSecret,
+        bool requireSecret,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(clientId))
+            return ClientAuthenticationResult.Failure("invalid_client", "client_id is required.");
+
+        var client = await _clientRepository.FindByClientIdAsync(clientId, ct);
+        if (client is null || !client.IsActive)
+            return ClientAuthenticationResult.Failure("invalid_client", "Client not found or inactive.");
+
+        if (requireSecret)
+        {
+            if (string.IsNullOrWhiteSpace(rawClientSecret))
+                return ClientAuthenticationResult.Failure("invalid_client", "client_secret is required.");
+
+            if (!client.VerifyClientSecret(rawClientSecret))
+                return ClientAuthenticationResult.Failure("invalid_client", "Invalid client secret.");
+        }
+
+        return ClientAuthenticationResult.Success(client);
+    }
+
+    public async Task<ScopeValidationResult> ValidateScopesAsync(
+        string clientId,
+        string scope,
+        bool allowIdentityScopes,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(scope))
+            return ScopeValidationResult.Failure("invalid_scope", "scope is required.");
+
+        var client = await _clientRepository.FindByClientIdAsync(clientId, ct);
+        if (client is null || !client.IsActive)
+            return ScopeValidationResult.Failure("invalid_client", "Client not found or inactive.");
+
+        var requestedScopes = scope
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var requestedScope in requestedScopes)
+        {
+            if (!client.AllowedScopes.Contains(requestedScope, StringComparer.Ordinal))
+                return ScopeValidationResult.Failure("invalid_scope", $"Scope '{requestedScope}' is not allowed for this client.");
+
+            if (allowIdentityScopes && IsIdentityScope(requestedScope))
+                continue;
+
+            var resource = await _apiResourceRepository.FindByNameAsync(requestedScope, ct);
+            if (resource is null || !resource.IsActive)
+                return ScopeValidationResult.Failure("invalid_scope", $"Scope '{requestedScope}' does not correspond to an active resource.");
+        }
+
+        return ScopeValidationResult.Success(string.Join(' ', requestedScopes));
+    }
+
+    private static bool IsIdentityScope(string scope)
+    {
+        return string.Equals(scope, "openid", StringComparison.Ordinal)
+            || string.Equals(scope, "profile", StringComparison.Ordinal)
+            || string.Equals(scope, "email", StringComparison.Ordinal)
+            || string.Equals(scope, "phone", StringComparison.Ordinal)
+            || string.Equals(scope, "address", StringComparison.Ordinal)
+            || string.Equals(scope, "offline_access", StringComparison.Ordinal);
     }
 }

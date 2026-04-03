@@ -7,12 +7,14 @@ public interface ITokenService : IScopedDependency
     Task<string> IssueAccessTokenAsync(
         string clientId,
         string scope,
+        string? audience = null,
         Guid? userId = null,
         CancellationToken ct = default);
 
     Task<TokenIssueResult> IssueAccessTokenWithMetadataAsync(
         string clientId,
         string scope,
+        string? audience = null,
         Guid? userId = null,
         CancellationToken ct = default);
 

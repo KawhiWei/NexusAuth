@@ -43,10 +43,9 @@ public class AuthController : ControllerBase
         var discovery = await _oidcBffService.FetchDiscoveryAsync(ct);
         var state = Guid.NewGuid().ToString("N");
         var nonce = Guid.NewGuid().ToString("N");
-        var codeVerifier = _oidcBffService.GenerateCodeVerifier();
-        var codeChallenge = _oidcBffService.GenerateCodeChallenge(codeVerifier);
+        var pkce = _oidcBffService.GeneratePkce();
 
-        _flowStore[state] = new OidcFlowState(codeVerifier, nonce);
+        _flowStore[state] = new OidcFlowState(pkce.CodeVerifier, nonce);
 
         var authorizeUrl = discovery.AuthorizationEndpoint +
                            $"?response_type=code" +
@@ -55,7 +54,7 @@ public class AuthController : ControllerBase
                            $"&scope={Uri.EscapeDataString(_oidcBffService.Scope)}" +
                            $"&state={Uri.EscapeDataString(state)}" +
                            $"&nonce={Uri.EscapeDataString(nonce)}" +
-                           $"&code_challenge={Uri.EscapeDataString(codeChallenge)}" +
+                           $"&code_challenge={Uri.EscapeDataString(pkce.CodeChallenge)}" +
                            $"&code_challenge_method=S256";
 
         return Ok(new { authorizeUrl });

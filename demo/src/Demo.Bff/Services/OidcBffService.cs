@@ -61,6 +61,13 @@ public class OidcBffService
         return Base64UrlEncoder.Encode(hash);
     }
 
+    public PkcePair GeneratePkce()
+    {
+        var codeVerifier = GenerateCodeVerifier();
+        var codeChallenge = GenerateCodeChallenge(codeVerifier);
+        return new PkcePair(codeVerifier, codeChallenge);
+    }
+
     public SessionPayload? ReadSession(ClaimsPrincipal principal)
     {
         var payload = principal.FindFirst("session_payload")?.Value;
@@ -130,3 +137,5 @@ public class OidcBffService
         await client.PostAsync(revocationEndpoint, request, ct);
     }
 }
+
+public record PkcePair(string CodeVerifier, string CodeChallenge);

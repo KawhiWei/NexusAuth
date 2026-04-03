@@ -13,6 +13,7 @@ public class TokenService : ITokenService
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly ITokenBlacklistRepository _tokenBlacklistRepository;
     private readonly IUserRepository _userRepository;
+    private readonly IApiResourceRepository _apiResourceRepository;
     private readonly JwtOptions _jwtOptions;
     private readonly ITokenSigningCredentialsProvider _signingCredentialsProvider;
 
@@ -20,12 +21,14 @@ public class TokenService : ITokenService
         IRefreshTokenRepository refreshTokenRepository,
         ITokenBlacklistRepository tokenBlacklistRepository,
         IUserRepository userRepository,
+        IApiResourceRepository apiResourceRepository,
         IOptions<JwtOptions> jwtOptions,
         ITokenSigningCredentialsProvider signingCredentialsProvider)
     {
         _refreshTokenRepository = refreshTokenRepository;
         _tokenBlacklistRepository = tokenBlacklistRepository;
         _userRepository = userRepository;
+        _apiResourceRepository = apiResourceRepository;
         _jwtOptions = jwtOptions.Value;
         _signingCredentialsProvider = signingCredentialsProvider;
     }
@@ -33,21 +36,24 @@ public class TokenService : ITokenService
     public Task<string> IssueAccessTokenAsync(
         string clientId,
         string scope,
+        string? audience = null,
         Guid? userId = null,
         CancellationToken ct = default)
     {
-        return IssueAccessTokenWithMetadataAsync(clientId, scope, userId, ct)
+        return IssueAccessTokenWithMetadataAsync(clientId, scope, audience, userId, ct)
             .ContinueWith(t => t.Result.AccessToken, ct);
     }
 
     public async Task<TokenIssueResult> IssueAccessTokenWithMetadataAsync(
         string clientId,
         string scope,
+        string? audience = null,
         Guid? userId = null,
         CancellationToken ct = default)
     {
         var now = DateTime.UtcNow;
         var jti = Guid.NewGuid().ToString();
+        var resolvedAudience = await ResolveAudienceAsync(scope, audience, ct);
 
         var claims = new List<Claim>
         {
@@ -63,7 +69,7 @@ public class TokenService : ITokenService
 
         var token = new JwtSecurityToken(
             issuer: _jwtOptions.Issuer,
-            audience: _jwtOptions.Audience,
+            audience: resolvedAudience,
             claims: claims,
             notBefore: now,
             expires: now.AddMinutes(_jwtOptions.AccessTokenLifetimeMinutes),
@@ -188,6 +194,7 @@ public class TokenService : ITokenService
         var accessToken = await IssueAccessTokenAsync(
             existingToken.ClientId,
             existingToken.Scope,
+            null,
             existingToken.UserId,
             ct);
 
@@ -220,7 +227,7 @@ public class TokenService : ITokenService
         {
             var principal = handler.ValidateToken(
                 token,
-                _signingCredentialsProvider.CreateTokenValidationParameters(_jwtOptions.Issuer, _jwtOptions.Audience),
+                _signingCredentialsProvider.CreateTokenValidationParameters(_jwtOptions.Issuer, null),
                 out var validatedToken);
 
             var jwt = (JwtSecurityToken)validatedToken;
@@ -252,7 +259,7 @@ public class TokenService : ITokenService
         {
             var principal = handler.ValidateToken(
                 accessToken,
-                _signingCredentialsProvider.CreateTokenValidationParameters(_jwtOptions.Issuer, _jwtOptions.Audience),
+                _signingCredentialsProvider.CreateTokenValidationParameters(_jwtOptions.Issuer, null),
                 out var validatedToken);
 
             var jti = GetClaimValue(principal, JwtRegisteredClaimNames.Jti, ClaimTypes.SerialNumber);
@@ -295,6 +302,49 @@ public class TokenService : ITokenService
         }
 
         return null;
+    }
+
+    private async Task<string> ResolveAudienceAsync(string scope, string? requestedAudience, CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(requestedAudience))
+            return requestedAudience;
+
+        var scopes = scope
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        string? resolved = null;
+        foreach (var scopeName in scopes)
+        {
+            if (IsIdentityScope(scopeName))
+                continue;
+
+            var resource = await _apiResourceRepository.FindByNameAsync(scopeName, ct);
+            if (resource is null || !resource.IsActive)
+                continue;
+
+            if (string.IsNullOrWhiteSpace(resolved))
+            {
+                resolved = resource.Audience;
+                continue;
+            }
+
+            if (!string.Equals(resolved, resource.Audience, StringComparison.Ordinal))
+                throw new InvalidOperationException("Requested scopes span multiple audiences. Please request one resource audience per token.");
+        }
+
+        return resolved ?? _jwtOptions.DefaultAudience;
+    }
+
+    private static bool IsIdentityScope(string scope)
+    {
+        return string.Equals(scope, "openid", StringComparison.Ordinal)
+            || string.Equals(scope, "profile", StringComparison.Ordinal)
+            || string.Equals(scope, "email", StringComparison.Ordinal)
+            || string.Equals(scope, "phone", StringComparison.Ordinal)
+            || string.Equals(scope, "address", StringComparison.Ordinal)
+            || string.Equals(scope, "offline_access", StringComparison.Ordinal);
     }
 }
 

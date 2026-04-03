@@ -23,6 +23,11 @@ public class ApiResourceConfiguration : IEntityTypeConfiguration<ApiResource>
             .HasMaxLength(256)
             .IsRequired();
 
+        builder.Property(r => r.Audience)
+            .HasColumnName("audience")
+            .HasMaxLength(256)
+            .IsRequired();
+
         builder.Property(r => r.Description)
             .HasColumnName("description")
             .HasColumnType("text");

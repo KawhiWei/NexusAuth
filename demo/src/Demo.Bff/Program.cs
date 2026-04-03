@@ -17,6 +17,7 @@ var audience = jwtSection["Audience"]!;
 
 builder.Services.Configure<FrontendOptions>(builder.Configuration.GetSection("Frontend"));
 builder.Services.Configure<NexusAuthBffOptions>(builder.Configuration.GetSection("NexusAuth"));
+builder.Services.Configure<MobileAuthOptions>(builder.Configuration.GetSection("MobileAuth"));
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -27,8 +28,21 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
         options.SlidingExpiration = true;
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.Events = new CookieAuthenticationEvents
+        {
+            OnRedirectToLogin = context =>
+            {
+                // API/BFF 场景统一返回 401，避免默认跳转登录页。
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return Task.CompletedTask;
+            },
+            OnRedirectToAccessDenied = context =>
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return Task.CompletedTask;
+            },
+        };
     })
-    .AddOAuth()
     .AddJwtBearer("Bearer", options =>
     {
         options.Authority = authority;
@@ -40,6 +54,17 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.TokenValidationParameters.ValidateLifetime = true;
         options.TokenValidationParameters.ClockSkew = TimeSpan.FromSeconds(30);
     });
+
+builder.Services.PostConfigureAll<JwtBearerOptions>(options =>
+{
+    options.TokenValidationParameters.ValidateAudience = true;
+    options.TokenValidationParameters.ValidAudience = null;
+    options.TokenValidationParameters.ValidAudiences = new[]
+    {
+        builder.Configuration["Jwt:WebAudience"] ?? "demo-bff-api",
+        builder.Configuration["Jwt:MobileAudience"] ?? "demo-mobile-api",
+    };
+});
 
 builder.Services.AddAuthorization(options =>
 {

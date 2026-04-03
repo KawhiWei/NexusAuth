@@ -20,6 +20,7 @@ public class ApiResourceService : IApiResourceService
     public async Task<ApiResource> RegisterAsync(
         string name,
         string displayName,
+        string audience,
         string? description = null,
         CancellationToken ct = default)
     {
@@ -27,7 +28,7 @@ public class ApiResourceService : IApiResourceService
         if (existing is not null)
             throw new InvalidOperationException($"API resource with name '{name}' already exists.");
 
-        var resource = ApiResource.Create(name, displayName, description);
+        var resource = ApiResource.Create(name, displayName, audience, description);
         await _apiResourceRepository.AddAsync(resource, ct);
 
         return resource;

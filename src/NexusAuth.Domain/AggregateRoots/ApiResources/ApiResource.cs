@@ -10,6 +10,8 @@ public class ApiResource : AggregateRootWithIdentity<Guid>
 
     public string? Description { get; private set; }
 
+    public string Audience { get; private set; } = default!;
+
     public bool IsActive { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
@@ -21,15 +23,17 @@ public class ApiResource : AggregateRootWithIdentity<Guid>
     {
     }
 
-    public static ApiResource Create(string name, string displayName, string? description = null)
+    public static ApiResource Create(string name, string displayName, string audience, string? description = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(audience);
 
         return new ApiResource(Guid.NewGuid())
         {
             Name = name,
             DisplayName = displayName,
+            Audience = audience,
             Description = description,
             IsActive = true,
             CreatedAt = DateTimeOffset.UtcNow,

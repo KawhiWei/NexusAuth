@@ -1,11 +1,9 @@
 -- ============================================================
--- NexusAuth demo schema
+-- NexusAuth demo schema (full reset)
 -- 说明：
--- 1. 该脚本用于从零开始重建 demo 数据库。
--- 2. 会先删除并重建 nexusauth 数据库。
--- 3. 不创建任何表间外键依赖。
--- 4. 只保留每张表自身主键和必要索引。
--- 5. 当前结构对齐最新代码中的 DbContext 与 EF 配置。
+-- 1) 本脚本会删除并重建 nexusauth 数据库。
+-- 2) 不创建任何表间外键依赖（按你的要求）。
+-- 3) 表结构对齐当前代码中的 DbContext + EF 配置。
 -- ============================================================
 
 SELECT pg_terminate_backend(pid)
@@ -22,7 +20,7 @@ CREATE SCHEMA IF NOT EXISTS nexusauth;
 SET search_path TO nexusauth;
 
 -- ============================================================
--- 1. users
+-- users
 -- ============================================================
 CREATE TABLE nexusauth.users (
     id              uuid            NOT NULL,
@@ -44,7 +42,7 @@ CREATE UNIQUE INDEX ix_users_email ON nexusauth.users (email) WHERE email IS NOT
 CREATE UNIQUE INDEX ix_users_phone_number ON nexusauth.users (phone_number) WHERE phone_number IS NOT NULL;
 
 -- ============================================================
--- 2. oauth_clients
+-- oauth_clients
 -- ============================================================
 CREATE TABLE nexusauth.oauth_clients (
     id                  uuid            NOT NULL,
@@ -64,12 +62,13 @@ CREATE TABLE nexusauth.oauth_clients (
 CREATE UNIQUE INDEX ix_oauth_clients_client_id ON nexusauth.oauth_clients (client_id);
 
 -- ============================================================
--- 3. api_resources
+-- api_resources
 -- ============================================================
 CREATE TABLE nexusauth.api_resources (
     id              uuid            NOT NULL,
     name            varchar(128)    NOT NULL,
     display_name    varchar(256)    NOT NULL,
+    audience        varchar(256)    NOT NULL,
     description     text,
     is_active       boolean         NOT NULL DEFAULT true,
     created_at      timestamptz     NOT NULL,
@@ -79,8 +78,8 @@ CREATE TABLE nexusauth.api_resources (
 CREATE UNIQUE INDEX ix_api_resources_name ON nexusauth.api_resources (name);
 
 -- ============================================================
--- 4. client_api_resources
--- 说明：这里只保留组合主键，不建立任何外键。
+-- client_api_resources
+-- 说明：只保留组合主键，不建立外键。
 -- ============================================================
 CREATE TABLE nexusauth.client_api_resources (
     client_id       uuid    NOT NULL,
@@ -92,7 +91,7 @@ CREATE INDEX ix_client_api_resources_client_id ON nexusauth.client_api_resources
 CREATE INDEX ix_client_api_resources_api_resource_id ON nexusauth.client_api_resources (api_resource_id);
 
 -- ============================================================
--- 5. authorization_codes
+-- authorization_codes
 -- ============================================================
 CREATE TABLE nexusauth.authorization_codes (
     id                      uuid            NOT NULL,
@@ -119,7 +118,7 @@ CREATE INDEX ix_authorization_codes_client_id ON nexusauth.authorization_codes (
 CREATE INDEX ix_authorization_codes_user_id ON nexusauth.authorization_codes (user_id);
 
 -- ============================================================
--- 6. refresh_tokens
+-- refresh_tokens
 -- ============================================================
 CREATE TABLE nexusauth.refresh_tokens (
     id          uuid            NOT NULL,
@@ -138,7 +137,7 @@ CREATE INDEX ix_refresh_tokens_client_id ON nexusauth.refresh_tokens (client_id)
 CREATE INDEX ix_refresh_tokens_user_id ON nexusauth.refresh_tokens (user_id);
 
 -- ============================================================
--- 7. device_authorizations
+-- device_authorizations
 -- ============================================================
 CREATE TABLE nexusauth.device_authorizations (
     id                          uuid            NOT NULL,
@@ -163,7 +162,7 @@ CREATE INDEX ix_device_authorizations_client_id ON nexusauth.device_authorizatio
 CREATE INDEX ix_device_authorizations_user_id ON nexusauth.device_authorizations (user_id);
 
 -- ============================================================
--- 8. token_blacklist_entries
+-- token_blacklist_entries
 -- ============================================================
 CREATE TABLE nexusauth.token_blacklist_entries (
     id          uuid            NOT NULL,

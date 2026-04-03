@@ -8,6 +8,7 @@ public interface IApiResourceService : IScopedDependency
     Task<ApiResource> RegisterAsync(
         string name,
         string displayName,
+        string audience,
         string? description = null,
         CancellationToken ct = default);
 

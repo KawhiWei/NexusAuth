@@ -71,7 +71,7 @@ public class TokenController : ControllerBase
         if (!result.IsSuccess)
             return BadRequest(new { error = "invalid_grant", error_description = result.Error });
 
-        var accessTokenResult = await _tokenService.IssueAccessTokenWithMetadataAsync(result.ClientId, result.Scope, result.UserId, ct);
+        var accessTokenResult = await _tokenService.IssueAccessTokenWithMetadataAsync(result.ClientId, result.Scope, null, result.UserId, ct);
         var refreshToken = await _tokenService.IssueRefreshTokenAsync(result.ClientId, result.UserId, result.Scope, ct);
         var includeIdToken = result.Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains("openid", StringComparer.Ordinal);
         string? idToken = null;
@@ -121,7 +121,7 @@ public class TokenController : ControllerBase
         if (!result.IsSuccess)
             return BadRequest(new { error = "invalid_client", error_description = result.Error });
 
-        var accessToken = await _tokenService.IssueAccessTokenAsync(result.ClientId, result.Scope, ct: ct);
+        var accessToken = await _tokenService.IssueAccessTokenAsync(result.ClientId, result.Scope, null, null, ct);
 
         return Ok(new
         {
@@ -172,7 +172,7 @@ public class TokenController : ControllerBase
             return BadRequest(new { error = "invalid_grant", error_description = result.Error });
         }
 
-        var accessTokenResult = await _tokenService.IssueAccessTokenWithMetadataAsync(result.ClientId!, result.Scope!, result.UserId, ct);
+        var accessTokenResult = await _tokenService.IssueAccessTokenWithMetadataAsync(result.ClientId!, result.Scope!, null, result.UserId, ct);
         var refreshToken = await _tokenService.IssueRefreshTokenAsync(result.ClientId!, result.UserId, result.Scope!, ct);
         var includeIdToken = result.Scope!.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains("openid", StringComparer.Ordinal);
         string? idToken = null;

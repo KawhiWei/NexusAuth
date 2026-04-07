@@ -16,6 +16,9 @@ public class AppWebModule : LuckAppModule
 {
     public const string AuthenticationScheme = "NexusAuth.Identity";
 
+    /// <summary>
+    /// 注册 Host 层所需的配置与基础认证服务。
+    /// </summary>
     public override void ConfigureServices(ConfigureServicesContext context)
     {
         var services = context.Services;
@@ -51,6 +54,9 @@ public class AppWebModule : LuckAppModule
         base.ConfigureServices(context);
     }
 
+    /// <summary>
+    /// 配置应用初始化中间件管道。
+    /// </summary>
     public override void ApplicationInitialization(ApplicationContext context)
     {
         var app = context.GetApplicationBuilder();

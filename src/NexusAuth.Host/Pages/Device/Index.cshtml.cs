@@ -23,6 +23,9 @@ public class IndexModel : PageModel
 
     public DeviceAuthorizationSessionResult? Session { get; set; }
 
+    /// <summary>
+    /// 访问设备授权页，按 user_code 拉取会话状态。
+    /// </summary>
     public async Task<IActionResult> OnGetAsync(CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(UserCode))
@@ -32,12 +35,18 @@ public class IndexModel : PageModel
         return Page();
     }
 
+    /// <summary>
+    /// 提交 user_code 并查询设备授权状态。
+    /// </summary>
     public async Task<IActionResult> OnPostAsync(CancellationToken ct)
     {
         await LoadSessionAsync(ct);
         return Page();
     }
 
+    /// <summary>
+    /// 当前登录用户确认设备授权。
+    /// </summary>
     public async Task<IActionResult> OnPostApproveAsync(CancellationToken ct)
     {
         if (User.Identity?.IsAuthenticated != true)
@@ -60,6 +69,9 @@ public class IndexModel : PageModel
         return Page();
     }
 
+    /// <summary>
+    /// 当前用户拒绝设备授权请求。
+    /// </summary>
     public async Task<IActionResult> OnPostDenyAsync(CancellationToken ct)
     {
         Session = await _deviceAuthorizationService.DenyAsync(UserCode, ct);

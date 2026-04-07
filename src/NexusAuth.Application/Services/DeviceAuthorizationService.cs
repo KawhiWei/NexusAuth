@@ -19,6 +19,9 @@ public class DeviceAuthorizationService : IDeviceAuthorizationService
         _securityPolicyService = securityPolicyService;
     }
 
+    /// <summary>
+    /// 发起 device authorization 请求，生成 device_code / user_code。
+    /// </summary>
     public async Task<DeviceAuthorizationStartResult> StartAsync(string clientId, string? clientSecret, string scope, CancellationToken ct = default)
     {
         var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: true, ct);
@@ -51,6 +54,9 @@ public class DeviceAuthorizationService : IDeviceAuthorizationService
             verificationUriComplete);
     }
 
+    /// <summary>
+    /// 轮询 device_code 状态，完成后返回用户信息用于签发 token。
+    /// </summary>
     public async Task<DeviceAuthorizationPollResult> PollAsync(string clientId, string? clientSecret, string deviceCode, CancellationToken ct = default)
     {
         var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: true, ct);
@@ -81,6 +87,9 @@ public class DeviceAuthorizationService : IDeviceAuthorizationService
         };
     }
 
+    /// <summary>
+    /// 按 user_code 查询设备授权会话。
+    /// </summary>
     public async Task<DeviceAuthorizationSessionResult> GetByUserCodeAsync(string userCode, CancellationToken ct = default)
     {
         var authorization = await FindByUserCodeAsync(userCode, ct);
@@ -90,6 +99,9 @@ public class DeviceAuthorizationService : IDeviceAuthorizationService
         return MapSession(authorization);
     }
 
+    /// <summary>
+    /// 用户确认设备授权。
+    /// </summary>
     public async Task<DeviceAuthorizationSessionResult> ApproveAsync(string userCode, Guid userId, CancellationToken ct = default)
     {
         var authorization = await FindByUserCodeAsync(userCode, ct);
@@ -101,6 +113,9 @@ public class DeviceAuthorizationService : IDeviceAuthorizationService
         return MapSession(authorization);
     }
 
+    /// <summary>
+    /// 用户拒绝设备授权。
+    /// </summary>
     public async Task<DeviceAuthorizationSessionResult> DenyAsync(string userCode, CancellationToken ct = default)
     {
         var authorization = await FindByUserCodeAsync(userCode, ct);

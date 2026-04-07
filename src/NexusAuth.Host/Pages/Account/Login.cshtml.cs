@@ -34,6 +34,9 @@ public class LoginModel : PageModel
 
     public string? ClientName { get; set; }
 
+    /// <summary>
+    /// 渲染登录页，并清理已有外部认证 Cookie。
+    /// </summary>
     public async Task<IActionResult> OnGetAsync()
     {
         // If user is already authenticated, redirect back immediately
@@ -51,6 +54,9 @@ public class LoginModel : PageModel
         return Page();
     }
 
+    /// <summary>
+    /// 提交登录表单，校验账号密码并建立 Cookie 登录会话。
+    /// </summary>
     public async Task<IActionResult> OnPostAsync()
     {
         if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password))

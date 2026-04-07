@@ -17,6 +17,9 @@ public class ApiResourceService : IApiResourceService
         _clientApiResourceRepository = clientApiResourceRepository;
     }
 
+    /// <summary>
+    /// 注册 API 资源，并指定其 audience。
+    /// </summary>
     public async Task<ApiResource> RegisterAsync(
         string name,
         string displayName,
@@ -34,6 +37,9 @@ public class ApiResourceService : IApiResourceService
         return resource;
     }
 
+    /// <summary>
+    /// 将资源授权给指定客户端。
+    /// </summary>
     public async Task AssignToClientAsync(
         Guid clientId,
         Guid apiResourceId,
@@ -43,6 +49,9 @@ public class ApiResourceService : IApiResourceService
         await _clientApiResourceRepository.AddAsync(association, ct);
     }
 
+    /// <summary>
+    /// 撤销客户端对指定资源的授权。
+    /// </summary>
     public async Task RevokeFromClientAsync(
         Guid clientId,
         Guid apiResourceId,
@@ -51,6 +60,9 @@ public class ApiResourceService : IApiResourceService
         await _clientApiResourceRepository.RemoveAsync(clientId, apiResourceId, ct);
     }
 
+    /// <summary>
+    /// 查询客户端当前可访问的资源列表。
+    /// </summary>
     public async Task<IReadOnlyList<ApiResource>> GetClientResourcesAsync(
         Guid clientId,
         CancellationToken ct = default)
@@ -58,6 +70,9 @@ public class ApiResourceService : IApiResourceService
         return await _clientApiResourceRepository.GetResourcesByClientIdAsync(clientId, ct);
     }
 
+    /// <summary>
+    /// 查询全部启用状态的资源。
+    /// </summary>
     public async Task<IReadOnlyList<ApiResource>> GetAllActiveResourcesAsync(
         CancellationToken ct = default)
     {

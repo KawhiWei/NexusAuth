@@ -8,6 +8,8 @@ public interface IApiResourceRepository : IAggregateRootRepository<ApiResource, 
 {
     Task<ApiResource?> FindByNameAsync(string name, CancellationToken ct = default);
 
+    Task<IReadOnlyList<ApiResource>> FindByNamesAsync(IEnumerable<string> names, CancellationToken ct = default);
+
     Task<ApiResource?> FindByIdAsync(Guid id, CancellationToken ct = default);
 
     Task<IReadOnlyList<ApiResource>> GetAllActiveAsync(CancellationToken ct = default);

@@ -27,6 +27,9 @@ public class TokenController : ControllerBase
     /// OAuth2.0 Token Endpoint.
     /// Supports grant_type: authorization_code, client_credentials, refresh_token.
     /// </summary>
+    /// <summary>
+    /// 统一 Token 入口，根据 grant_type 分发到具体流程。
+    /// </summary>
     [HttpPost("/connect/token")]
     [Consumes("application/x-www-form-urlencoded")]
     public async Task<IActionResult> Token(

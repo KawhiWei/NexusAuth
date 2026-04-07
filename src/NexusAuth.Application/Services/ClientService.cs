@@ -16,6 +16,9 @@ public class ClientService : IClientService
         _apiResourceRepository = apiResourceRepository;
     }
 
+    /// <summary>
+    /// 注册 OAuth 客户端。
+    /// </summary>
     public async Task<OAuthClient> RegisterClientAsync(
         string clientId,
         string rawClientSecret,
@@ -46,6 +49,9 @@ public class ClientService : IClientService
         return client;
     }
 
+    /// <summary>
+    /// 使用 client_id + client_secret 校验客户端。
+    /// </summary>
     public async Task<OAuthClient?> ValidateClientAsync(
         string clientId,
         string rawClientSecret,
@@ -59,6 +65,9 @@ public class ClientService : IClientService
         return client.VerifyClientSecret(rawClientSecret) ? client : null;
     }
 
+    /// <summary>
+    /// 校验授权端请求中的客户端参数、回调地址、授权类型与 PKCE 要求。
+    /// </summary>
     public async Task<ClientValidationResult> ValidateClientForAuthorizationAsync(
         string clientId,
         string redirectUri,
@@ -85,6 +94,9 @@ public class ClientService : IClientService
         return ClientValidationResult.Success();
     }
 
+    /// <summary>
+    /// 统一的客户端认证入口（可配置是否必须校验 client_secret）。
+    /// </summary>
     public async Task<ClientAuthenticationResult> AuthenticateClientAsync(
         string clientId,
         string? rawClientSecret,
@@ -110,6 +122,9 @@ public class ClientService : IClientService
         return ClientAuthenticationResult.Success(client);
     }
 
+    /// <summary>
+    /// 校验 scope 是否被客户端允许，且资源是否有效。
+    /// </summary>
     public async Task<ScopeValidationResult> ValidateScopesAsync(
         string clientId,
         string scope,

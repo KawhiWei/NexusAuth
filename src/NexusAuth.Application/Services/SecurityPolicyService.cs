@@ -12,6 +12,9 @@ public class SecurityPolicyService : ISecurityPolicyService
         _options = options.Value;
     }
 
+    /// <summary>
+    /// 执行客户端黑白名单策略校验。
+    /// </summary>
     public PolicyCheckResult CheckClient(string clientId)
     {
         if (Contains(_options.ClientBlacklist, clientId))
@@ -23,6 +26,9 @@ public class SecurityPolicyService : ISecurityPolicyService
         return PolicyCheckResult.Success();
     }
 
+    /// <summary>
+    /// 执行用户黑白名单策略校验。
+    /// </summary>
     public PolicyCheckResult CheckUser(User user)
     {
         if (Contains(_options.UserBlacklist, user.Username) || Contains(_options.UserBlacklist, user.Id.ToString()))

@@ -12,6 +12,9 @@ public class UserService : IUserService
         _userRepository = userRepository;
     }
 
+    /// <summary>
+    /// 注册本地用户账号。
+    /// </summary>
     public async Task<Guid> RegisterAsync(
         string username,
         string rawPassword,
@@ -46,6 +49,9 @@ public class UserService : IUserService
         return user.Id;
     }
 
+    /// <summary>
+    /// 校验用户名/邮箱/手机号 + 密码，返回有效用户。
+    /// </summary>
     public async Task<User?> ValidateCredentialsAsync(
         string identifier,
         string rawPassword,
@@ -67,6 +73,9 @@ public class UserService : IUserService
         return user.VerifyPassword(rawPassword) ? user : null;
     }
 
+    /// <summary>
+    /// 按用户 ID 查询用户。
+    /// </summary>
     public Task<User?> FindByIdAsync(Guid id, CancellationToken ct = default)
     {
         return _userRepository.FindByIdAsync(id, ct);

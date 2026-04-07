@@ -16,6 +16,9 @@ public sealed class OidcRequestedClaims
         UserInfoClaims = userInfoClaims;
     }
 
+    /// <summary>
+    /// 创建请求 claims 模型。
+    /// </summary>
     public static OidcRequestedClaims Create(IEnumerable<string>? idTokenClaims = null, IEnumerable<string>? userInfoClaims = null)
     {
         return new OidcRequestedClaims(
@@ -24,6 +27,9 @@ public sealed class OidcRequestedClaims
     }
 
     // 中文注释：OIDC claims 参数是 JSON 对象，这里只提取被请求的 claim 名称。
+    /// <summary>
+    /// 解析 OIDC claims JSON 参数。
+    /// </summary>
     public static OidcRequestedClaims Parse(string? claimsJson)
     {
         if (string.IsNullOrWhiteSpace(claimsJson))
@@ -38,11 +44,17 @@ public sealed class OidcRequestedClaims
             ParseClaimSection(document.RootElement, "userinfo"));
     }
 
+    /// <summary>
+    /// 判断是否请求了某个 id_token claim。
+    /// </summary>
     public bool RequestsIdTokenClaim(string claimName)
     {
         return IdTokenClaims.Contains(claimName);
     }
 
+    /// <summary>
+    /// 判断是否请求了某个 userinfo claim。
+    /// </summary>
     public bool RequestsUserInfoClaim(string claimName)
     {
         return UserInfoClaims.Contains(claimName);

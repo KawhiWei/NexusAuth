@@ -41,6 +41,9 @@ public class OpenIdController : ControllerBase
         _jwtOptions = jwtOptions.Value;
     }
 
+    /// <summary>
+    /// OIDC Discovery 元数据端点。
+    /// </summary>
     [HttpGet("/.well-known/openid-configuration")]
     public IActionResult Discovery()
     {
@@ -81,12 +84,18 @@ public class OpenIdController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// JWKS 公钥端点。
+    /// </summary>
     [HttpGet("/.well-known/jwks.json")]
     public IActionResult Jwks()
     {
         return Ok(new { keys = new[] { _signingCredentialsProvider.GetJwk() } });
     }
 
+    /// <summary>
+    /// OIDC UserInfo 端点。
+    /// </summary>
     [HttpGet("/connect/userinfo")]
     public async Task<IActionResult> UserInfo(CancellationToken ct)
     {
@@ -114,6 +123,9 @@ public class OpenIdController : ControllerBase
         return Ok(BuildUserInfoPayload(user, requestedClaims));
     }
 
+    /// <summary>
+    /// Device Authorization 端点。
+    /// </summary>
     [HttpPost("/connect/deviceauthorization")]
     [Consumes("application/x-www-form-urlencoded")]
     public async Task<IActionResult> DeviceAuthorization(
@@ -147,6 +159,9 @@ public class OpenIdController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// OAuth2 Introspection 端点。
+    /// </summary>
     [HttpPost("/connect/introspect")]
     [Consumes("application/x-www-form-urlencoded")]
     public async Task<IActionResult> Introspect(
@@ -178,6 +193,9 @@ public class OpenIdController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// OAuth2 Revocation 端点。
+    /// </summary>
     [HttpPost("/connect/revocation")]
     [Consumes("application/x-www-form-urlencoded")]
     public async Task<IActionResult> Revoke(
@@ -208,6 +226,9 @@ public class OpenIdController : ControllerBase
         return Ok();
     }
 
+    /// <summary>
+    /// OIDC RP-Initiated Logout 端点。
+    /// </summary>
     [HttpGet("/connect/endsession")]
     public async Task<IActionResult> EndSession([FromQuery(Name = "post_logout_redirect_uri")] string? postLogoutRedirectUri = null)
     {

@@ -30,6 +30,9 @@ public class AuthorizeController : ControllerBase
     /// If the user is NOT authenticated, they are redirected to /account/login with the
     /// current URL as returnUrl. After login, they are redirected back here with a valid cookie.
     /// </summary>
+    /// <summary>
+    /// OAuth2/OIDC 授权端点，负责校验请求并签发 authorization code。
+    /// </summary>
     [HttpGet("/connect/authorize")]
     public async Task<IActionResult> Authorize(
         [FromQuery(Name = "response_type")] string responseType,

@@ -25,6 +25,9 @@ public class AuthorizationService : IAuthorizationService
         _securityPolicyService = securityPolicyService;
     }
 
+    /// <summary>
+    /// 生成并持久化授权码（authorization code）。
+    /// </summary>
     public async Task<string> GenerateCodeAsync(
         Guid userId,
         string clientId,
@@ -67,6 +70,9 @@ public class AuthorizationService : IAuthorizationService
         return code.Code;
     }
 
+    /// <summary>
+    /// 解析并校验 OIDC claims 参数。
+    /// </summary>
     public OidcRequestedClaims ParseRequestedClaims(string? claimsJson)
     {
         try
@@ -79,6 +85,9 @@ public class AuthorizationService : IAuthorizationService
         }
     }
 
+    /// <summary>
+    /// 校验授权码并消费（一次性使用）。
+    /// </summary>
     public async Task<AuthorizationCodeResult> ValidateAndConsumeCodeAsync(
         string code,
         string redirectUri,
@@ -127,6 +136,9 @@ public class AuthorizationService : IAuthorizationService
             authCode.Amr);
     }
 
+    /// <summary>
+    /// 校验 client_credentials 流程中的客户端与 scope。
+    /// </summary>
     public async Task<ClientCredentialsResult> ValidateClientCredentialsAsync(
         string clientId,
         string rawClientSecret,

@@ -33,6 +33,9 @@ public class TokenService : ITokenService
         _signingCredentialsProvider = signingCredentialsProvider;
     }
 
+    /// <summary>
+    /// 签发访问令牌（简化返回，仅返回 JWT 字符串）。
+    /// </summary>
     public Task<string> IssueAccessTokenAsync(
         string clientId,
         string scope,
@@ -44,6 +47,9 @@ public class TokenService : ITokenService
             .ContinueWith(t => t.Result.AccessToken, ct);
     }
 
+    /// <summary>
+    /// 签发访问令牌并返回元信息（jti、过期时间等）。
+    /// </summary>
     public async Task<TokenIssueResult> IssueAccessTokenWithMetadataAsync(
         string clientId,
         string scope,
@@ -81,6 +87,9 @@ public class TokenService : ITokenService
         return await Task.FromResult(new TokenIssueResult(jwt, jti, token.ValidTo));
     }
 
+    /// <summary>
+    /// 签发 OIDC 的 id_token。
+    /// </summary>
     public async Task<string> IssueIdTokenAsync(
         string clientId,
         Guid userId,
@@ -153,6 +162,9 @@ public class TokenService : ITokenService
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
+    /// <summary>
+    /// 生成并持久化 refresh_token。
+    /// </summary>
     public async Task<string> IssueRefreshTokenAsync(
         string clientId,
         Guid userId,
@@ -165,6 +177,9 @@ public class TokenService : ITokenService
         return refreshToken.Token;
     }
 
+    /// <summary>
+    /// 使用 refresh_token 轮换刷新访问令牌。
+    /// </summary>
     public async Task<RefreshResult> RefreshAsync(
         string refreshTokenString,
         CancellationToken ct = default)
@@ -201,6 +216,9 @@ public class TokenService : ITokenService
         return RefreshResult.Success(accessToken, newRefreshToken.Token);
     }
 
+    /// <summary>
+    /// 吊销单个 refresh_token。
+    /// </summary>
     public async Task RevokeRefreshTokenAsync(
         string refreshTokenString,
         CancellationToken ct = default)
@@ -210,6 +228,9 @@ public class TokenService : ITokenService
             await _refreshTokenRepository.RevokeAsync(token.Id, ct);
     }
 
+    /// <summary>
+    /// 吊销指定用户的全部 refresh_token。
+    /// </summary>
     public async Task RevokeAllUserTokensAsync(
         Guid userId,
         CancellationToken ct = default)
@@ -217,6 +238,9 @@ public class TokenService : ITokenService
         await _refreshTokenRepository.RevokeAllForUserAsync(userId, ct);
     }
 
+    /// <summary>
+    /// 对 access_token 进行自检（OAuth2 introspection 风格）。
+    /// </summary>
     public async Task<TokenIntrospectionResult> IntrospectAsync(string token, CancellationToken ct = default)
     {
         var handler = new JwtSecurityTokenHandler();
@@ -249,6 +273,9 @@ public class TokenService : ITokenService
         }
     }
 
+    /// <summary>
+    /// 吊销 access_token（通过黑名单记录 jti）。
+    /// </summary>
     public async Task RevokeAccessTokenAsync(string accessToken, CancellationToken ct = default)
     {
         var handler = new JwtSecurityTokenHandler();
@@ -314,14 +341,19 @@ public class TokenService : ITokenService
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
-        string? resolved = null;
-        foreach (var scopeName in scopes)
-        {
-            if (IsIdentityScope(scopeName))
-                continue;
+        var resourceScopeNames = scopes
+            .Where(scopeName => !IsIdentityScope(scopeName))
+            .ToArray();
 
-            var resource = await _apiResourceRepository.FindByNameAsync(scopeName, ct);
-            if (resource is null || !resource.IsActive)
+        var resources = await _apiResourceRepository.FindByNamesAsync(resourceScopeNames, ct);
+        var resourceMap = resources
+            .Where(resource => resource.IsActive)
+            .ToDictionary(resource => resource.Name, resource => resource, StringComparer.Ordinal);
+
+        string? resolved = null;
+        foreach (var scopeName in resourceScopeNames)
+        {
+            if (!resourceMap.TryGetValue(scopeName, out var resource))
                 continue;
 
             if (string.IsNullOrWhiteSpace(resolved))

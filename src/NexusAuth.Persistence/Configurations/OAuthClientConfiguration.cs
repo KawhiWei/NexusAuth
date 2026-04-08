@@ -51,6 +51,12 @@ public class OAuthClientConfiguration : IEntityTypeConfiguration<OAuthClient>
             .HasConversion(stringListConverter)
             .Metadata.SetValueComparer(stringListComparer);
 
+        builder.Property(c => c.PostLogoutRedirectUris)
+            .HasColumnName("post_logout_redirect_uris")
+            .HasColumnType("jsonb")
+            .HasConversion(stringListConverter)
+            .Metadata.SetValueComparer(stringListComparer);
+
         builder.Property(c => c.AllowedScopes)
             .HasColumnName("allowed_scopes")
             .HasColumnType("jsonb")

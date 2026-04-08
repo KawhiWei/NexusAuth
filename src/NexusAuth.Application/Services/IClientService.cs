@@ -11,6 +11,7 @@ public interface IClientService : IScopedDependency
         string clientName,
         string? description = null,
         IEnumerable<string>? redirectUris = null,
+        IEnumerable<string>? postLogoutRedirectUris = null,
         IEnumerable<string>? allowedScopes = null,
         IEnumerable<string>? allowedGrantTypes = null,
         bool requirePkce = true,
@@ -36,6 +37,11 @@ public interface IClientService : IScopedDependency
         string clientId,
         string? rawClientSecret,
         bool requireSecret,
+        CancellationToken ct = default);
+
+    Task<ClientAuthenticationResult> AuthenticateClientForPostLogoutAsync(
+        string clientId,
+        string? postLogoutRedirectUri,
         CancellationToken ct = default);
 
     Task<ScopeValidationResult> ValidateScopesAsync(

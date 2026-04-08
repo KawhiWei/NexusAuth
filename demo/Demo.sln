@@ -1,22 +1,14 @@
-
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.0.31903.59
-MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Demo.Bff", "src\Demo.Bff\Demo.Bff.csproj", "{90A676C7-2D93-4317-9088-401F6608F580}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Demo.RefreshToken", "src\Demo.RefreshToken\Demo.RefreshToken.csproj", "{E8215369-C9DB-4ABF-BFFB-4C92CFDCE110}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Demo.Web", "Demo.Web", "{5483AE4E-1A1B-4C27-93F9-55097124F624}"
-	ProjectSection(SolutionItems) = preProject
-		src\Demo.Web\index.html = src\Demo.Web\index.html
-		src\Demo.Web\package.json = src\Demo.Web\package.json
-		src\Demo.Web\src\App.tsx = src\Demo.Web\src\App.tsx
-		src\Demo.Web\src\main.tsx = src\Demo.Web\src\main.tsx
-		src\Demo.Web\src\styles.css = src\Demo.Web\src\styles.css
-		src\Demo.Web\tsconfig.json = src\Demo.Web\tsconfig.json
-		src\Demo.Web\vite.config.ts = src\Demo.Web\vite.config.ts
-	EndProjectSection
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Demo.DeviceCode", "src\Demo.DeviceCode\Demo.DeviceCode.csproj", "{9BF03193-00B5-4785-A7F8-2F343DDB76E7}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Demo Items", "Demo Items", "{2D0D6A0E-40E9-413F-9601-4A1A9C2AB2F7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Demo.ClientCredentials", "src\Demo.ClientCredentials\Demo.ClientCredentials.csproj", "{8E6EAF9A-ED8D-45B1-BF42-C8176CFFD926}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Demo.Bff", "src\Demo.Bff\Demo.Bff.csproj", "{E6CEBF3B-480D-49CE-B071-D75A2A2547A5}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "0.Solution Items", "0.Solution Items", "{099A7B33-0B3D-4289-99D8-2140F551EBA2}"
 	ProjectSection(SolutionItems) = preProject
 		schema.sql = schema.sql
 		seed.sql = seed.sql
@@ -28,12 +20,21 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{90A676C7-2D93-4317-9088-401F6608F580}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{90A676C7-2D93-4317-9088-401F6608F580}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{90A676C7-2D93-4317-9088-401F6608F580}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{90A676C7-2D93-4317-9088-401F6608F580}.Release|Any CPU.Build.0 = Release|Any CPU
-	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
+		{E8215369-C9DB-4ABF-BFFB-4C92CFDCE110}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E8215369-C9DB-4ABF-BFFB-4C92CFDCE110}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E8215369-C9DB-4ABF-BFFB-4C92CFDCE110}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E8215369-C9DB-4ABF-BFFB-4C92CFDCE110}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9BF03193-00B5-4785-A7F8-2F343DDB76E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9BF03193-00B5-4785-A7F8-2F343DDB76E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9BF03193-00B5-4785-A7F8-2F343DDB76E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9BF03193-00B5-4785-A7F8-2F343DDB76E7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8E6EAF9A-ED8D-45B1-BF42-C8176CFFD926}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8E6EAF9A-ED8D-45B1-BF42-C8176CFFD926}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8E6EAF9A-ED8D-45B1-BF42-C8176CFFD926}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8E6EAF9A-ED8D-45B1-BF42-C8176CFFD926}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E6CEBF3B-480D-49CE-B071-D75A2A2547A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E6CEBF3B-480D-49CE-B071-D75A2A2547A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E6CEBF3B-480D-49CE-B071-D75A2A2547A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E6CEBF3B-480D-49CE-B071-D75A2A2547A5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

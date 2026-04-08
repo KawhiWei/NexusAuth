@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -126,15 +127,26 @@ public class OidcBffService
             return;
 
         var client = _httpClientFactory.CreateClient();
+        ApplyClientAuthentication(client);
         var request = new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            ["client_id"] = ClientId,
-            ["client_secret"] = ClientSecret,
             ["token"] = token,
             ["token_type_hint"] = tokenTypeHint,
         });
 
         await client.PostAsync(revocationEndpoint, request, ct);
+    }
+
+    /// <summary>
+    /// 给下游 Token/Revocation 请求附加 client_secret_basic 认证头。
+    /// 主要调用方：Web BFF 调 NexusAuth 的后端交换 token 场景。
+    /// </summary>
+    public void ApplyClientAuthentication(HttpClient client, string? clientId = null, string? clientSecret = null)
+    {
+        var actualClientId = clientId ?? ClientId;
+        var actualClientSecret = clientSecret ?? ClientSecret;
+        var credentialBytes = Encoding.UTF8.GetBytes($"{actualClientId}:{actualClientSecret}");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(credentialBytes));
     }
 }
 

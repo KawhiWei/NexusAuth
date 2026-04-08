@@ -47,17 +47,29 @@ public class TokenController : ControllerBase
         if (string.IsNullOrWhiteSpace(grantType))
             return BadRequest(new { error = "invalid_request", error_description = "grant_type is required." });
 
+        // 中文注释：统一解析 OAuth2 客户端认证，优先兼容标准的 client_secret_basic，
+        // 同时保留现有 demo 在用的 client_secret_post 表单方式。
+        // 主要调用方：Demo.Bff、移动端 demo，以及任意标准 OAuth2/OIDC 客户端。
+        var resolvedClientAuthentication = OAuthClientAuthenticationParser.ResolveClientAuthentication(
+            Request.Headers.Authorization.ToString(),
+            clientId,
+            clientSecret);
+        clientId = resolvedClientAuthentication.ClientId;
+        clientSecret = resolvedClientAuthentication.ClientSecret;
+
         return grantType switch
         {
-            "authorization_code" => await HandleAuthorizationCodeAsync(code, redirectUri, codeVerifier, ct),
+            "authorization_code" => await HandleAuthorizationCodeAsync(clientId, clientSecret, code, redirectUri, codeVerifier, ct),
             "client_credentials" => await HandleClientCredentialsAsync(clientId, clientSecret, scope, ct),
-            "refresh_token" => await HandleRefreshTokenAsync(refreshToken, ct),
+            "refresh_token" => await HandleRefreshTokenAsync(clientId, clientSecret, refreshToken, ct),
             "urn:ietf:params:oauth:grant-type:device_code" => await HandleDeviceCodeAsync(clientId, clientSecret, deviceCode, ct),
             _ => BadRequest(new { error = "unsupported_grant_type", error_description = $"Grant type '{grantType}' is not supported." }),
         };
     }
 
     private async Task<IActionResult> HandleAuthorizationCodeAsync(
+        string? clientId,
+        string? clientSecret,
         string? code,
         string? redirectUri,
         string? codeVerifier,
@@ -69,13 +81,22 @@ public class TokenController : ControllerBase
         if (string.IsNullOrWhiteSpace(redirectUri))
             return BadRequest(new { error = "invalid_request", error_description = "redirect_uri is required." });
 
+        if (!string.IsNullOrWhiteSpace(clientId))
+        {
+            var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: true, ct);
+            if (!authentication.IsSuccess)
+                return Unauthorized(new { error = authentication.ErrorCode ?? "invalid_client", error_description = authentication.Error });
+        }
+
         var result = await _authorizationService.ValidateAndConsumeCodeAsync(code, redirectUri, codeVerifier, ct);
 
         if (!result.IsSuccess)
             return BadRequest(new { error = "invalid_grant", error_description = result.Error });
 
-        var accessTokenResult = await _tokenService.IssueAccessTokenWithMetadataAsync(result.ClientId, result.Scope, null, result.UserId, ct);
-        var refreshToken = await _tokenService.IssueRefreshTokenAsync(result.ClientId, result.UserId, result.Scope, ct);
+        var accessTokenResult = await _tokenService.IssueAccessTokenWithMetadataAsync(result.ClientId, result.Scope, null, result.UserId, result.ClaimsJson, ct);
+        var refreshToken = ShouldIssueRefreshToken(result.Scope)
+            ? await _tokenService.IssueRefreshTokenAsync(result.ClientId, result.UserId, result.Scope, ct)
+            : null;
         var includeIdToken = result.Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains("openid", StringComparer.Ordinal);
         string? idToken = null;
         if (includeIdToken)
@@ -124,7 +145,7 @@ public class TokenController : ControllerBase
         if (!result.IsSuccess)
             return BadRequest(new { error = "invalid_client", error_description = result.Error });
 
-        var accessToken = await _tokenService.IssueAccessTokenAsync(result.ClientId, result.Scope, null, null, ct);
+        var accessToken = await _tokenService.IssueAccessTokenAsync(result.ClientId, result.Scope, null, null, null, ct);
 
         return Ok(new
         {
@@ -135,13 +156,22 @@ public class TokenController : ControllerBase
     }
 
     private async Task<IActionResult> HandleRefreshTokenAsync(
+        string? clientId,
+        string? clientSecret,
         string? refreshToken,
         CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(refreshToken))
             return BadRequest(new { error = "invalid_request", error_description = "refresh_token is required." });
 
-        var result = await _tokenService.RefreshAsync(refreshToken, ct);
+        if (string.IsNullOrWhiteSpace(clientId))
+            return BadRequest(new { error = "invalid_request", error_description = "client_id is required." });
+
+        var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: true, ct);
+        if (!authentication.IsSuccess)
+            return Unauthorized(new { error = authentication.ErrorCode ?? "invalid_client", error_description = authentication.Error });
+
+        var result = await _tokenService.RefreshAsync(refreshToken, clientId, ct);
 
         if (!result.IsSuccess)
             return BadRequest(new { error = "invalid_grant", error_description = result.Error });
@@ -151,6 +181,7 @@ public class TokenController : ControllerBase
             access_token = result.AccessToken,
             token_type = "Bearer",
             refresh_token = result.RefreshToken,
+            expires_in = 3600,
         });
     }
 
@@ -175,8 +206,10 @@ public class TokenController : ControllerBase
             return BadRequest(new { error = "invalid_grant", error_description = result.Error });
         }
 
-        var accessTokenResult = await _tokenService.IssueAccessTokenWithMetadataAsync(result.ClientId!, result.Scope!, null, result.UserId, ct);
-        var refreshToken = await _tokenService.IssueRefreshTokenAsync(result.ClientId!, result.UserId, result.Scope!, ct);
+        var accessTokenResult = await _tokenService.IssueAccessTokenWithMetadataAsync(result.ClientId!, result.Scope!, null, result.UserId, null, ct);
+        var refreshToken = ShouldIssueRefreshToken(result.Scope!)
+            ? await _tokenService.IssueRefreshTokenAsync(result.ClientId!, result.UserId, result.Scope!, ct)
+            : null;
         var includeIdToken = result.Scope!.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains("openid", StringComparer.Ordinal);
         string? idToken = null;
         if (includeIdToken)
@@ -191,5 +224,14 @@ public class TokenController : ControllerBase
             id_token = idToken,
             expires_in = 3600,
         });
+    }
+
+    private static bool ShouldIssueRefreshToken(string scope)
+    {
+        // 中文注释：refresh token 只在请求了 offline_access 时才签发，
+        // 这样 discovery 文档里的 OIDC 能力声明和真实行为保持一致。
+        // 主要调用方：authorization_code 与 device_code 的换 token 流程。
+        return scope.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Contains("offline_access", StringComparer.Ordinal);
     }
 }

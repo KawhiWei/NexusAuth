@@ -1,8 +1,13 @@
 -- ============================================================
--- NexusAuth demo seed data (latest)
+-- NexusAuth demo seed data (single source of truth)
 -- 说明：
--- 1) 该脚本用于初始化当前 Demo 所需的全部测试数据。
--- 2) 账号密码：alice / Pass@123, bob / Pass@123, admin / Pass@123
+-- 1) 该脚本是所有 demo 客户端的唯一种子数据来源。
+-- 2) 支持的 demo / grant 类型：
+--    - Demo.Bff + Demo.Web: authorization_code + refresh_token + OIDC
+--    - Demo.ClientCredentials: client_credentials
+--    - Demo.DeviceCode: device_code
+--    - Demo.RefreshToken: refresh_token（复用 demo-device 客户端）
+-- 3) 测试账号密码：alice / Pass@123, bob / Pass@123, admin / Pass@123
 -- ============================================================
 
 \connect nexusauth
@@ -27,11 +32,16 @@ ON CONFLICT (name) DO UPDATE SET
     is_active = EXCLUDED.is_active;
 
 -- ============================================================
--- OAuth clients
+-- OAuth demo clients
 -- ============================================================
 
+-- ------------------------------------------------------------
+-- OAuth2 / OIDC Demo 1: authorization_code + refresh_token
+-- 对应项目：Demo.Bff + Demo.Web
 -- client_secret: demo-bff-secret
-INSERT INTO oauth_clients (id, client_id, client_secret_hash, client_name, description, redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
+-- ------------------------------------------------------------
+-- client_secret: demo-bff-secret
+INSERT INTO oauth_clients (id, client_id, client_secret_hash, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
 VALUES (
     '20000000-0000-0000-0000-000000000001',
     'demo-bff',
@@ -39,6 +49,7 @@ VALUES (
     'Demo Frontend BFF Client',
     'A front-end/back-end separated demo client for authorization code + OIDC',
     '["http://localhost:5201/signin-oidc"]',
+    '["http://localhost:5200/"]',
     '["openid","profile","email","phone","offline_access","demo_api","profile_api"]',
     '["authorization_code","refresh_token"]',
     true,
@@ -48,29 +59,67 @@ VALUES (
 ON CONFLICT (client_id) DO UPDATE SET
     client_secret_hash = EXCLUDED.client_secret_hash,
     redirect_uris = EXCLUDED.redirect_uris,
+    post_logout_redirect_uris = EXCLUDED.post_logout_redirect_uris,
     allowed_scopes = EXCLUDED.allowed_scopes,
     allowed_grant_types = EXCLUDED.allowed_grant_types,
     require_pkce = EXCLUDED.require_pkce,
     is_active = EXCLUDED.is_active;
 
--- client_secret: demo-mobile-secret
-INSERT INTO oauth_clients (id, client_id, client_secret_hash, client_name, description, redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
+-- ------------------------------------------------------------
+-- OAuth2 Demo 2: client_credentials
+-- 对应项目：Demo.ClientCredentials
+-- client_secret: demo-bff-secret
+-- ------------------------------------------------------------
+-- client_secret: demo-bff-secret
+INSERT INTO oauth_clients (id, client_id, client_secret_hash, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
 VALUES (
-    '20000000-0000-0000-0000-000000000002',
-    'demo-mobile',
-    '$2a$12$9TGL4MAZQqJ5T9wl.e/m4O0z8QsVRTVo9J0WVBC.Pa6iveKKGVceG',
-    'Demo Mobile Client',
-    'A demo mobile app client for authorization code + PKCE',
-    '["myapp://auth/callback"]',
-    '["openid","profile","email","phone","offline_access","mobile_api"]',
-    '["authorization_code","refresh_token"]',
-    true,
+    '20000000-0000-0000-0000-000000000101',
+    'demo-cc',
+    '$2a$12$pw856E1CHH3FfcshE0NwCeETGR5hyYaeudBqZfQYCpXdbBuvOpuuy',
+    'Demo Client Credentials Client',
+    'Console demo client for OAuth2 client_credentials grant',
+    '[]',
+    '[]',
+    '["demo_api"]',
+    '["client_credentials"]',
+    false,
     true,
     NOW()
 )
 ON CONFLICT (client_id) DO UPDATE SET
     client_secret_hash = EXCLUDED.client_secret_hash,
     redirect_uris = EXCLUDED.redirect_uris,
+    post_logout_redirect_uris = EXCLUDED.post_logout_redirect_uris,
+    allowed_scopes = EXCLUDED.allowed_scopes,
+    allowed_grant_types = EXCLUDED.allowed_grant_types,
+    require_pkce = EXCLUDED.require_pkce,
+    is_active = EXCLUDED.is_active;
+
+-- ------------------------------------------------------------
+-- OAuth2 Demo 3 + 4: device_code + refresh_token
+-- 对应项目：Demo.DeviceCode / Demo.RefreshToken
+-- client_secret: demo-bff-secret
+-- ------------------------------------------------------------
+-- client_secret: demo-bff-secret
+INSERT INTO oauth_clients (id, client_id, client_secret_hash, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
+VALUES (
+    '20000000-0000-0000-0000-000000000102',
+    'demo-device',
+    '$2a$12$pw856E1CHH3FfcshE0NwCeETGR5hyYaeudBqZfQYCpXdbBuvOpuuy',
+    'Demo Device Flow Client',
+    'Console demo client for OAuth2 device_code and refresh_token grants',
+    '[]',
+    '[]',
+    '["openid","profile","email","phone","offline_access","demo_api"]',
+    '["urn:ietf:params:oauth:grant-type:device_code","refresh_token"]',
+    false,
+    true,
+    NOW()
+)
+ON CONFLICT (client_id) DO UPDATE SET
+    client_secret_hash = EXCLUDED.client_secret_hash,
+    redirect_uris = EXCLUDED.redirect_uris,
+    post_logout_redirect_uris = EXCLUDED.post_logout_redirect_uris,
     allowed_scopes = EXCLUDED.allowed_scopes,
     allowed_grant_types = EXCLUDED.allowed_grant_types,
     require_pkce = EXCLUDED.require_pkce,
@@ -138,5 +187,6 @@ INSERT INTO client_api_resources (client_id, api_resource_id)
 VALUES
     ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001'),
     ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000002'),
-    ('20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000003')
+    ('20000000-0000-0000-0000-000000000101', '10000000-0000-0000-0000-000000000001'),
+    ('20000000-0000-0000-0000-000000000102', '10000000-0000-0000-0000-000000000001')
 ON CONFLICT (client_id, api_resource_id) DO NOTHING;

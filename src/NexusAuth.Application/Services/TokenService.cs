@@ -41,9 +41,10 @@ public class TokenService : ITokenService
         string scope,
         string? audience = null,
         Guid? userId = null,
+        string? claimsJson = null,
         CancellationToken ct = default)
     {
-        return IssueAccessTokenWithMetadataAsync(clientId, scope, audience, userId, ct)
+        return IssueAccessTokenWithMetadataAsync(clientId, scope, audience, userId, claimsJson, ct)
             .ContinueWith(t => t.Result.AccessToken, ct);
     }
 
@@ -55,6 +56,7 @@ public class TokenService : ITokenService
         string scope,
         string? audience = null,
         Guid? userId = null,
+        string? claimsJson = null,
         CancellationToken ct = default)
     {
         var now = DateTime.UtcNow;
@@ -72,6 +74,14 @@ public class TokenService : ITokenService
 
         if (userId.HasValue)
             claims.Add(new("token_use", "access_token"));
+
+        if (!string.IsNullOrWhiteSpace(claimsJson))
+        {
+            // 中文注释：把原始 OIDC claims 请求透传到 access_token 中，
+            // 这样 userinfo 端点可以按客户端真实请求返回更精确的 claim 集合。
+            // 主要调用方：授权码流程与设备码流程换 token。
+            claims.Add(new("claims_json", claimsJson));
+        }
 
         var token = new JwtSecurityToken(
             issuer: _jwtOptions.Issuer,
@@ -134,6 +144,7 @@ public class TokenService : ITokenService
         }
 
         if (!string.IsNullOrWhiteSpace(user.Email)
+            && OidcClaimEmissionPolicy.ShouldEmitRequestedClaim(requestedClaims, "email", user.Email)
             && (requestedClaims.RequestsIdTokenClaim("email") || requestedClaims.RequestsIdTokenClaim("email_verified")))
         {
             claims.Add(new("email", user.Email));
@@ -141,11 +152,21 @@ public class TokenService : ITokenService
         }
 
         if (!string.IsNullOrWhiteSpace(user.PhoneNumber)
+            && OidcClaimEmissionPolicy.ShouldEmitRequestedClaim(requestedClaims, "phone_number", user.PhoneNumber)
             && (requestedClaims.RequestsIdTokenClaim("phone_number") || requestedClaims.RequestsIdTokenClaim("phone_number_verified")))
         {
             claims.Add(new("phone_number", user.PhoneNumber));
             claims.Add(new("phone_number_verified", "false", ClaimValueTypes.Boolean));
         }
+
+        if (OidcClaimEmissionPolicy.ShouldEmitRequestedClaim(requestedClaims, "gender", user.Gender.ToString()))
+            claims.Add(new("gender", user.Gender.ToString()));
+
+        if (!string.IsNullOrWhiteSpace(user.Ethnicity) && OidcClaimEmissionPolicy.ShouldEmitRequestedClaim(requestedClaims, "ethnicity", user.Ethnicity))
+            claims.Add(new("ethnicity", user.Ethnicity));
+
+        if (requestedClaims.RequestsIdTokenClaim("nickname"))
+            claims.Add(new("nickname", user.Nickname));
 
         if (!string.IsNullOrWhiteSpace(nonce))
             claims.Add(new("nonce", nonce));
@@ -182,6 +203,7 @@ public class TokenService : ITokenService
     /// </summary>
     public async Task<RefreshResult> RefreshAsync(
         string refreshTokenString,
+        string? clientId = null,
         CancellationToken ct = default)
     {
         var existingToken = await _refreshTokenRepository.FindByTokenAsync(refreshTokenString, ct);
@@ -194,6 +216,14 @@ public class TokenService : ITokenService
 
         if (existingToken.ExpiresAt <= DateTimeOffset.UtcNow)
             return RefreshResult.Failure("Refresh token has expired.");
+
+        // 中文注释：refresh token 必须和当前认证过的客户端绑定，防止一个客户端拿着别人的 refresh token 刷新。
+        // 主要调用方：/connect/token 的 refresh_token 分支，以及 Demo.Bff 的会话续期流程。
+        if (!string.IsNullOrWhiteSpace(clientId)
+            && !string.Equals(existingToken.ClientId, clientId, StringComparison.Ordinal))
+        {
+            return RefreshResult.Failure("Refresh token does not belong to the authenticated client.");
+        }
 
         // Revoke old token
         await _refreshTokenRepository.RevokeAsync(existingToken.Id, ct);
@@ -211,6 +241,7 @@ public class TokenService : ITokenService
             existingToken.Scope,
             null,
             existingToken.UserId,
+            null,
             ct);
 
         return RefreshResult.Success(accessToken, newRefreshToken.Token);
@@ -223,9 +254,42 @@ public class TokenService : ITokenService
         string refreshTokenString,
         CancellationToken ct = default)
     {
+        await RevokeRefreshTokenAsync(refreshTokenString, null, ct);
+    }
+
+    /// <summary>
+    /// 吊销 refresh_token，并可选校验 token 是否属于当前客户端。
+    /// 主要调用方：/connect/revocation 与 Demo.Bff 退出登录流程。
+    /// </summary>
+    public async Task RevokeRefreshTokenAsync(
+        string refreshTokenString,
+        string? clientId,
+        CancellationToken ct = default)
+    {
         var token = await _refreshTokenRepository.FindByTokenAsync(refreshTokenString, ct);
-        if (token is not null)
-            await _refreshTokenRepository.RevokeAsync(token.Id, ct);
+        if (token is null)
+            return;
+
+        if (!string.IsNullOrWhiteSpace(clientId)
+            && !string.Equals(token.ClientId, clientId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        await _refreshTokenRepository.RevokeAsync(token.Id, ct);
+    }
+
+    /// <summary>
+    /// 判断 refresh_token 是否属于指定客户端。
+    /// 主要调用方：/connect/revocation 的客户端边界检查。
+    /// </summary>
+    public async Task<bool> IsRefreshTokenOwnedByClientAsync(
+        string refreshTokenString,
+        string clientId,
+        CancellationToken ct = default)
+    {
+        var token = await _refreshTokenRepository.FindByTokenAsync(refreshTokenString, ct);
+        return token is not null && string.Equals(token.ClientId, clientId, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -243,6 +307,15 @@ public class TokenService : ITokenService
     /// </summary>
     public async Task<TokenIntrospectionResult> IntrospectAsync(string token, CancellationToken ct = default)
     {
+        return await IntrospectAsync(token, null, ct);
+    }
+
+    /// <summary>
+    /// 对 access_token / id_token 做自检，并可选限制只能由所属客户端查询。
+    /// 主要调用方：/connect/introspect、/connect/userinfo。
+    /// </summary>
+    public async Task<TokenIntrospectionResult> IntrospectAsync(string token, string? clientId, CancellationToken ct = default)
+    {
         var handler = new JwtSecurityTokenHandler();
         if (!handler.CanReadToken(token))
             return TokenIntrospectionResult.Inactive();
@@ -259,10 +332,18 @@ public class TokenService : ITokenService
             if (!string.IsNullOrWhiteSpace(jti) && await _tokenBlacklistRepository.ExistsActiveAsync(jti, DateTimeOffset.UtcNow, ct))
                 return TokenIntrospectionResult.Inactive();
 
+            var tokenClientId = principal.FindFirst("client_id")?.Value;
+            if (!string.IsNullOrWhiteSpace(clientId)
+                && !string.Equals(tokenClientId, clientId, StringComparison.Ordinal))
+            {
+                return TokenIntrospectionResult.Inactive();
+            }
+
             return TokenIntrospectionResult.Success(
                 GetClaimValue(principal, JwtRegisteredClaimNames.Sub, ClaimTypes.NameIdentifier),
-                principal.FindFirst("client_id")?.Value,
+                tokenClientId,
                 principal.FindFirst("scope")?.Value,
+                principal.FindFirst("claims_json")?.Value,
                 new DateTimeOffset(jwt.ValidTo).ToUnixTimeSeconds(),
                 jwt.Issuer,
                 principal.FindFirst("token_use")?.Value);
@@ -278,6 +359,15 @@ public class TokenService : ITokenService
     /// </summary>
     public async Task RevokeAccessTokenAsync(string accessToken, CancellationToken ct = default)
     {
+        await RevokeAccessTokenAsync(accessToken, null, ct);
+    }
+
+    /// <summary>
+    /// 吊销 access_token，并可选校验它是否属于当前客户端。
+    /// 主要调用方：/connect/revocation。
+    /// </summary>
+    public async Task RevokeAccessTokenAsync(string accessToken, string? clientId, CancellationToken ct = default)
+    {
         var handler = new JwtSecurityTokenHandler();
         if (!handler.CanReadToken(accessToken))
             return;
@@ -292,6 +382,13 @@ public class TokenService : ITokenService
             var jti = GetClaimValue(principal, JwtRegisteredClaimNames.Jti, ClaimTypes.SerialNumber);
             if (string.IsNullOrWhiteSpace(jti))
                 return;
+
+            var tokenClientId = principal.FindFirst("client_id")?.Value;
+            if (!string.IsNullOrWhiteSpace(clientId)
+                && !string.Equals(tokenClientId, clientId, StringComparison.Ordinal))
+            {
+                return;
+            }
 
             var existing = await _tokenBlacklistRepository.FindByJtiAsync(jti, ct);
             if (existing is not null)
@@ -378,6 +475,7 @@ public class TokenService : ITokenService
             || string.Equals(scope, "address", StringComparison.Ordinal)
             || string.Equals(scope, "offline_access", StringComparison.Ordinal);
     }
+
 }
 
 public record TokenIssueResult(string AccessToken, string Jti, DateTime ExpiresAtUtc);
@@ -400,12 +498,13 @@ public record TokenIntrospectionResult(
     string? Subject,
     string? ClientId,
     string? Scope,
+    string? ClaimsJson,
     long? Exp,
     string? Issuer,
     string? TokenUse)
 {
-    public static TokenIntrospectionResult Inactive() => new(false, null, null, null, null, null, null);
+    public static TokenIntrospectionResult Inactive() => new(false, null, null, null, null, null, null, null);
 
-    public static TokenIntrospectionResult Success(string? subject, string? clientId, string? scope, long? exp, string? issuer, string? tokenUse)
-        => new(true, subject, clientId, scope, exp, issuer, tokenUse);
+    public static TokenIntrospectionResult Success(string? subject, string? clientId, string? scope, string? claimsJson, long? exp, string? issuer, string? tokenUse)
+        => new(true, subject, clientId, scope, claimsJson, exp, issuer, tokenUse);
 }

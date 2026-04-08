@@ -25,6 +25,7 @@ public class ClientService : IClientService
         string clientName,
         string? description = null,
         IEnumerable<string>? redirectUris = null,
+        IEnumerable<string>? postLogoutRedirectUris = null,
         IEnumerable<string>? allowedScopes = null,
         IEnumerable<string>? allowedGrantTypes = null,
         bool requirePkce = true,
@@ -40,6 +41,7 @@ public class ClientService : IClientService
             clientName,
             description,
             redirectUris,
+            postLogoutRedirectUris,
             allowedScopes,
             allowedGrantTypes,
             requirePkce);
@@ -117,6 +119,28 @@ public class ClientService : IClientService
 
             if (!client.VerifyClientSecret(rawClientSecret))
                 return ClientAuthenticationResult.Failure("invalid_client", "Invalid client secret.");
+        }
+
+        return ClientAuthenticationResult.Success(client);
+    }
+
+    /// <summary>
+    /// 用于 OIDC logout 场景校验 RP 身份和 post_logout_redirect_uri 白名单。
+    /// 主要调用方：Host 层的 /connect/endsession 端点。
+    /// </summary>
+    public async Task<ClientAuthenticationResult> AuthenticateClientForPostLogoutAsync(
+        string clientId,
+        string? postLogoutRedirectUri,
+        CancellationToken ct = default)
+    {
+        var client = await _clientRepository.FindByClientIdAsync(clientId, ct);
+        if (client is null || !client.IsActive)
+            return ClientAuthenticationResult.Failure("invalid_client", "Client not found or inactive.");
+
+        if (!string.IsNullOrWhiteSpace(postLogoutRedirectUri)
+            && !client.IsValidPostLogoutRedirectUri(postLogoutRedirectUri))
+        {
+            return ClientAuthenticationResult.Failure("invalid_request", "post_logout_redirect_uri is not registered for this client.");
         }
 
         return ClientAuthenticationResult.Success(client);

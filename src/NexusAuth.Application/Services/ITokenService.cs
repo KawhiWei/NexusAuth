@@ -9,6 +9,7 @@ public interface ITokenService : IScopedDependency
         string scope,
         string? audience = null,
         Guid? userId = null,
+        string? claimsJson = null,
         CancellationToken ct = default);
 
     Task<TokenIssueResult> IssueAccessTokenWithMetadataAsync(
@@ -16,6 +17,7 @@ public interface ITokenService : IScopedDependency
         string scope,
         string? audience = null,
         Guid? userId = null,
+        string? claimsJson = null,
         CancellationToken ct = default);
 
     Task<string> IssueIdTokenAsync(
@@ -37,10 +39,21 @@ public interface ITokenService : IScopedDependency
 
     Task<RefreshResult> RefreshAsync(
         string refreshTokenString,
+        string? clientId = null,
         CancellationToken ct = default);
 
     Task RevokeRefreshTokenAsync(
         string refreshTokenString,
+        CancellationToken ct = default);
+
+    Task RevokeRefreshTokenAsync(
+        string refreshTokenString,
+        string? clientId,
+        CancellationToken ct = default);
+
+    Task<bool> IsRefreshTokenOwnedByClientAsync(
+        string refreshTokenString,
+        string clientId,
         CancellationToken ct = default);
 
     Task RevokeAllUserTokensAsync(
@@ -49,5 +62,9 @@ public interface ITokenService : IScopedDependency
 
     Task<TokenIntrospectionResult> IntrospectAsync(string token, CancellationToken ct = default);
 
+    Task<TokenIntrospectionResult> IntrospectAsync(string token, string? clientId, CancellationToken ct = default);
+
     Task RevokeAccessTokenAsync(string accessToken, CancellationToken ct = default);
+
+    Task RevokeAccessTokenAsync(string accessToken, string? clientId, CancellationToken ct = default);
 }

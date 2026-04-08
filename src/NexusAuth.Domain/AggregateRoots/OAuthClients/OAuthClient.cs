@@ -14,6 +14,8 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
 
     public List<string> RedirectUris { get; private set; } = new();
 
+    public List<string> PostLogoutRedirectUris { get; private set; } = new();
+
     public List<string> AllowedScopes { get; private set; } = new();
 
     public List<string> AllowedGrantTypes { get; private set; } = new();
@@ -37,6 +39,7 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
         string clientName,
         string? description = null,
         IEnumerable<string>? redirectUris = null,
+        IEnumerable<string>? postLogoutRedirectUris = null,
         IEnumerable<string>? allowedScopes = null,
         IEnumerable<string>? allowedGrantTypes = null,
         bool requirePkce = true)
@@ -52,6 +55,7 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
             ClientName = clientName,
             Description = description,
             RedirectUris = redirectUris?.ToList() ?? new List<string>(),
+            PostLogoutRedirectUris = postLogoutRedirectUris?.ToList() ?? new List<string>(),
             AllowedScopes = allowedScopes?.ToList() ?? new List<string>(),
             AllowedGrantTypes = allowedGrantTypes?.ToList() ?? new List<string>(),
             RequirePkce = requirePkce,
@@ -70,6 +74,15 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
     public bool IsValidRedirectUri(string uri)
     {
         return RedirectUris.Contains(uri, StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// 用于 OIDC RP-Initiated Logout 场景，校验 RP 传入的 post_logout_redirect_uri 是否已登记。
+    /// 主要调用方：Host 层的 /connect/endsession 端点。
+    /// </summary>
+    public bool IsValidPostLogoutRedirectUri(string uri)
+    {
+        return PostLogoutRedirectUris.Contains(uri, StringComparer.Ordinal);
     }
 
     public bool IsGrantTypeAllowed(string grantType)

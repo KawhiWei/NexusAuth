@@ -76,13 +76,12 @@ public class AuthController : ControllerBase
 
         var discovery = await _oidcBffService.FetchDiscoveryAsync(ct);
         var httpClient = HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
+        _oidcBffService.ApplyClientAuthentication(httpClient);
         var tokenRequest = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["grant_type"] = "authorization_code",
             ["code"] = code,
             ["redirect_uri"] = _oidcBffService.RedirectUri,
-            ["client_id"] = _oidcBffService.ClientId,
-            ["client_secret"] = _oidcBffService.ClientSecret,
             ["code_verifier"] = flow.CodeVerifier,
         });
 
@@ -165,7 +164,7 @@ public class AuthController : ControllerBase
 
         return Ok(new
         {
-            logoutUrl = $"{_oidcBffService.Authority.TrimEnd('/')}/connect/endsession?post_logout_redirect_uri={Uri.EscapeDataString(_oidcBffService.PostLogoutRedirectUri)}",
+            logoutUrl = $"{_oidcBffService.Authority.TrimEnd('/')}/connect/endsession?id_token_hint={Uri.EscapeDataString(session?.IdToken ?? string.Empty)}&post_logout_redirect_uri={Uri.EscapeDataString(_oidcBffService.PostLogoutRedirectUri)}&state={Uri.EscapeDataString(Guid.NewGuid().ToString("N"))}",
         });
     }
 
@@ -176,12 +175,11 @@ public class AuthController : ControllerBase
 
         var discovery = await _oidcBffService.FetchDiscoveryAsync(ct);
         var client = HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
+        _oidcBffService.ApplyClientAuthentication(client);
         var refreshRequest = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["grant_type"] = "refresh_token",
             ["refresh_token"] = session.RefreshToken,
-            ["client_id"] = _oidcBffService.ClientId,
-            ["client_secret"] = _oidcBffService.ClientSecret,
         });
 
         var response = await client.PostAsync(discovery.TokenEndpoint, refreshRequest, ct);

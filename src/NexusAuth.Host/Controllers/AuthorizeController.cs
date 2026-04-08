@@ -7,32 +7,25 @@ using NexusAuth.Application.Services;
 namespace NexusAuth.Host.Controllers;
 
 [ApiController]
-public class AuthorizeController : ControllerBase
+public class AuthorizeController(
+    IAuthorizationService authorizationService,
+    IClientService clientService)
+    : ControllerBase
 {
-    private readonly IAuthorizationService _authorizationService;
-    private readonly IClientService _clientService;
-
-    public AuthorizeController(
-        IAuthorizationService authorizationService,
-        IClientService clientService)
-    {
-        _authorizationService = authorizationService;
-        _clientService = clientService;
-    }
-
     /// <summary>
     /// OAuth2.0 Authorization Endpoint.
     /// Supports response_type=code (Authorization Code flow with optional PKCE).
-    ///
+    /// 
     /// If the user is already authenticated (via cookie), the authorization code is issued
     /// immediately and the user is redirected back to the client — no login page shown.
-    ///
+    /// 
     /// If the user is NOT authenticated, they are redirected to /account/login with the
     /// current URL as returnUrl. After login, they are redirected back here with a valid cookie.
     /// </summary>
     /// <summary>
     /// OAuth2/OIDC 授权端点，负责校验请求并签发 authorization code。
     /// </summary>
+    /// <exception cref="ArgumentNullException"></exception>
     [HttpGet("/connect/authorize")]
     public async Task<IActionResult> Authorize(
         [FromQuery(Name = "response_type")] string responseType,
@@ -62,7 +55,7 @@ public class AuthorizeController : ControllerBase
             return BadRequest(new { error = "invalid_request", error_description = "scope is required." });
 
         // Validate client via Application layer
-        var clientValidation = await _clientService.ValidateClientForAuthorizationAsync(
+        var clientValidation = await clientService.ValidateClientForAuthorizationAsync(
             clientId, redirectUri, "authorization_code", codeChallenge, ct);
 
         if (!clientValidation.IsSuccess)
@@ -73,7 +66,7 @@ public class AuthorizeController : ControllerBase
             try
             {
                 // 中文注释：OIDC claims 参数允许客户端声明希望返回哪些 claim，这里先做格式校验。
-                _authorizationService.ParseRequestedClaims(claims);
+                authorizationService.ParseRequestedClaims(claims);
             }
             catch (InvalidOperationException ex)
             {
@@ -104,6 +97,14 @@ public class AuthorizeController : ControllerBase
             return Redirect($"/account/login?returnUrl={Uri.EscapeDataString(returnUrl)}");
         }
 
+        if (promptValues.Contains("consent", StringComparer.Ordinal))
+        {
+            // 中文注释：当 RP 显式要求 prompt=consent 时，先进入服务端确认页，
+            // 由当前用户确认本次授权的 scope 与 claims，再回到授权端继续签发 code。
+            // 主要调用方：标准 OIDC 客户端，以及后续需要强制重新确认授权的 demo 场景。
+            return Redirect(BuildConsentPageUrl(clientId, redirectUri, scope, state, nonce, prompt, maxAge, claims, codeChallenge, codeChallengeMethod));
+        }
+
         // User is authenticated — extract user ID from cookie claims
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrWhiteSpace(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
@@ -124,7 +125,7 @@ public class AuthorizeController : ControllerBase
         }
 
         // Generate authorization code
-        var code = await _authorizationService.GenerateCodeAsync(
+        var code = await authorizationService.GenerateCodeAsync(
             userId,
             clientId,
             redirectUri,
@@ -172,5 +173,34 @@ public class AuthorizeController : ControllerBase
             errorRedirect += $"&state={Uri.EscapeDataString(state)}";
 
         return errorRedirect;
+    }
+
+    private static string BuildConsentPageUrl(
+        string clientId,
+        string redirectUri,
+        string scope,
+        string? state,
+        string? nonce,
+        string? prompt,
+        int? maxAge,
+        string? claims,
+        string? codeChallenge,
+        string? codeChallengeMethod)
+    {
+        var query = new Dictionary<string, string?>
+        {
+            ["client_id"] = clientId,
+            ["redirect_uri"] = redirectUri,
+            ["scope"] = scope,
+            ["state"] = state,
+            ["nonce"] = nonce,
+            ["prompt"] = prompt,
+            ["max_age"] = maxAge?.ToString(),
+            ["claims"] = claims,
+            ["code_challenge"] = codeChallenge,
+            ["code_challenge_method"] = codeChallengeMethod,
+        };
+
+        return Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString("/consent", query!);
     }
 }

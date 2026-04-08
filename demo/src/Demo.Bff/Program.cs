@@ -2,9 +2,9 @@ using System.Collections.Concurrent;
 using Demo.Bff.Models;
 using Demo.Bff.Options;
 using Demo.Bff.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,7 +17,6 @@ var audience = jwtSection["Audience"]!;
 
 builder.Services.Configure<FrontendOptions>(builder.Configuration.GetSection("Frontend"));
 builder.Services.Configure<NexusAuthBffOptions>(builder.Configuration.GetSection("NexusAuth"));
-builder.Services.Configure<MobileAuthOptions>(builder.Configuration.GetSection("MobileAuth"));
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -61,8 +60,8 @@ builder.Services.PostConfigureAll<JwtBearerOptions>(options =>
     options.TokenValidationParameters.ValidAudience = null;
     options.TokenValidationParameters.ValidAudiences = new[]
     {
-        builder.Configuration["Jwt:WebAudience"] ?? "demo-bff-api",
-        builder.Configuration["Jwt:MobileAudience"] ?? "demo-mobile-api",
+        "demo-bff-api",
+        builder.Configuration["Jwt:Audience"] ?? "NexusAuth",
     };
 });
 

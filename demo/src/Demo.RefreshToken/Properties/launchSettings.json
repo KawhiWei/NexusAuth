@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "Demo.RefreshToken": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "NEXUSAUTH_AUTHORITY": "http://localhost:5100",
+        "NEXUSAUTH_CLIENT_ID": "demo-device",
+        "NEXUSAUTH_CLIENT_SECRET": "demo-bff-secret",
+        "NEXUSAUTH_REFRESH_TOKEN": ""
+      }
+    }
+  }
+}

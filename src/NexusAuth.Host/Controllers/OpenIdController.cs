@@ -59,7 +59,7 @@ public class OpenIdController : ControllerBase
             introspection_endpoint = $"{issuer}/connect/introspect",
             device_authorization_endpoint = $"{issuer}/connect/deviceauthorization",
             end_session_endpoint = $"{issuer}/connect/endsession",
-            scopes_supported = new[] { "openid", "profile", "email", "phone", "offline_access" },
+            scopes_supported = new[] { "openid", "profile", "email", "phone", "address", "offline_access" },
             response_types_supported = new[] { "code" },
             grant_types_supported = new[]
             {
@@ -70,17 +70,17 @@ public class OpenIdController : ControllerBase
             },
             subject_types_supported = new[] { "public" },
             id_token_signing_alg_values_supported = new[] { "RS256" },
-            token_endpoint_auth_methods_supported = new[] { "client_secret_post" },
+            token_endpoint_auth_methods_supported = new[] { "client_secret_post", "client_secret_basic" },
             claims_supported = new[]
             {
-                "sub", "preferred_username", "name", "email", "phone_number", "email_verified",
-                "phone_number_verified", "nonce", "at_hash", "auth_time", "acr", "amr"
+                "sub", "preferred_username", "name", "nickname", "email", "phone_number", "email_verified",
+                "phone_number_verified", "gender", "ethnicity", "address", "nonce", "at_hash", "auth_time", "acr", "amr"
             },
             code_challenge_methods_supported = new[] { "plain", "S256" },
             claims_parameter_supported = true,
             request_parameter_supported = false,
             request_uri_parameter_supported = false,
-            prompt_values_supported = new[] { "none", "login" },
+            prompt_values_supported = new[] { "none", "login", "consent" },
         });
     }
 
@@ -111,6 +111,9 @@ public class OpenIdController : ControllerBase
         if (!introspection.Active)
             return Unauthorized(new { error = "invalid_token", error_description = "Access token is invalid." });
 
+        if (!string.Equals(introspection.TokenUse, "access_token", StringComparison.Ordinal))
+            return Unauthorized(new { error = "invalid_token", error_description = "Only access tokens can call userinfo." });
+
         if (!Guid.TryParse(introspection.Subject, out var userId))
             return Unauthorized(new { error = "invalid_token", error_description = "Access token does not represent a user." });
 
@@ -118,7 +121,7 @@ public class OpenIdController : ControllerBase
         if (user is null)
             return Unauthorized(new { error = "invalid_token", error_description = "User not found." });
 
-        var requestedClaims = ResolveRequestedClaims(introspection.Scope);
+        var requestedClaims = ResolveRequestedClaims(introspection.Scope, introspection.ClaimsJson);
 
         return Ok(BuildUserInfoPayload(user, requestedClaims));
     }
@@ -134,6 +137,13 @@ public class OpenIdController : ControllerBase
         [FromForm] string? scope,
         CancellationToken ct = default)
     {
+        var resolvedClientAuthentication = OAuthClientAuthenticationParser.ResolveClientAuthentication(
+            Request.Headers.Authorization.ToString(),
+            clientId,
+            clientSecret);
+        clientId = resolvedClientAuthentication.ClientId;
+        clientSecret = resolvedClientAuthentication.ClientSecret;
+
         if (string.IsNullOrWhiteSpace(clientId))
             return BadRequest(new { error = "invalid_request", error_description = "client_id is required." });
 
@@ -170,6 +180,13 @@ public class OpenIdController : ControllerBase
         [FromForm] string? token,
         CancellationToken ct = default)
     {
+        var resolvedClientAuthentication = OAuthClientAuthenticationParser.ResolveClientAuthentication(
+            Request.Headers.Authorization.ToString(),
+            clientId,
+            clientSecret);
+        clientId = resolvedClientAuthentication.ClientId;
+        clientSecret = resolvedClientAuthentication.ClientSecret;
+
         if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
             return Unauthorized(new { error = "invalid_client" });
 
@@ -180,7 +197,7 @@ public class OpenIdController : ControllerBase
         if (string.IsNullOrWhiteSpace(token))
             return BadRequest(new { error = "invalid_request", error_description = "token is required." });
 
-        var result = await _tokenService.IntrospectAsync(token, ct);
+        var result = await _tokenService.IntrospectAsync(token, clientId, ct);
         return Ok(new
         {
             active = result.Active,
@@ -205,6 +222,13 @@ public class OpenIdController : ControllerBase
         [FromForm(Name = "token_type_hint")] string? tokenTypeHint,
         CancellationToken ct = default)
     {
+        var resolvedClientAuthentication = OAuthClientAuthenticationParser.ResolveClientAuthentication(
+            Request.Headers.Authorization.ToString(),
+            clientId,
+            clientSecret);
+        clientId = resolvedClientAuthentication.ClientId;
+        clientSecret = resolvedClientAuthentication.ClientSecret;
+
         if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
             return Unauthorized(new { error = "invalid_client" });
 
@@ -215,11 +239,11 @@ public class OpenIdController : ControllerBase
         if (!string.IsNullOrWhiteSpace(token))
         {
             if (string.Equals(tokenTypeHint, "refresh_token", StringComparison.OrdinalIgnoreCase))
-                await _tokenService.RevokeRefreshTokenAsync(token, ct);
+                await RevokeRefreshTokenForClientAsync(token, clientId, ct);
             else
             {
-                await _tokenService.RevokeAccessTokenAsync(token, ct);
-                await _tokenService.RevokeRefreshTokenAsync(token, ct);
+                await _tokenService.RevokeAccessTokenAsync(token, clientId, ct);
+                await RevokeRefreshTokenForClientAsync(token, clientId, ct);
             }
         }
 
@@ -230,12 +254,40 @@ public class OpenIdController : ControllerBase
     /// OIDC RP-Initiated Logout 端点。
     /// </summary>
     [HttpGet("/connect/endsession")]
-    public async Task<IActionResult> EndSession([FromQuery(Name = "post_logout_redirect_uri")] string? postLogoutRedirectUri = null)
+    public async Task<IActionResult> EndSession(
+        [FromQuery(Name = "id_token_hint")] string? idTokenHint = null,
+        [FromQuery(Name = "post_logout_redirect_uri")] string? postLogoutRedirectUri = null,
+        [FromQuery] string? state = null,
+        CancellationToken ct = default)
     {
+        if (!string.IsNullOrWhiteSpace(idTokenHint))
+        {
+            var introspection = await _tokenService.IntrospectAsync(idTokenHint, ct);
+            if (!introspection.Active || !string.Equals(introspection.TokenUse, "id_token", StringComparison.Ordinal))
+                return BadRequest(new { error = "invalid_request", error_description = "id_token_hint is invalid." });
+
+            if (string.IsNullOrWhiteSpace(introspection.ClientId))
+                return BadRequest(new { error = "invalid_request", error_description = "id_token_hint does not identify a client." });
+
+            var clientValidation = await _clientService.AuthenticateClientForPostLogoutAsync(introspection.ClientId, postLogoutRedirectUri, ct);
+            if (!clientValidation.IsSuccess)
+                return BadRequest(new { error = clientValidation.ErrorCode ?? "invalid_request", error_description = clientValidation.Error });
+        }
+        else if (!string.IsNullOrWhiteSpace(postLogoutRedirectUri))
+        {
+            return BadRequest(new { error = "invalid_request", error_description = "id_token_hint is required when post_logout_redirect_uri is provided." });
+        }
+
         await HttpContext.SignOutAsync(AppWebModule.AuthenticationScheme);
 
         if (!string.IsNullOrWhiteSpace(postLogoutRedirectUri) && Uri.TryCreate(postLogoutRedirectUri, UriKind.Absolute, out _))
-            return Redirect(postLogoutRedirectUri);
+        {
+            var redirectUri = postLogoutRedirectUri;
+            if (!string.IsNullOrWhiteSpace(state))
+                redirectUri = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(redirectUri, "state", state);
+
+            return Redirect(redirectUri);
+        }
 
         return Redirect("/");
     }
@@ -246,10 +298,11 @@ public class OpenIdController : ControllerBase
         return _jwtOptions.Issuer.TrimEnd('/');
     }
 
-    private static OidcRequestedClaims ResolveRequestedClaims(string? scope)
+    private static OidcRequestedClaims ResolveRequestedClaims(string? scope, string? claimsJson)
     {
-        // 中文注释：当前 access token 里只保留了 scope，没有携带原始 claims 参数。
-        // 因此 userinfo 先按 scope 映射基础 claim，并允许未来继续扩展为更精细的 claims 透传。
+        // 中文注释：优先使用授权阶段传入的 OIDC claims 参数，
+        // 没有显式 claims 请求时，再按 scope 做基础 claim 回退。
+        var requestedClaims = OidcRequestedClaims.Parse(claimsJson);
         var userInfoClaims = new HashSet<string>(BaseUserInfoClaims, StringComparer.Ordinal);
         var requestedScopes = scope?
             .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -268,6 +321,11 @@ public class OpenIdController : ControllerBase
             userInfoClaims.Remove("phone_number_verified");
         }
 
+        if (requestedClaims.HasExplicitRequests)
+        {
+            userInfoClaims.UnionWith(requestedClaims.UserInfoClaims);
+        }
+
         return OidcRequestedClaims.Create(userInfoClaims: userInfoClaims);
     }
 
@@ -280,18 +338,44 @@ public class OpenIdController : ControllerBase
             ["name"] = user.Nickname,
         };
 
-        if (requestedClaims.RequestsUserInfoClaim("email"))
+        if (requestedClaims.RequestsUserInfoClaim("nickname"))
+            payload["nickname"] = user.Nickname;
+
+        if (OidcClaimEmissionPolicy.ShouldEmitRequestedClaim(requestedClaims, "email", user.Email))
             payload["email"] = user.Email;
 
         if (requestedClaims.RequestsUserInfoClaim("email_verified"))
             payload["email_verified"] = false;
 
-        if (requestedClaims.RequestsUserInfoClaim("phone_number"))
+        if (OidcClaimEmissionPolicy.ShouldEmitRequestedClaim(requestedClaims, "phone_number", user.PhoneNumber))
             payload["phone_number"] = user.PhoneNumber;
 
         if (requestedClaims.RequestsUserInfoClaim("phone_number_verified"))
             payload["phone_number_verified"] = false;
 
+        if (OidcClaimEmissionPolicy.ShouldEmitRequestedClaim(requestedClaims, "gender", user.Gender.ToString()))
+            payload["gender"] = user.Gender.ToString();
+
+        if (OidcClaimEmissionPolicy.ShouldEmitRequestedClaim(requestedClaims, "ethnicity", user.Ethnicity))
+            payload["ethnicity"] = user.Ethnicity;
+
+        if (requestedClaims.RequestsUserInfoClaim("address"))
+        {
+            payload["address"] = new Dictionary<string, object?>
+            {
+                ["formatted"] = null,
+            };
+        }
+
         return payload;
+    }
+
+    private async Task RevokeRefreshTokenForClientAsync(string token, string clientId, CancellationToken ct)
+    {
+        var isOwnedByClient = await _tokenService.IsRefreshTokenOwnedByClientAsync(token, clientId, ct);
+        if (!isOwnedByClient)
+            return;
+
+        await _tokenService.RevokeRefreshTokenAsync(token, clientId, ct);
     }
 }

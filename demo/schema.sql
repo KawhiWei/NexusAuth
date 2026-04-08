@@ -2,8 +2,10 @@
 -- NexusAuth demo schema (full reset)
 -- 说明：
 -- 1) 本脚本会删除并重建 nexusauth 数据库。
--- 2) 不创建任何表间外键依赖（按你的要求）。
--- 3) 表结构对齐当前代码中的 DbContext + EF 配置。
+-- 2) 只负责建库、建 schema、建表、建索引。
+-- 3) 不创建任何表间外键依赖（按你的要求）。
+-- 4) 所有 demo 种子数据统一放在 seed.sql，不在本脚本中插入数据。
+-- 5) 推荐执行顺序：先 schema.sql，再 seed.sql。
 -- ============================================================
 
 SELECT pg_terminate_backend(pid)
@@ -51,6 +53,7 @@ CREATE TABLE nexusauth.oauth_clients (
     client_name         varchar(256)    NOT NULL,
     description         text,
     redirect_uris       jsonb           NOT NULL,
+    post_logout_redirect_uris jsonb     NOT NULL,
     allowed_scopes      jsonb           NOT NULL,
     allowed_grant_types jsonb           NOT NULL,
     require_pkce        boolean         NOT NULL DEFAULT true,

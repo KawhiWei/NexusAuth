@@ -6,6 +6,8 @@ public class JwtOptions
 
     public string DefaultAudience { get; set; } = default!;
 
+    public string SigningKeyPath { get; set; } = "App_Data/signing-key.json";
+
     public int AccessTokenLifetimeMinutes { get; set; } = 60;
 
     public int DeviceCodeLifetimeMinutes { get; set; } = 15;

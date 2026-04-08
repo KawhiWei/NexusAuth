@@ -1,0 +1,94 @@
+@page "/consent"
+@model NexusAuth.Host.Pages.ConsentModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Consent - NexusAuth</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f3f6fb; color: #0f172a; }
+        .shell { max-width: 760px; margin: 40px auto; padding: 0 16px; }
+        .card { background: #fff; border-radius: 16px; box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08); padding: 28px; }
+        h1 { margin: 0 0 12px; font-size: 28px; }
+        p { color: #475569; line-height: 1.7; }
+        .meta { margin: 20px 0; padding: 14px 16px; background: #eff6ff; border-radius: 12px; }
+        .section { margin-top: 24px; }
+        .section h2 { margin: 0 0 10px; font-size: 18px; }
+        ul { margin: 0; padding-left: 20px; color: #1e293b; }
+        li { margin-bottom: 8px; }
+        .error { padding: 12px 14px; border-radius: 12px; background: #fef2f2; color: #b91c1c; }
+        .actions { display: flex; gap: 12px; margin-top: 28px; flex-wrap: wrap; }
+        button { border: 0; cursor: pointer; border-radius: 12px; padding: 12px 18px; font-size: 14px; font-weight: 600; }
+        .approve { background: #2563eb; color: #fff; }
+        .deny { background: #e2e8f0; color: #0f172a; }
+    </style>
+</head>
+<body>
+<div class="shell">
+    <div class="card">
+        <h1>授权确认</h1>
+        <p>客户端 <strong>@Model.ClientId</strong> 正在请求访问你的 NexusAuth 账户信息。请确认本次授权内容。</p>
+
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+        {
+            <div class="error">@Model.ErrorMessage</div>
+        }
+        else
+        {
+            <div class="meta">
+                <div><strong>回调地址：</strong>@Model.RedirectUri</div>
+            </div>
+
+            <div class="section">
+                <h2>请求的 Scope</h2>
+                <ul>
+                    @foreach (var item in Model.ScopeItems)
+                    {
+                        <li>@item</li>
+                    }
+                </ul>
+            </div>
+
+            @if (Model.ClaimItems.Count > 0)
+            {
+                <div class="section">
+                    <h2>请求的 Claims</h2>
+                    <ul>
+                        @foreach (var item in Model.ClaimItems)
+                        {
+                            <li>@item</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            <div class="actions">
+                <form method="post" asp-page-handler="Approve">
+                    <input type="hidden" asp-for="ClientId" />
+                    <input type="hidden" asp-for="RedirectUri" />
+                    <input type="hidden" asp-for="Scope" />
+                    <input type="hidden" asp-for="State" />
+                    <input type="hidden" asp-for="Nonce" />
+                    <input type="hidden" asp-for="Prompt" />
+                    <input type="hidden" asp-for="MaxAge" />
+                    <input type="hidden" asp-for="Claims" />
+                    <input type="hidden" asp-for="CodeChallenge" />
+                    <input type="hidden" asp-for="CodeChallengeMethod" />
+                    <button type="submit" class="approve">允许并继续</button>
+                </form>
+                <form method="post" asp-page-handler="Deny">
+                    <input type="hidden" asp-for="RedirectUri" />
+                    <input type="hidden" asp-for="State" />
+                    <button type="submit" class="deny">拒绝</button>
+                </form>
+            </div>
+        }
+    </div>
+</div>
+</body>
+</html>

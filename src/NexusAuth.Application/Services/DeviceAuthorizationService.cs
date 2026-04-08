@@ -24,7 +24,9 @@ public class DeviceAuthorizationService : IDeviceAuthorizationService
     /// </summary>
     public async Task<DeviceAuthorizationStartResult> StartAsync(string clientId, string? clientSecret, string scope, CancellationToken ct = default)
     {
-        var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: true, ct);
+        // 中文注释：设备授权常用于输入受限设备，应允许 public client 使用，
+        // 因此这里不再强制要求 client_secret。
+        var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: false, ct);
         if (!authentication.IsSuccess)
             return DeviceAuthorizationStartResult.Failure(authentication.ErrorCode ?? "invalid_client", authentication.Error ?? "Invalid client.");
 
@@ -59,7 +61,7 @@ public class DeviceAuthorizationService : IDeviceAuthorizationService
     /// </summary>
     public async Task<DeviceAuthorizationPollResult> PollAsync(string clientId, string? clientSecret, string deviceCode, CancellationToken ct = default)
     {
-        var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: true, ct);
+        var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: false, ct);
         if (!authentication.IsSuccess)
             return DeviceAuthorizationPollResult.Failure(authentication.ErrorCode ?? "invalid_client", authentication.Error ?? "Invalid client.");
 

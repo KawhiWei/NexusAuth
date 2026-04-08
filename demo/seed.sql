@@ -39,6 +39,7 @@ ON CONFLICT (name) DO UPDATE SET
 -- OAuth2 / OIDC Demo 1: authorization_code + refresh_token
 -- 对应项目：Demo.Bff + Demo.Web
 -- client_secret: demo-bff-secret
+-- 说明：authorization_code 已按 OAuth 2.1 风格收敛为强制 S256 PKCE。
 -- ------------------------------------------------------------
 -- client_secret: demo-bff-secret
 INSERT INTO oauth_clients (id, client_id, client_secret_hash, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
@@ -107,7 +108,7 @@ VALUES (
     'demo-device',
     '$2a$12$pw856E1CHH3FfcshE0NwCeETGR5hyYaeudBqZfQYCpXdbBuvOpuuy',
     'Demo Device Flow Client',
-    'Console demo client for OAuth2 device_code and refresh_token grants',
+    'Console demo client for OAuth2 device_code and refresh_token grants (public-client friendly)',
     '[]',
     '[]',
     '["openid","profile","email","phone","offline_access","demo_api"]',

@@ -56,7 +56,7 @@ public class AuthorizeController(
 
         // Validate client via Application layer
         var clientValidation = await clientService.ValidateClientForAuthorizationAsync(
-            clientId, redirectUri, "authorization_code", codeChallenge, ct);
+            clientId, redirectUri, "authorization_code", codeChallenge, codeChallengeMethod, ct);
 
         if (!clientValidation.IsSuccess)
             return BadRequest(new { error = clientValidation.ErrorCode, error_description = clientValidation.Error });

@@ -75,6 +75,7 @@ public class ClientService : IClientService
         string redirectUri,
         string grantType,
         string? codeChallenge = null,
+        string? codeChallengeMethod = null,
         CancellationToken ct = default)
     {
         var client = await _clientRepository.FindByClientIdAsync(clientId, ct);
@@ -89,9 +90,17 @@ public class ClientService : IClientService
             return ClientValidationResult.Failure("unauthorized_client",
                 $"Client is not allowed to use {grantType} grant type.");
 
-        if (client.RequirePkce && string.IsNullOrWhiteSpace(codeChallenge))
-            return ClientValidationResult.Failure("invalid_request",
-                "code_challenge is required for this client (PKCE).");
+        if (string.Equals(grantType, "authorization_code", StringComparison.OrdinalIgnoreCase))
+        {
+            // 中文注释：向 OAuth 2.1 收敛时，authorization_code 流程统一强制 PKCE，
+            // 并且只允许更安全的 S256，不再接受 plain。
+            // 主要调用方：/connect/authorize。
+            if (string.IsNullOrWhiteSpace(codeChallenge))
+                return ClientValidationResult.Failure("invalid_request", "code_challenge is required for authorization_code flow.");
+
+            if (!string.Equals(codeChallengeMethod, "S256", StringComparison.Ordinal))
+                return ClientValidationResult.Failure("invalid_request", "code_challenge_method must be S256 for authorization_code flow.");
+        }
 
         return ClientValidationResult.Success();
     }

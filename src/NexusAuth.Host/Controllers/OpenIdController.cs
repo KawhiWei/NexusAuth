@@ -76,7 +76,7 @@ public class OpenIdController : ControllerBase
                 "sub", "preferred_username", "name", "nickname", "email", "phone_number", "email_verified",
                 "phone_number_verified", "gender", "ethnicity", "address", "nonce", "at_hash", "auth_time", "acr", "amr"
             },
-            code_challenge_methods_supported = new[] { "plain", "S256" },
+            code_challenge_methods_supported = new[] { "S256" },
             claims_parameter_supported = true,
             request_parameter_supported = false,
             request_uri_parameter_supported = false,
@@ -190,7 +190,7 @@ public class OpenIdController : ControllerBase
         if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
             return Unauthorized(new { error = "invalid_client" });
 
-        var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: true, ct);
+        var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: false, ct);
         if (!authentication.IsSuccess)
             return Unauthorized(new { error = "invalid_client" });
 
@@ -232,7 +232,7 @@ public class OpenIdController : ControllerBase
         if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
             return Unauthorized(new { error = "invalid_client" });
 
-        var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: true, ct);
+        var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: false, ct);
         if (!authentication.IsSuccess)
             return Unauthorized(new { error = "invalid_client" });
 

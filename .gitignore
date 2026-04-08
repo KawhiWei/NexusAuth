@@ -287,3 +287,4 @@ pnpm-debug.log*
 __pycache__/
 *.pyc
 ./.github
+signing-key.json

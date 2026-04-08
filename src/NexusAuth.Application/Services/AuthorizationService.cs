@@ -167,9 +167,6 @@ public class AuthorizationService : IAuthorizationService
 
     private static bool VerifyPkce(string codeVerifier, string codeChallenge, string? codeChallengeMethod)
     {
-        if (codeChallengeMethod is null or "plain")
-            return codeVerifier == codeChallenge;
-
         if (codeChallengeMethod == "S256")
         {
             var hash = SHA256.HashData(Encoding.ASCII.GetBytes(codeVerifier));
@@ -180,6 +177,7 @@ public class AuthorizationService : IAuthorizationService
             return computed == codeChallenge;
         }
 
+        // 中文注释：OAuth 2.1 风格下只接受 S256，这里明确拒绝 plain 和其它方法。
         return false;
     }
 }

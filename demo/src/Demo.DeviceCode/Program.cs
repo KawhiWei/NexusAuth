@@ -6,11 +6,13 @@ var authority = Environment.GetEnvironmentVariable("NEXUSAUTH_AUTHORITY") ?? "ht
 var clientId = Environment.GetEnvironmentVariable("NEXUSAUTH_CLIENT_ID") ?? "demo-device";
 var clientSecret = Environment.GetEnvironmentVariable("NEXUSAUTH_CLIENT_SECRET") ?? "demo-bff-secret";
 var scope = Environment.GetEnvironmentVariable("NEXUSAUTH_SCOPE") ?? "openid profile email phone offline_access demo_api";
+var apiUrl = Environment.GetEnvironmentVariable("DEMO_BFF_API") ?? "http://localhost:5201/api/m2m/profile";
 
 Console.WriteLine("=== Demo: device_code ===");
 Console.WriteLine($"Authority: {authority}");
 Console.WriteLine($"ClientId : {clientId}");
 Console.WriteLine($"Scope    : {scope}");
+Console.WriteLine($"BFF API  : {apiUrl}");
 Console.WriteLine();
 
 using var http = new HttpClient();
@@ -68,6 +70,21 @@ while (true)
     {
         Console.WriteLine("设备授权成功，token 响应如下：");
         PrintJson(pollPayload);
+
+        if (pollRoot.TryGetProperty("access_token", out var accessTokenElement) && accessTokenElement.ValueKind == JsonValueKind.String)
+        {
+            Console.WriteLine();
+            Console.WriteLine("开始使用 access_token 调用 Demo.Bff 接口...");
+
+            using var apiRequest = new HttpRequestMessage(HttpMethod.Get, apiUrl);
+            apiRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessTokenElement.GetString());
+            var apiResponse = await http.SendAsync(apiRequest);
+            var apiPayload = await apiResponse.Content.ReadAsStringAsync();
+
+            Console.WriteLine($"BFF HTTP {(int)apiResponse.StatusCode} {apiResponse.StatusCode}");
+            PrintJson(apiPayload);
+        }
+
         if (pollRoot.TryGetProperty("refresh_token", out var refreshTokenElement) && refreshTokenElement.ValueKind == JsonValueKind.String)
         {
             Console.WriteLine();

@@ -31,6 +31,7 @@ public interface IClientService : IScopedDependency
         string redirectUri,
         string grantType,
         string? codeChallenge = null,
+        string? codeChallengeMethod = null,
         CancellationToken ct = default);
 
     Task<ClientAuthenticationResult> AuthenticateClientAsync(

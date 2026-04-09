@@ -13,7 +13,8 @@ internal static class ClientAssertionHelper
         string keyId,
         CancellationToken ct = default)
     {
-        var pem = await File.ReadAllTextAsync(privateKeyPath, ct);
+        var resolvedPath = ResolvePrivateKeyPath(privateKeyPath);
+        var pem = await File.ReadAllTextAsync(resolvedPath, ct);
         using var rsa = RSA.Create();
         rsa.ImportFromPem(pem);
         var keyParameters = rsa.ExportParameters(true);
@@ -39,5 +40,31 @@ internal static class ClientAssertionHelper
         form["client_id"] = clientId;
         form["client_assertion_type"] = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
         form["client_assertion"] = handler.WriteToken(token);
+    }
+
+    private static string ResolvePrivateKeyPath(string configuredPath)
+    {
+        if (Path.IsPathRooted(configuredPath) && File.Exists(configuredPath))
+            return configuredPath;
+
+        var fileName = Path.GetFileName(configuredPath);
+
+        var candidates = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, configuredPath),
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", configuredPath),
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "keys", fileName),
+            Path.Combine(Environment.CurrentDirectory, configuredPath),
+            Path.Combine(Environment.CurrentDirectory, "demo", "src", "Demo.RefreshToken", "keys", fileName),
+        };
+
+        foreach (var candidate in candidates)
+        {
+            var fullPath = Path.GetFullPath(candidate);
+            if (File.Exists(fullPath))
+                return fullPath;
+        }
+
+        throw new FileNotFoundException($"Private key file was not found: {configuredPath}");
     }
 }

@@ -226,11 +226,34 @@ public class OidcBffService
             throw new InvalidOperationException("ClientAssertionPrivateKeyPem or ClientAssertionPrivateKeyPath must be configured for private_key_jwt.");
 
         var configuredPath = _authOptions.ClientAssertionPrivateKeyPath;
-        var resolvedPath = Path.IsPathRooted(configuredPath)
-            ? configuredPath
-            : Path.Combine(_environment.ContentRootPath, configuredPath);
+        var resolvedPath = ResolvePrivateKeyPath(configuredPath);
 
         return await File.ReadAllTextAsync(resolvedPath, ct);
+    }
+
+    private string ResolvePrivateKeyPath(string configuredPath)
+    {
+        if (Path.IsPathRooted(configuredPath) && File.Exists(configuredPath))
+            return configuredPath;
+
+        var fileName = Path.GetFileName(configuredPath);
+
+        var candidates = new[]
+        {
+            Path.Combine(_environment.ContentRootPath, configuredPath),
+            Path.Combine(AppContext.BaseDirectory, configuredPath),
+            Path.Combine(Environment.CurrentDirectory, configuredPath),
+            Path.Combine(_environment.ContentRootPath, "keys", fileName),
+        };
+
+        foreach (var candidate in candidates)
+        {
+            var fullPath = Path.GetFullPath(candidate);
+            if (File.Exists(fullPath))
+                return fullPath;
+        }
+
+        throw new FileNotFoundException($"Private key file was not found: {configuredPath}");
     }
 }
 

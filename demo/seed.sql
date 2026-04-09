@@ -38,7 +38,7 @@ ON CONFLICT (name) DO UPDATE SET
 -- auth_method: private_key_jwt
 -- 说明：authorization_code 已按 OAuth 2.1 风格收敛为强制 S256 PKCE。
 -- ------------------------------------------------------------
--- key_id: demo-pkjwt-key-1
+-- key_id: demo-bff-key-1
 INSERT INTO oauth_clients (id, client_id, client_secrets, token_endpoint_auth_method, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
 VALUES (
     '20000000-0000-0000-0000-000000000001',
@@ -46,8 +46,8 @@ VALUES (
     jsonb_build_array(
         jsonb_build_object(
             'Type', 'jwks',
-            'Value', '{"keys":[{"kty":"RSA","kid":"demo-pkjwt-key-1","use":"sig","alg":"RS256","n":"6w09s2hJkNzMwC9RyInQU4IoUtcaunsRp6dJRIS6VUHLxMCWJQyKeLtOH6_PiWHx6-pfddIRHdrP7LRJjB-Zdw9WJcaOLPquEOuXc9COJvENZZxp26Hg7t_T7LIJR366bMEyv1FsaaO0uKJj8AHQUOw6BaR0qD3qwGXrlzV1aDrJewnrwuXhlufhKZkgHXpAvUbi4vthCEvJqhgdHtagDFCHAUYJHupH8GYe5Hcg0iJ7VNw9lnIAkFcnqKiUPMimJ934m0sjZTGEcOSMtDMya02KZvD2wRxf5lyCmQK5ZP48mFNQdPuZezsvlVivVFhFzsEvoAynWbF6vhs5awCWwQ","e":"AQAB"}]}',
-            'Description', 'demo-bff-pkjwt-keyset'
+            'Value', '{"keys":[{"kty":"RSA","kid":"demo-bff-key-1","use":"sig","alg":"RS256","n":"7Bghnu8yZRRAnvax9eqUO0MziC3hSa4XKBP-mEE8WpFs8smd9PLgulFHCJEgZdTpT7eM6i-1HrQl66F2yP9iZiZ8cKbpYzL-QKH8ii8VLaXJ9bMR7mEKPAOU85H3tQS0W5RMGemXdN78o7oQwn8p3_mAoKby77YI3EcwNBaoZo51ud7x7jAxBGA0IiHhTqCrJEo4t3eXREIepEN5xBXAcnTTqTdrUQXWrEL0bD06Hud_xm2SapuxbogLkPKK3keRhTPSbEcZrAbVsNr08WnCMoGa6QsSSpj6Bk4kFF-nJDZyENU0IzZO28n_Uz0bSgEHGlIl0Qe2iv9hz6wdlHw6-Q","e":"AQAB"}]}',
+            'Description', 'demo-bff-jwks'
         )
     ),
     'private_key_jwt',
@@ -83,8 +83,8 @@ VALUES (
     jsonb_build_array(
         jsonb_build_object(
             'Type', 'jwks',
-            'Value', '{"keys":[{"kty":"RSA","kid":"demo-pkjwt-key-1","use":"sig","alg":"RS256","n":"6w09s2hJkNzMwC9RyInQU4IoUtcaunsRp6dJRIS6VUHLxMCWJQyKeLtOH6_PiWHx6-pfddIRHdrP7LRJjB-Zdw9WJcaOLPquEOuXc9COJvENZZxp26Hg7t_T7LIJR366bMEyv1FsaaO0uKJj8AHQUOw6BaR0qD3qwGXrlzV1aDrJewnrwuXhlufhKZkgHXpAvUbi4vthCEvJqhgdHtagDFCHAUYJHupH8GYe5Hcg0iJ7VNw9lnIAkFcnqKiUPMimJ934m0sjZTGEcOSMtDMya02KZvD2wRxf5lyCmQK5ZP48mFNQdPuZezsvlVivVFhFzsEvoAynWbF6vhs5awCWwQ","e":"AQAB"}]}',
-            'Description', 'demo-cc-pkjwt-keyset'
+            'Value', '{"keys":[{"kty":"RSA","kid":"demo-cc-key-1","use":"sig","alg":"RS256","n":"qcGBVp2tCI3PlfndpcWi5MPT-6sNej-_El3p5ivGDzUy_26Do6R2Bak3o4uJ7a4im5WuHtBRmfzgSJlPl7GPuc5KEjnhIupBtvbpKnEhSFKpcYt-0-E6lIA-asudW2AUgXGWjGO53e9_kml-qZ63E976op-tkecILxDpha846YbHIvpE4_hZLxmw4jCpGSzjvJdnM80po5qguwktBHCQuvUVSk2j_5RwiiN9bKHYNiWoIzpwXNXGyvbaANuk_FYIcHLG-kPHUMuWZSpt7lAq1Z045aiG_Nat9aBAA76klOcyuOF6-FI3qQenkoAEHC-VgG3NsNPRn25CJes0varcdQ","e":"AQAB"}]}',
+            'Description', 'demo-cc-jwks'
         )
     ),
     'private_key_jwt',
@@ -120,8 +120,8 @@ VALUES (
     jsonb_build_array(
         jsonb_build_object(
             'Type', 'jwks',
-            'Value', '{"keys":[{"kty":"RSA","kid":"demo-pkjwt-key-1","use":"sig","alg":"RS256","n":"6w09s2hJkNzMwC9RyInQU4IoUtcaunsRp6dJRIS6VUHLxMCWJQyKeLtOH6_PiWHx6-pfddIRHdrP7LRJjB-Zdw9WJcaOLPquEOuXc9COJvENZZxp26Hg7t_T7LIJR366bMEyv1FsaaO0uKJj8AHQUOw6BaR0qD3qwGXrlzV1aDrJewnrwuXhlufhKZkgHXpAvUbi4vthCEvJqhgdHtagDFCHAUYJHupH8GYe5Hcg0iJ7VNw9lnIAkFcnqKiUPMimJ934m0sjZTGEcOSMtDMya02KZvD2wRxf5lyCmQK5ZP48mFNQdPuZezsvlVivVFhFzsEvoAynWbF6vhs5awCWwQ","e":"AQAB"}]}',
-            'Description', 'demo-device-pkjwt-keyset'
+            'Value', '{"keys":[{"kty":"RSA","kid":"demo-device-key-1","use":"sig","alg":"RS256","n":"yxfXmgXAnVynvxs0fGwdlmjA71O6tS8O3UuGDZ_7Z0BQ4t_T3fCjIRJeqQ3_-sHG-cocuKm6eCmbinEoneoQVbKZ7HjL_HmWQ2vm2CfpwvtY719R43oHLn1vXxx87kKqDVpCJwETlC-iyA9OkNlbSASY5aFTc5wFd1uxjEUUUwJm9yMn6lclZn23Mt32ayh7j6cfuCWSSI2jeV6v0wikeDm3MYE9G42PZJ9SX-fSsCgY7u3u9OopLgwEUBhnpQT1MEWsxy_hVqNpD-6nVOhhJdw5lka1qEzZJ1Keoq5xib4SmGDGOrEzebd-qq9XMWKNfvZ-BEzCcp1vyHUJ0B7HiQ","e":"AQAB"}]}',
+            'Description', 'demo-device-jwks'
         )
     ),
     'private_key_jwt',
@@ -156,8 +156,8 @@ VALUES (
     jsonb_build_array(
         jsonb_build_object(
             'Type', 'jwks',
-            'Value', '{"keys":[{"kty":"RSA","kid":"demo-pkjwt-key-1","use":"sig","alg":"RS256","n":"6w09s2hJkNzMwC9RyInQU4IoUtcaunsRp6dJRIS6VUHLxMCWJQyKeLtOH6_PiWHx6-pfddIRHdrP7LRJjB-Zdw9WJcaOLPquEOuXc9COJvENZZxp26Hg7t_T7LIJR366bMEyv1FsaaO0uKJj8AHQUOw6BaR0qD3qwGXrlzV1aDrJewnrwuXhlufhKZkgHXpAvUbi4vthCEvJqhgdHtagDFCHAUYJHupH8GYe5Hcg0iJ7VNw9lnIAkFcnqKiUPMimJ934m0sjZTGEcOSMtDMya02KZvD2wRxf5lyCmQK5ZP48mFNQdPuZezsvlVivVFhFzsEvoAynWbF6vhs5awCWwQ","e":"AQAB"}]}',
-            'Description', 'demo-pkjwt-keyset'
+            'Value', '{"keys":[{"kty":"RSA","kid":"demo-cert-key-1","use":"sig","alg":"RS256","n":"pPbIZWa9Kor7p4jaPrNrv29XigyKHTuBU3QG7xDRgy5GqbX16QBl715QtgCqe6mQAYhrazLH7LIecQ1ymeD7OCy6Bm0llgvGSTr8X_JU8dsrVN6MF7ab31bcOy1GggTdXpU-5QTfVcyd0MxQw1zxRubEj4jEhw2abUEn7PAdWgVLyB4r-sz0uMq7DQkUhOI8horrKowP_3rqumuba54Pj4hRwmKoSzEpW3MGvwhaanDzqTSWng00ooOysTNZou198Xpwq-BXxeX868KS-ud4DbebbzOQ85eyToRKC80jJscvlD8QcJJ6Uh_rcJPGJfaZPKgtwLy4q1szxFhXqUepXw","e":"AQAB"}]}',
+            'Description', 'demo-cert-jwks'
         )
     ),
     'private_key_jwt',

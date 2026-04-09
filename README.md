@@ -1,6 +1,7 @@
 # NexusAuth
 
 `Nexus` 意为“连接点”，隐喻统一认证中心作为多个系统之间的连接枢纽。
+<img width="2586" height="1487" alt="image" src="https://github.com/user-attachments/assets/8995624b-b769-401b-bae5-9c4a8a998c33" />
 
 NexusAuth 是一个基于 ASP.NET Core 的 OAuth 2.0 / OpenID Connect 认证授权服务示例工程，当前项目已经具备以下能力：
 

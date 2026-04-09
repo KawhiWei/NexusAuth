@@ -29,7 +29,8 @@ public class RefreshToken : EntityWithIdentity<Guid>
     public static RefreshToken Create(
         string clientId,
         Guid userId,
-        string scope)
+        string scope,
+        TimeSpan? lifetime = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
         ArgumentException.ThrowIfNullOrWhiteSpace(scope);
@@ -43,7 +44,7 @@ public class RefreshToken : EntityWithIdentity<Guid>
             UserId = userId,
             Scope = scope,
             IsRevoked = false,
-            ExpiresAt = now.AddDays(30),
+            ExpiresAt = now.Add(lifetime ?? TimeSpan.FromDays(30)),
             CreatedAt = now,
         };
     }

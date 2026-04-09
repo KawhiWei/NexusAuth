@@ -192,7 +192,8 @@ public class TokenService : ITokenService
         string scope,
         CancellationToken ct = default)
     {
-        var refreshToken = RefreshToken.Create(clientId, userId, scope);
+        var refreshLifetime = TimeSpan.FromMinutes(_jwtOptions.RefreshTokenLifetimeMinutes);
+        var refreshToken = RefreshToken.Create(clientId, userId, scope, refreshLifetime);
         await _refreshTokenRepository.AddAsync(refreshToken, ct);
 
         return refreshToken.Token;
@@ -232,7 +233,8 @@ public class TokenService : ITokenService
         var newRefreshToken = RefreshToken.Create(
             existingToken.ClientId,
             existingToken.UserId,
-            existingToken.Scope);
+            existingToken.Scope,
+            TimeSpan.FromMinutes(_jwtOptions.RefreshTokenLifetimeMinutes));
         await _refreshTokenRepository.AddAsync(newRefreshToken, ct);
 
         // Issue new access token

@@ -6,6 +6,8 @@ using System.Text;
 using System.Text.Json;
 using Demo.Bff.Models;
 using Demo.Bff.Options;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Options;
@@ -83,7 +85,71 @@ public class OidcBffService
 
     public bool IsExpired(SessionPayload session)
     {
-        return session.IssuedAtUtc.AddSeconds(session.ExpiresIn - 30) <= DateTimeOffset.UtcNow;
+        var refreshWindowSeconds = Math.Min(10, Math.Max(session.ExpiresIn / 4, 1));
+        return session.IssuedAtUtc.AddSeconds(session.ExpiresIn - refreshWindowSeconds) <= DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
+    /// 确保当前 Cookie 会话对应的 access_token 仍然可用。
+    /// 如果 access_token 即将过期且存在 refresh_token，则在服务端自动刷新并续签 Cookie。
+    /// </summary>
+    public async Task<SessionRenewalResult?> EnsureActiveSessionAsync(ClaimsPrincipal principal, CancellationToken ct)
+    {
+        var session = ReadSession(principal);
+        if (session is null)
+            return null;
+
+        if (!IsExpired(session))
+            return SessionRenewalResult.NotRefreshed(session, principal);
+
+        if (string.IsNullOrWhiteSpace(session.RefreshToken))
+            return null;
+
+        var discovery = await FetchDiscoveryAsync(ct);
+        var client = _httpClientFactory.CreateClient();
+        await ApplyClientAuthenticationAsync(client);
+        var refreshForm = new Dictionary<string, string>
+        {
+            ["grant_type"] = "refresh_token",
+            ["refresh_token"] = session.RefreshToken,
+        };
+        await AppendClientAuthenticationFormFieldsAsync(refreshForm, discovery.TokenEndpoint, ct);
+        var refreshRequest = new FormUrlEncodedContent(refreshForm);
+
+        var response = await client.PostAsync(discovery.TokenEndpoint, refreshRequest, ct);
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+        var root = document.RootElement;
+        var accessToken = root.GetProperty("access_token").GetString();
+        if (string.IsNullOrWhiteSpace(accessToken))
+            return null;
+
+        var refreshed = session with
+        {
+            AccessToken = accessToken,
+            RefreshToken = root.TryGetProperty("refresh_token", out var refreshedRt) ? refreshedRt.GetString() : session.RefreshToken,
+            IdToken = root.TryGetProperty("id_token", out var refreshedIdToken) ? refreshedIdToken.GetString() : session.IdToken,
+            ExpiresIn = root.TryGetProperty("expires_in", out var expiresIn) ? expiresIn.GetInt32() : session.ExpiresIn,
+            IssuedAtUtc = DateTimeOffset.UtcNow,
+            User = await FetchUserInfoAsync(discovery.UserInfoEndpoint, accessToken, ct),
+        };
+
+        var claims = new List<Claim>
+        {
+            new("sub", refreshed.User.Sub ?? string.Empty),
+            new("name", refreshed.User.Name ?? refreshed.User.PreferredUsername ?? refreshed.User.Sub ?? "Unknown"),
+            new("preferred_username", refreshed.User.PreferredUsername ?? string.Empty),
+            new("session_payload", JsonSerializer.Serialize(refreshed)),
+        };
+
+        if (!string.IsNullOrWhiteSpace(refreshed.User.Email))
+            claims.Add(new("email", refreshed.User.Email));
+
+        var refreshedPrincipal = new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
+
+        return SessionRenewalResult.Refreshed(refreshed, refreshedPrincipal);
     }
 
     public async Task<ValidatedIdToken> ValidateIdTokenAsync(DiscoveryDocument discovery, string idToken, string expectedNonce, CancellationToken ct)
@@ -258,3 +324,12 @@ public class OidcBffService
 }
 
 public record PkcePair(string CodeVerifier, string CodeChallenge);
+
+public sealed record SessionRenewalResult(SessionPayload Session, ClaimsPrincipal Principal, bool IsRefreshed)
+{
+    public static SessionRenewalResult NotRefreshed(SessionPayload session, ClaimsPrincipal principal)
+        => new(session, principal, false);
+
+    public static SessionRenewalResult Refreshed(SessionPayload session, ClaimsPrincipal principal)
+        => new(session, principal, true);
+}

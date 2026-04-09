@@ -1,0 +1,19 @@
+sequenceDiagram
+    autonumber
+    participant Client as Demo.RefreshToken or Demo.Bff
+    participant Auth as NexusAuth
+    participant Api as Demo.Bff /api/profile or /api/m2m/profile
+
+    Client->>Client: 发现 access_token 即将过期或已过期
+    Client->>Auth: POST /connect/token<br/>grant_type=refresh_token<br/>refresh_token=...<br/>client authentication
+    Auth->>Auth: 校验客户端身份<br/>- client_secret_basic 或 private_key_jwt
+    Auth->>Auth: 校验 refresh_token<br/>- 未过期<br/>- 未吊销<br/>- 绑定当前 client_id
+    Auth->>Auth: 吊销旧 refresh_token
+    Auth->>Auth: 生成新 access_token 和新 refresh_token
+    Auth-->>Client: access_token + refresh_token + expires_in
+
+    Client->>Client: 替换本地保存的 access_token / refresh_token
+    Client->>Api: 使用刷新后的 access_token 继续访问受保护接口
+    Api->>Auth: 资源服务器验证新的 access_token
+    Auth-->>Api: access_token 有效
+    Api-->>Client: 返回业务响应

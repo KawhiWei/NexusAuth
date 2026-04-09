@@ -15,6 +15,9 @@ var jwtSection = builder.Configuration.GetSection("Jwt");
 var issuer = jwtSection["Issuer"]!;
 var audience = jwtSection["Audience"]!;
 var sessionCookieName = builder.Configuration["Session:CookieName"] ?? ".Demo.Bff.Session";
+var sessionCookieMinutes = int.TryParse(builder.Configuration["Session:CookieLifetimeMinutes"], out var parsedSessionCookieMinutes)
+    ? parsedSessionCookieMinutes
+    : 10;
 
 builder.Services.Configure<FrontendOptions>(builder.Configuration.GetSection("Frontend"));
 builder.Services.Configure<NexusAuthBffOptions>(builder.Configuration.GetSection("NexusAuth"));
@@ -27,21 +30,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.SameSite = SameSiteMode.Strict;
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
         options.SlidingExpiration = true;
-        options.ExpireTimeSpan = TimeSpan.FromHours(8);
-        options.Events = new CookieAuthenticationEvents
-        {
-            OnRedirectToLogin = context =>
-            {
-                // API/BFF 场景统一返回 401，避免默认跳转登录页。
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                return Task.CompletedTask;
-            },
-            OnRedirectToAccessDenied = context =>
-            {
-                context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                return Task.CompletedTask;
-            },
-        };
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(sessionCookieMinutes);
+        options.EventsType = typeof(OidcSessionCookieEvents);
     })
     .AddJwtBearer("Bearer", options =>
     {
@@ -77,6 +67,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddControllers();
 builder.Services.AddSingleton<ConcurrentDictionary<string, OidcFlowState>>();
 builder.Services.AddScoped<OidcBffService>();
+builder.Services.AddScoped<OidcSessionCookieEvents>();
 
 var app = builder.Build();
 

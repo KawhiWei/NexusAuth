@@ -121,7 +121,7 @@ public class AuthController : ControllerBase
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties
         {
             IsPersistent = true,
-            ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8),
+            ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(3),
         });
 
         return Redirect($"{_oidcBffService.FrontendBaseUrl}/auth/callback");
@@ -133,15 +133,6 @@ public class AuthController : ControllerBase
         var session = _oidcBffService.ReadSession(User);
         if (session is null)
             return Unauthorized();
-
-        if (_oidcBffService.IsExpired(session))
-        {
-            var refreshed = await RefreshSessionAsync(session, ct);
-            if (refreshed is null)
-                return Unauthorized();
-
-            session = refreshed;
-        }
 
         return Ok(new
         {
@@ -168,63 +159,5 @@ public class AuthController : ControllerBase
         {
             logoutUrl = $"{_oidcBffService.Authority.TrimEnd('/')}/connect/endsession?id_token_hint={Uri.EscapeDataString(session?.IdToken ?? string.Empty)}&post_logout_redirect_uri={Uri.EscapeDataString(_oidcBffService.PostLogoutRedirectUri)}&state={Uri.EscapeDataString(Guid.NewGuid().ToString("N"))}",
         });
-    }
-
-    private async Task<SessionPayload?> RefreshSessionAsync(SessionPayload session, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(session.RefreshToken))
-            return null;
-
-        var discovery = await _oidcBffService.FetchDiscoveryAsync(ct);
-        var client = HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
-        await _oidcBffService.ApplyClientAuthenticationAsync(client);
-        var refreshForm = new Dictionary<string, string>
-        {
-            ["grant_type"] = "refresh_token",
-            ["refresh_token"] = session.RefreshToken,
-        };
-        await _oidcBffService.AppendClientAuthenticationFormFieldsAsync(refreshForm, discovery.TokenEndpoint, ct);
-        var refreshRequest = new FormUrlEncodedContent(refreshForm);
-
-        var response = await client.PostAsync(discovery.TokenEndpoint, refreshRequest, ct);
-        if (!response.IsSuccessStatusCode)
-            return null;
-
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
-        var root = document.RootElement;
-        var accessToken = root.GetProperty("access_token").GetString();
-        if (string.IsNullOrWhiteSpace(accessToken))
-            return null;
-
-        var refreshed = session with
-        {
-            AccessToken = accessToken,
-            RefreshToken = root.TryGetProperty("refresh_token", out var refreshedRt) ? refreshedRt.GetString() : session.RefreshToken,
-            IdToken = root.TryGetProperty("id_token", out var refreshedIdToken) ? refreshedIdToken.GetString() : session.IdToken,
-            ExpiresIn = root.TryGetProperty("expires_in", out var expiresIn) ? expiresIn.GetInt32() : session.ExpiresIn,
-            IssuedAtUtc = DateTimeOffset.UtcNow,
-            User = await _oidcBffService.FetchUserInfoAsync(discovery.UserInfoEndpoint, accessToken, ct),
-        };
-
-        var claims = new List<Claim>
-        {
-            new("sub", refreshed.User.Sub ?? string.Empty),
-            new("name", refreshed.User.Name ?? refreshed.User.PreferredUsername ?? refreshed.User.Sub ?? "Unknown"),
-            new("preferred_username", refreshed.User.PreferredUsername ?? string.Empty),
-            new("session_payload", JsonSerializer.Serialize(refreshed)),
-        };
-
-        if (!string.IsNullOrWhiteSpace(refreshed.User.Email))
-            claims.Add(new("email", refreshed.User.Email));
-
-        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
-
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties
-        {
-            IsPersistent = true,
-            ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8),
-        });
-
-        return refreshed;
     }
 }

@@ -30,4 +30,9 @@ sequenceDiagram
     BFF->>BFF: 建立本地 Cookie Session
     BFF-->>Web: 返回登录成功状态
     Web->>BFF: GET /api/profile
+    BFF->>BFF: Cookie 中间件自动验证会话<br/>access_token 接近过期时触发 refresh_token
+    BFF->>Auth: POST /connect/token<br/>grant_type=refresh_token<br/>refresh_token=...<br/>client_assertion(private_key_jwt)
+    Auth->>Auth: 校验 refresh_token 与 client 绑定<br/>吊销旧 refresh_token 并签发新 token
+    Auth-->>BFF: 新的 access_token + refresh_token
+    BFF->>BFF: 更新 Cookie Session 中的 session_payload
     BFF-->>Web: 返回当前登录用户信息

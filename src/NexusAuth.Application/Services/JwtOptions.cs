@@ -11,4 +11,6 @@ public class JwtOptions
     public int AccessTokenLifetimeMinutes { get; set; } = 60;
 
     public int DeviceCodeLifetimeMinutes { get; set; } = 15;
+
+    public int RefreshTokenLifetimeMinutes { get; set; } = 43200;
 }

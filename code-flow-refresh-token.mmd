@@ -1,0 +1,20 @@
+sequenceDiagram
+    autonumber
+    participant Client as Demo.Bff / Demo.RefreshToken / Demo.DeviceCode
+    participant Token as TokenController
+    participant ClientSvc as ClientService
+    participant TokenSvc as TokenService
+    participant RTRepo as RefreshTokenRepository
+
+    Client->>Token: POST /connect/token<br/>grant_type=refresh_token
+    Token->>ClientSvc: AuthenticateClientAsync
+    ClientSvc-->>Token: 客户端认证通过
+    Token->>TokenSvc: RefreshAsync(refresh_token, client_id)
+    TokenSvc->>RTRepo: FindByTokenAsync
+    RTRepo-->>TokenSvc: RefreshToken
+    TokenSvc->>TokenSvc: 校验未吊销 / 未过期 / 属于当前 client
+    TokenSvc->>RTRepo: RevokeAsync(old refresh_token)
+    TokenSvc->>RTRepo: AddAsync(new refresh_token)
+    TokenSvc->>TokenSvc: IssueAccessTokenAsync
+    TokenSvc-->>Token: 新 access_token + 新 refresh_token
+    Token-->>Client: token 响应

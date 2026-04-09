@@ -78,6 +78,15 @@ public class ClientService : IClientService
         bool requireClientAuthentication,
         CancellationToken ct = default)
     {
+        // 中文注释：这是整个系统统一的客户端认证入口。
+        // 当前支持：
+        // 1. client_secret_basic / client_secret_post
+        // 2. private_key_jwt
+        // 主要调用方：
+        // - /connect/token
+        // - /connect/deviceauthorization
+        // - /connect/introspect
+        // - /connect/revocation
         if (string.IsNullOrWhiteSpace(input.ClientId))
             return ClientAuthenticationResult.Failure("invalid_client", "client_id is required.");
 

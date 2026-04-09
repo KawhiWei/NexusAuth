@@ -33,6 +33,17 @@ public class TokenController : ControllerBase
     /// </summary>
     /// <summary>
     /// 统一 Token 入口，根据 grant_type 分发到具体流程。
+    /// 主要流程：
+    /// 1. 解析客户端认证（client_secret_basic / client_secret_post / private_key_jwt）
+    /// 2. 进入 authorization_code / client_credentials / refresh_token / device_code 分支
+    /// 3. 调用 Application 层完成客户端校验、授权码消费、refresh token 轮换或 device_code 兑换
+    /// 4. 签发 access_token / id_token / refresh_token
+    /// 主要调用方：
+    /// - Demo.Bff
+    /// - Demo.Bff.ClientSecret
+    /// - Demo.ClientCredentials
+    /// - Demo.DeviceCode
+    /// - Demo.RefreshToken
     /// </summary>
     [HttpPost("/connect/token")]
     [Consumes("application/x-www-form-urlencoded")]
@@ -162,6 +173,7 @@ public class TokenController : ControllerBase
         string? refreshToken,
         CancellationToken ct)
     {
+        // 中文注释：refresh_token 分支会先校验客户端身份，再调用 TokenService 做旧 refresh token 吊销和新 token 轮换。
         if (string.IsNullOrWhiteSpace(refreshToken))
             return BadRequest(new { error = "invalid_request", error_description = "refresh_token is required." });
 
@@ -191,6 +203,7 @@ public class TokenController : ControllerBase
         string? deviceCode,
         CancellationToken ct)
     {
+        // 中文注释：device_code 分支本身只负责“兑换”，真正的 device_code 状态机在 DeviceAuthorizationService 中维护。
         if (string.IsNullOrWhiteSpace(authentication.ClientId))
             return BadRequest(new { error = "invalid_request", error_description = "client_id is required." });
 

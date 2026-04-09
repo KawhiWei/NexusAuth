@@ -24,6 +24,15 @@ public class AuthorizeController(
     /// </summary>
     /// <summary>
     /// OAuth2/OIDC 授权端点，负责校验请求并签发 authorization code。
+    /// 主要流程：
+    /// 1. 校验 client_id / redirect_uri / scope / PKCE
+    /// 2. 检查当前浏览器是否已登录
+    /// 3. 必要时跳转登录页或 consent 页
+    /// 4. 登录成功后签发 authorization code 并重定向回客户端
+    /// 主要调用方：
+    /// - Demo.Bff
+    /// - Demo.Bff.ClientSecret
+    /// - 任意标准 OIDC Web Client
     /// </summary>
     /// <exception cref="ArgumentNullException"></exception>
     [HttpGet("/connect/authorize")]

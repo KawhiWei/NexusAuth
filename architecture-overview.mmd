@@ -1,0 +1,80 @@
+flowchart LR
+    RO[Resource Owner User]
+
+    subgraph ClientSide[OAuth Clients]
+        WEBCLIENT[Web Client and BFF]
+        MACHINECLIENT[Machine Client]
+        DEVICECLIENT[Device Client]
+        THIRDPARTY[Grafana and External OIDC Client]
+    end
+
+    subgraph AuthorizationServer[Authorization Server - NexusAuth.Host]
+        AUTHENDPOINT[Authorize Endpoint AuthorizeController]
+        TOKENENDPOINT[Token Endpoint TokenController]
+        OIDCENDPOINTS[OIDC Endpoints OpenIdController]
+        LOGINUI[Login Consent Device Pages]
+    end
+
+    subgraph CoreServices[Core Application Services - NexusAuth.Application]
+        CLIENTSERVICE[ClientService Client Authentication and Scope Validation]
+        AUTHSERVICE[AuthorizationService Authorization Code Flow]
+        TOKENSERVICE[TokenService AccessToken IdToken RefreshToken]
+        DEVICESERVICE[DeviceAuthorizationService Device Code State Machine]
+        VALIDATOR[ClientPrivateKeyJwtValidator]
+        SIGNING[Signing Credentials Provider]
+    end
+
+    subgraph DataLayer[Persistence and Domain]
+        CLIENTDATA[OAuthClient and OAuthClientSecret]
+        CODEDATA[AuthorizationCode]
+        TOKENDATA[RefreshToken and TokenBlacklistEntry]
+        DEVICEDATA[DeviceAuthorization]
+        USERDATA[User]
+        REPOS[Repositories and EF Core Configurations]
+        DB[(PostgreSQL)]
+    end
+
+    subgraph ResourceServer[Resource Server]
+        API[Protected API and Resource API]
+    end
+
+    RO --> WEBCLIENT
+    RO --> DEVICECLIENT
+
+    WEBCLIENT --> AUTHENDPOINT
+    MACHINECLIENT --> TOKENENDPOINT
+    DEVICECLIENT --> TOKENENDPOINT
+    DEVICECLIENT --> OIDCENDPOINTS
+    THIRDPARTY --> AUTHENDPOINT
+    THIRDPARTY --> TOKENENDPOINT
+    THIRDPARTY --> OIDCENDPOINTS
+
+    AUTHENDPOINT --> LOGINUI
+    AUTHENDPOINT --> CLIENTSERVICE
+    AUTHENDPOINT --> AUTHSERVICE
+
+    TOKENENDPOINT --> CLIENTSERVICE
+    TOKENENDPOINT --> AUTHSERVICE
+    TOKENENDPOINT --> TOKENSERVICE
+    TOKENENDPOINT --> DEVICESERVICE
+
+    OIDCENDPOINTS --> CLIENTSERVICE
+    OIDCENDPOINTS --> TOKENSERVICE
+    OIDCENDPOINTS --> DEVICESERVICE
+    OIDCENDPOINTS --> SIGNING
+
+    CLIENTSERVICE --> VALIDATOR
+    CLIENTSERVICE --> REPOS
+    AUTHSERVICE --> REPOS
+    TOKENSERVICE --> REPOS
+    DEVICESERVICE --> REPOS
+
+    REPOS --> CLIENTDATA
+    REPOS --> CODEDATA
+    REPOS --> TOKENDATA
+    REPOS --> DEVICEDATA
+    REPOS --> USERDATA
+    REPOS --> DB
+
+    TOKENENDPOINT --> API
+    OIDCENDPOINTS --> API

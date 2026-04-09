@@ -21,6 +21,7 @@ public class DeviceAuthorizationService : IDeviceAuthorizationService
 
     /// <summary>
     /// 发起 device authorization 请求，生成 device_code / user_code。
+    /// 主要调用方：OpenIdController 的 /connect/deviceauthorization。
     /// </summary>
     public async Task<DeviceAuthorizationStartResult> StartAsync(ClientAuthenticationInput authentication, string scope, CancellationToken ct = default)
     {
@@ -60,6 +61,7 @@ public class DeviceAuthorizationService : IDeviceAuthorizationService
 
     /// <summary>
     /// 轮询 device_code 状态，完成后返回用户信息用于签发 token。
+    /// 主要调用方：TokenController 的 device_code 分支。
     /// </summary>
     public async Task<DeviceAuthorizationPollResult> PollAsync(ClientAuthenticationInput authentication, string deviceCode, CancellationToken ct = default)
     {

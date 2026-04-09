@@ -43,6 +43,12 @@ public class OpenIdController : ControllerBase
 
     /// <summary>
     /// OIDC Discovery 元数据端点。
+    /// 主要调用方：
+    /// - Demo.Bff / Demo.Bff.ClientSecret
+    /// - Demo.ClientCredentials
+    /// - Demo.DeviceCode
+    /// - Demo.RefreshToken
+    /// - Grafana / 其他外部 OIDC Client
     /// </summary>
     [HttpGet("/.well-known/openid-configuration")]
     public IActionResult Discovery()
@@ -96,6 +102,10 @@ public class OpenIdController : ControllerBase
 
     /// <summary>
     /// OIDC UserInfo 端点。
+    /// 主要流程：
+    /// 1. 解析 Bearer access_token
+    /// 2. 通过 TokenService 做 introspection 风格校验
+    /// 3. 按 scope 和 claims 参数返回用户信息
     /// </summary>
     [HttpGet("/connect/userinfo")]
     public async Task<IActionResult> UserInfo(CancellationToken ct)
@@ -129,6 +139,7 @@ public class OpenIdController : ControllerBase
 
     /// <summary>
     /// Device Authorization 端点。
+    /// 主要调用方：Demo.DeviceCode，以及任意符合 RFC 8628 的设备端客户端。
     /// </summary>
     [HttpPost("/connect/deviceauthorization")]
     [Consumes("application/x-www-form-urlencoded")]
@@ -219,6 +230,10 @@ public class OpenIdController : ControllerBase
 
     /// <summary>
     /// OAuth2 Revocation 端点。
+    /// 主要流程：
+    /// 1. 校验客户端身份
+    /// 2. 对 access_token / refresh_token 做客户端边界检查
+    /// 3. 吊销 token 或加入黑名单
     /// </summary>
     [HttpPost("/connect/revocation")]
     [Consumes("application/x-www-form-urlencoded")]

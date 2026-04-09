@@ -1,0 +1,91 @@
+flowchart TB
+    classDef layer fill:#ffffff,stroke:#cbd5e1,stroke-width:1px,color:#0f172a;
+    classDef access fill:#eef6ff,stroke:#60a5fa,stroke-width:1.5px,color:#0f172a;
+    classDef presentation fill:#eff6ff,stroke:#2563eb,stroke-width:1.5px,color:#0f172a;
+    classDef application fill:#f0fdf4,stroke:#16a34a,stroke-width:1.5px,color:#0f172a;
+    classDef domain fill:#f8fafc,stroke:#64748b,stroke-width:1.5px,color:#0f172a;
+    classDef infra fill:#fff7ed,stroke:#ea580c,stroke-width:1.5px,color:#0f172a;
+    classDef storage fill:#f5f3ff,stroke:#7c3aed,stroke-width:1.5px,color:#0f172a;
+
+    subgraph L1[Access Layer]
+        direction LR
+        C1[Browser Client]
+        C2[Web Application and BFF]
+        C3[Machine Client]
+        C4[Device Client]
+        C5[External OIDC Client]
+    end
+    class L1 layer
+    class C1,C2,C3,C4,C5 access
+
+    subgraph L2[Presentation Layer · NexusAuth.Host]
+        direction LR
+        P1[OAuth Endpoints<br/>authorize · token]
+        P2[OIDC Endpoints<br/>discovery · jwks · userinfo<br/>revocation · introspection · logout]
+        P3[Interaction Pages<br/>login · consent · device]
+    end
+    class L2 layer
+    class P1,P2,P3 presentation
+
+    subgraph L3[Application Layer · NexusAuth.Application]
+        direction LR
+        A1[Client Authentication<br/>client_secret and private_key_jwt]
+        A2[Authorization Orchestration<br/>authorization code · PKCE · consent]
+        A3[Token Lifecycle<br/>access token · id token · refresh token rotation]
+        A4[Device Flow Orchestration<br/>device_code · polling · approval state]
+        A5[Security Rules<br/>scope validation · replay protection · client boundary]
+    end
+    class L3 layer
+    class A1,A2,A3,A4,A5 application
+
+    subgraph L4[Domain Layer · NexusAuth.Domain]
+        direction LR
+        D1[Identity and Client Model<br/>User · OAuthClient · OAuthClientSecret]
+        D2[Grant and Session Model<br/>AuthorizationCode · RefreshToken · DeviceAuthorization]
+        D3[Security Model<br/>TokenBlacklistEntry · Domain Rules]
+        D4[Repository Contracts<br/>Repository Interfaces]
+    end
+    class L4 layer
+    class D1,D2,D3,D4 domain
+
+    subgraph L5[Infrastructure Layer · NexusAuth.Persistence]
+        direction LR
+        I1[Repository Implementations]
+        I2[Entity Framework Core Mapping]
+        I3[Database Integration]
+    end
+    class L5 layer
+    class I1,I2,I3 infra
+
+    subgraph L6[Storage Layer]
+        direction LR
+        S1[(PostgreSQL)]
+        S2[(Signing Key Storage)]
+    end
+    class L6 layer
+    class S1,S2 storage
+
+    L1 --> L2 --> L3 --> L4 --> L5 --> L6
+
+    P1 --> A1
+    P1 --> A2
+    P1 --> A3
+    P2 --> A1
+    P2 --> A3
+    P2 --> A4
+    P3 --> A2
+    P3 --> A4
+
+    A1 --> A5
+    A2 --> D2
+    A3 --> D2
+    A4 --> D2
+    A5 --> D3
+
+    L3 --> D4
+    I1 -. implements .-> D4
+
+    I1 --> S1
+    I2 --> S1
+    I3 --> S1
+    A3 --> S2

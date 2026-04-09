@@ -27,6 +27,11 @@ public class AuthorizationService : IAuthorizationService
 
     /// <summary>
     /// 生成并持久化授权码（authorization code）。
+    /// 主要调用方：AuthorizeController。
+    /// 主要职责：
+    /// 1. 校验 scope
+    /// 2. 解析 claims 参数
+    /// 3. 生成一次性 authorization code 并入库
     /// </summary>
     public async Task<string> GenerateCodeAsync(
         Guid userId,
@@ -87,6 +92,12 @@ public class AuthorizationService : IAuthorizationService
 
     /// <summary>
     /// 校验授权码并消费（一次性使用）。
+    /// 主要调用方：TokenController 的 authorization_code 分支。
+    /// 主要职责：
+    /// 1. 校验 code 是否存在、是否过期、是否已被使用
+    /// 2. 校验 redirect_uri
+    /// 3. 校验 PKCE
+    /// 4. 将授权码标记为已消费
     /// </summary>
     public async Task<AuthorizationCodeResult> ValidateAndConsumeCodeAsync(
         string code,

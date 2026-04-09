@@ -1,0 +1,26 @@
+sequenceDiagram
+    autonumber
+    participant Endpoint as Token/OpenId Endpoint
+    participant Parser as OAuthClientAuthenticationParser
+    participant ClientSvc as ClientService
+    participant ClientRepo as OAuthClientRepository
+    participant PKJWT as ClientPrivateKeyJwtValidator
+    participant Blacklist as TokenBlacklistRepository
+
+    Endpoint->>Parser: ResolveClientAuthentication
+    Parser-->>Endpoint: ClientAuthenticationInput
+    Endpoint->>ClientSvc: AuthenticateClientAsync
+    ClientSvc->>ClientRepo: FindByClientIdAsync
+    ClientRepo-->>ClientSvc: OAuthClient
+
+    alt token_endpoint_auth_method = private_key_jwt
+        ClientSvc->>PKJWT: Validate(client_assertion, jwks, audience)
+        PKJWT-->>ClientSvc: 校验签名 / iss / sub / aud / alg / jti
+        ClientSvc->>Blacklist: ExistsActiveAsync(client_assertion:jti)
+        Blacklist-->>ClientSvc: 是否已使用
+        ClientSvc->>Blacklist: AddAsync(client_assertion:jti)
+    else token_endpoint_auth_method = client_secret_basic/post
+        ClientSvc->>ClientSvc: VerifyClientSecret
+    end
+
+    ClientSvc-->>Endpoint: ClientAuthenticationResult

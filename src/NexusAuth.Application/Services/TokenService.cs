@@ -50,6 +50,9 @@ public class TokenService : ITokenService
 
     /// <summary>
     /// 签发访问令牌并返回元信息（jti、过期时间等）。
+    /// 主要调用方：
+    /// - TokenController 的 authorization_code / client_credentials / device_code 分支
+    /// - TokenService.RefreshAsync 内部续签 access_token
     /// </summary>
     public async Task<TokenIssueResult> IssueAccessTokenWithMetadataAsync(
         string clientId,
@@ -99,6 +102,7 @@ public class TokenService : ITokenService
 
     /// <summary>
     /// 签发 OIDC 的 id_token。
+    /// 主要调用方：TokenController 的 authorization_code / device_code 分支。
     /// </summary>
     public async Task<string> IssueIdTokenAsync(
         string clientId,
@@ -185,6 +189,7 @@ public class TokenService : ITokenService
 
     /// <summary>
     /// 生成并持久化 refresh_token。
+    /// 主要调用方：TokenController 的 authorization_code / device_code 分支。
     /// </summary>
     public async Task<string> IssueRefreshTokenAsync(
         string clientId,
@@ -201,6 +206,14 @@ public class TokenService : ITokenService
 
     /// <summary>
     /// 使用 refresh_token 轮换刷新访问令牌。
+    /// 主要流程：
+    /// 1. 查找 refresh_token
+    /// 2. 校验是否过期、是否已吊销、是否属于当前 client
+    /// 3. 吊销旧 refresh_token
+    /// 4. 签发新的 refresh_token 与 access_token
+    /// 主要调用方：
+    /// - TokenController 的 refresh_token 分支
+    /// - Demo.Bff 的自动续期逻辑
     /// </summary>
     public async Task<RefreshResult> RefreshAsync(
         string refreshTokenString,

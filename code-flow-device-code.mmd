@@ -1,0 +1,30 @@
+sequenceDiagram
+    autonumber
+    participant Device as Demo.DeviceCode
+    participant OpenId as OpenIdController
+    participant DeviceSvc as DeviceAuthorizationService
+    participant DeviceRepo as DeviceAuthorizationRepository
+    participant Token as TokenController
+    participant TokenSvc as TokenService
+
+    Device->>OpenId: POST /connect/deviceauthorization
+    OpenId->>DeviceSvc: StartAsync
+    DeviceSvc->>DeviceRepo: AddAsync(device_authorization)
+    DeviceRepo-->>DeviceSvc: 持久化 device_code / user_code
+    DeviceSvc-->>OpenId: 返回 verification_uri / user_code
+    OpenId-->>Device: device_code 响应
+
+    loop 轮询
+        Device->>Token: POST /connect/token<br/>grant_type=device_code
+        Token->>DeviceSvc: PollAsync
+        DeviceSvc->>DeviceRepo: FindByDeviceCodeAsync + UpdateAsync
+        alt 用户未授权
+            DeviceSvc-->>Token: authorization_pending / slow_down
+            Token-->>Device: 错误响应
+        else 用户已授权
+            DeviceSvc-->>Token: user_id / client_id / scope
+            Token->>TokenSvc: IssueAccessTokenWithMetadataAsync
+            Token->>TokenSvc: IssueRefreshTokenAsync
+            Token-->>Device: access_token + refresh_token
+        end
+    end

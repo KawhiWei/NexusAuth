@@ -1,0 +1,31 @@
+sequenceDiagram
+    autonumber
+    participant Client as Demo.Bff or External OIDC Client
+    participant Authorize as AuthorizeController
+    participant ClientSvc as ClientService
+    participant AuthSvc as AuthorizationService
+    participant CodeRepo as AuthorizationCodeRepository
+    participant Token as TokenController
+    participant TokenSvc as TokenService
+
+    Client->>Authorize: GET /connect/authorize
+    Authorize->>ClientSvc: ValidateClientForAuthorizationAsync
+    ClientSvc-->>Authorize: client + redirect_uri + PKCE 验证结果
+    Authorize->>Authorize: 检查登录态 / prompt / consent / max_age
+    Authorize->>AuthSvc: GenerateCodeAsync
+    AuthSvc->>CodeRepo: AddAsync(authorization_code)
+    CodeRepo-->>AuthSvc: 持久化完成
+    AuthSvc-->>Authorize: 返回 code
+    Authorize-->>Client: 302 redirect_uri?code=...&state=...
+
+    Client->>Token: POST /connect/token<br/>grant_type=authorization_code
+    Token->>ClientSvc: AuthenticateClientAsync
+    ClientSvc-->>Token: 客户端认证通过
+    Token->>AuthSvc: ValidateAndConsumeCodeAsync
+    AuthSvc->>CodeRepo: FindByCodeAsync + MarkUsedAsync
+    AuthSvc-->>Token: 返回 user_id / scope / nonce / claims
+    Token->>TokenSvc: IssueAccessTokenWithMetadataAsync
+    Token->>TokenSvc: IssueRefreshTokenAsync
+    Token->>TokenSvc: IssueIdTokenAsync
+    TokenSvc-->>Token: access_token + refresh_token + id_token
+    Token-->>Client: 返回 token 响应

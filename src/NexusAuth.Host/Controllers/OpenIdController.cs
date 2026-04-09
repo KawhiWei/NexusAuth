@@ -70,7 +70,8 @@ public class OpenIdController : ControllerBase
             },
             subject_types_supported = new[] { "public" },
             id_token_signing_alg_values_supported = new[] { "RS256" },
-            token_endpoint_auth_methods_supported = new[] { "client_secret_post", "client_secret_basic" },
+            token_endpoint_auth_methods_supported = new[] { "client_secret_post", "client_secret_basic", "private_key_jwt" },
+            token_endpoint_auth_signing_alg_values_supported = new[] { "RS256" },
             claims_supported = new[]
             {
                 "sub", "preferred_username", "name", "nickname", "email", "phone_number", "email_verified",
@@ -134,23 +135,26 @@ public class OpenIdController : ControllerBase
     public async Task<IActionResult> DeviceAuthorization(
         [FromForm(Name = "client_id")] string? clientId,
         [FromForm(Name = "client_secret")] string? clientSecret,
+        [FromForm(Name = "client_assertion_type")] string? clientAssertionType,
+        [FromForm(Name = "client_assertion")] string? clientAssertion,
         [FromForm] string? scope,
         CancellationToken ct = default)
     {
         var resolvedClientAuthentication = OAuthClientAuthenticationParser.ResolveClientAuthentication(
             Request.Headers.Authorization.ToString(),
             clientId,
-            clientSecret);
-        clientId = resolvedClientAuthentication.ClientId;
-        clientSecret = resolvedClientAuthentication.ClientSecret;
+            clientSecret,
+            clientAssertionType,
+            clientAssertion,
+            GetEndpointAudience());
 
-        if (string.IsNullOrWhiteSpace(clientId))
+        if (string.IsNullOrWhiteSpace(resolvedClientAuthentication.ClientId))
             return BadRequest(new { error = "invalid_request", error_description = "client_id is required." });
 
         if (string.IsNullOrWhiteSpace(scope))
             return BadRequest(new { error = "invalid_request", error_description = "scope is required." });
 
-        var result = await _deviceAuthorizationService.StartAsync(clientId, clientSecret, scope, ct);
+        var result = await _deviceAuthorizationService.StartAsync(resolvedClientAuthentication, scope, ct);
         if (!result.IsSuccess)
             return BadRequest(new { error = result.ErrorCode, error_description = result.Error });
 
@@ -177,27 +181,30 @@ public class OpenIdController : ControllerBase
     public async Task<IActionResult> Introspect(
         [FromForm(Name = "client_id")] string? clientId,
         [FromForm(Name = "client_secret")] string? clientSecret,
+        [FromForm(Name = "client_assertion_type")] string? clientAssertionType,
+        [FromForm(Name = "client_assertion")] string? clientAssertion,
         [FromForm] string? token,
         CancellationToken ct = default)
     {
         var resolvedClientAuthentication = OAuthClientAuthenticationParser.ResolveClientAuthentication(
             Request.Headers.Authorization.ToString(),
             clientId,
-            clientSecret);
-        clientId = resolvedClientAuthentication.ClientId;
-        clientSecret = resolvedClientAuthentication.ClientSecret;
+            clientSecret,
+            clientAssertionType,
+            clientAssertion,
+            GetEndpointAudience());
 
-        if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
+        if (string.IsNullOrWhiteSpace(resolvedClientAuthentication.ClientId))
             return Unauthorized(new { error = "invalid_client" });
 
-        var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: false, ct);
+        var authentication = await _clientService.AuthenticateClientAsync(resolvedClientAuthentication, requireClientAuthentication: true, ct);
         if (!authentication.IsSuccess)
             return Unauthorized(new { error = "invalid_client" });
 
         if (string.IsNullOrWhiteSpace(token))
             return BadRequest(new { error = "invalid_request", error_description = "token is required." });
 
-        var result = await _tokenService.IntrospectAsync(token, clientId, ct);
+        var result = await _tokenService.IntrospectAsync(token, resolvedClientAuthentication.ClientId, ct);
         return Ok(new
         {
             active = result.Active,
@@ -218,6 +225,8 @@ public class OpenIdController : ControllerBase
     public async Task<IActionResult> Revoke(
         [FromForm(Name = "client_id")] string? clientId,
         [FromForm(Name = "client_secret")] string? clientSecret,
+        [FromForm(Name = "client_assertion_type")] string? clientAssertionType,
+        [FromForm(Name = "client_assertion")] string? clientAssertion,
         [FromForm] string? token,
         [FromForm(Name = "token_type_hint")] string? tokenTypeHint,
         CancellationToken ct = default)
@@ -225,25 +234,26 @@ public class OpenIdController : ControllerBase
         var resolvedClientAuthentication = OAuthClientAuthenticationParser.ResolveClientAuthentication(
             Request.Headers.Authorization.ToString(),
             clientId,
-            clientSecret);
-        clientId = resolvedClientAuthentication.ClientId;
-        clientSecret = resolvedClientAuthentication.ClientSecret;
+            clientSecret,
+            clientAssertionType,
+            clientAssertion,
+            GetEndpointAudience());
 
-        if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
+        if (string.IsNullOrWhiteSpace(resolvedClientAuthentication.ClientId))
             return Unauthorized(new { error = "invalid_client" });
 
-        var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: false, ct);
+        var authentication = await _clientService.AuthenticateClientAsync(resolvedClientAuthentication, requireClientAuthentication: true, ct);
         if (!authentication.IsSuccess)
             return Unauthorized(new { error = "invalid_client" });
 
         if (!string.IsNullOrWhiteSpace(token))
         {
             if (string.Equals(tokenTypeHint, "refresh_token", StringComparison.OrdinalIgnoreCase))
-                await RevokeRefreshTokenForClientAsync(token, clientId, ct);
+                await RevokeRefreshTokenForClientAsync(token, resolvedClientAuthentication.ClientId, ct);
             else
             {
-                await _tokenService.RevokeAccessTokenAsync(token, clientId, ct);
-                await RevokeRefreshTokenForClientAsync(token, clientId, ct);
+                await _tokenService.RevokeAccessTokenAsync(token, resolvedClientAuthentication.ClientId, ct);
+                await RevokeRefreshTokenForClientAsync(token, resolvedClientAuthentication.ClientId, ct);
             }
         }
 
@@ -296,6 +306,16 @@ public class OpenIdController : ControllerBase
     {
         // 统一使用配置中的 Issuer，确保 discovery 的 issuer 与 token 的 iss 完全一致。
         return _jwtOptions.Issuer.TrimEnd('/');
+    }
+
+    private string GetEndpointAudience()
+    {
+        var request = HttpContext.Request;
+        var host = request.Host.HasValue ? request.Host.Value : null;
+        if (!string.IsNullOrWhiteSpace(host))
+            return $"{request.Scheme}://{host}{request.PathBase}{request.Path}";
+
+        return GetIssuer();
     }
 
     private static OidcRequestedClaims ResolveRequestedClaims(string? scope, string? claimsJson)

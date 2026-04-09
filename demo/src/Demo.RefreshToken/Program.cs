@@ -1,12 +1,12 @@
-using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
 
 var authority = Environment.GetEnvironmentVariable("NEXUSAUTH_AUTHORITY") ?? "http://localhost:5100";
 var clientId = Environment.GetEnvironmentVariable("NEXUSAUTH_CLIENT_ID") ?? "demo-device";
-var clientSecret = Environment.GetEnvironmentVariable("NEXUSAUTH_CLIENT_SECRET") ?? "demo-bff-secret";
+var privateKeyPath = Environment.GetEnvironmentVariable("NEXUSAUTH_CLIENT_PRIVATE_KEY_PATH") ?? Path.Combine(AppContext.BaseDirectory, "keys", "demo-client-private.pem");
+var keyId = Environment.GetEnvironmentVariable("NEXUSAUTH_CLIENT_KEY_ID") ?? "demo-pkjwt-key-1";
 
 Console.WriteLine("=== Demo: refresh_token ===");
+Console.WriteLine($"Auth     : private_key_jwt ({keyId})");
 Console.WriteLine("请先通过 Demo.DeviceCode 拿到 refresh_token，再粘贴到这里。\n");
 
 var refreshToken = Environment.GetEnvironmentVariable("NEXUSAUTH_REFRESH_TOKEN");
@@ -26,12 +26,13 @@ using var http = new HttpClient();
 var discovery = await GetDiscoveryAsync(http, authority);
 var tokenEndpoint = GetStringProperty(discovery, "token_endpoint");
 
-ApplyBasicAuth(http, clientId, clientSecret);
-using var request = new FormUrlEncodedContent(new Dictionary<string, string>
+var form = new Dictionary<string, string>
 {
     ["grant_type"] = "refresh_token",
     ["refresh_token"] = refreshToken,
-});
+};
+await ClientAssertionHelper.AppendPrivateKeyJwtAsync(form, clientId, tokenEndpoint, privateKeyPath, keyId);
+using var request = new FormUrlEncodedContent(form);
 
 var response = await http.PostAsync(tokenEndpoint, request);
 var payload = await response.Content.ReadAsStringAsync();
@@ -55,12 +56,6 @@ static string GetStringProperty(JsonElement element, string name)
         throw new InvalidOperationException($"Discovery missing '{name}'.");
 
     return value.GetString()!;
-}
-
-static void ApplyBasicAuth(HttpClient http, string clientId, string clientSecret)
-{
-    var raw = Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}");
-    http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(raw));
 }
 
 static void PrintJson(string json)

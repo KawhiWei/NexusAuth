@@ -140,16 +140,16 @@ public class AuthorizationService : IAuthorizationService
     /// 校验 client_credentials 流程中的客户端与 scope。
     /// </summary>
     public async Task<ClientCredentialsResult> ValidateClientCredentialsAsync(
-        string clientId,
-        string rawClientSecret,
+        ClientAuthenticationInput authentication,
         string scope,
         CancellationToken ct = default)
     {
-        var authentication = await _clientService.AuthenticateClientAsync(clientId, rawClientSecret, requireSecret: true, ct);
-        if (!authentication.IsSuccess)
-            return ClientCredentialsResult.Failure(authentication.Error ?? "Invalid client.");
+        var result = await _clientService.AuthenticateClientAsync(authentication, requireClientAuthentication: true, ct);
+        if (!result.IsSuccess)
+            return ClientCredentialsResult.Failure(result.Error ?? "Invalid client.");
 
-        var client = authentication.Client!;
+        var client = result.Client!;
+        var clientId = client.ClientId;
 
         var clientPolicy = _securityPolicyService.CheckClient(clientId);
         if (!clientPolicy.IsSuccess)

@@ -1,16 +1,17 @@
 using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
 
 var authority = Environment.GetEnvironmentVariable("NEXUSAUTH_AUTHORITY") ?? "http://localhost:5100";
 var clientId = Environment.GetEnvironmentVariable("NEXUSAUTH_CLIENT_ID") ?? "demo-device";
-var clientSecret = Environment.GetEnvironmentVariable("NEXUSAUTH_CLIENT_SECRET") ?? "demo-bff-secret";
+var privateKeyPath = Environment.GetEnvironmentVariable("NEXUSAUTH_CLIENT_PRIVATE_KEY_PATH") ?? Path.Combine(AppContext.BaseDirectory, "keys", "demo-client-private.pem");
+var keyId = Environment.GetEnvironmentVariable("NEXUSAUTH_CLIENT_KEY_ID") ?? "demo-pkjwt-key-1";
 var scope = Environment.GetEnvironmentVariable("NEXUSAUTH_SCOPE") ?? "openid profile email phone offline_access demo_api";
 var apiUrl = Environment.GetEnvironmentVariable("DEMO_BFF_API") ?? "http://localhost:5201/api/m2m/profile";
 
 Console.WriteLine("=== Demo: device_code ===");
 Console.WriteLine($"Authority: {authority}");
 Console.WriteLine($"ClientId : {clientId}");
+Console.WriteLine($"Auth     : private_key_jwt ({keyId})");
 Console.WriteLine($"Scope    : {scope}");
 Console.WriteLine($"BFF API  : {apiUrl}");
 Console.WriteLine();
@@ -20,12 +21,13 @@ var discovery = await GetDiscoveryAsync(http, authority);
 var deviceEndpoint = GetStringProperty(discovery, "device_authorization_endpoint");
 var tokenEndpoint = GetStringProperty(discovery, "token_endpoint");
 
-ApplyBasicAuth(http, clientId, clientSecret);
-
-var startResponse = await http.PostAsync(deviceEndpoint, new FormUrlEncodedContent(new Dictionary<string, string>
+var startForm = new Dictionary<string, string>
 {
     ["scope"] = scope,
-}));
+};
+await ClientAssertionHelper.AppendPrivateKeyJwtAsync(startForm, clientId, deviceEndpoint, privateKeyPath, keyId);
+
+var startResponse = await http.PostAsync(deviceEndpoint, new FormUrlEncodedContent(startForm));
 
 var startPayload = await startResponse.Content.ReadAsStringAsync();
 if (!startResponse.IsSuccessStatusCode)
@@ -56,11 +58,14 @@ while (true)
 {
     await Task.Delay(TimeSpan.FromSeconds(interval));
 
-    var pollResponse = await http.PostAsync(tokenEndpoint, new FormUrlEncodedContent(new Dictionary<string, string>
+    var pollForm = new Dictionary<string, string>
     {
         ["grant_type"] = "urn:ietf:params:oauth:grant-type:device_code",
         ["device_code"] = deviceCode,
-    }));
+    };
+    await ClientAssertionHelper.AppendPrivateKeyJwtAsync(pollForm, clientId, tokenEndpoint, privateKeyPath, keyId);
+
+    var pollResponse = await http.PostAsync(tokenEndpoint, new FormUrlEncodedContent(pollForm));
 
     var pollPayload = await pollResponse.Content.ReadAsStringAsync();
     using var pollDocument = JsonDocument.Parse(pollPayload);
@@ -133,12 +138,6 @@ static string GetStringProperty(JsonElement element, string name)
         throw new InvalidOperationException($"JSON missing '{name}'.");
 
     return value.GetString()!;
-}
-
-static void ApplyBasicAuth(HttpClient http, string clientId, string clientSecret)
-{
-    var raw = Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}");
-    http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(raw));
 }
 
 static void PrintJson(string json)

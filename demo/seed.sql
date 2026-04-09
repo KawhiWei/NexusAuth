@@ -2,12 +2,9 @@
 -- NexusAuth demo seed data (single source of truth)
 -- 说明：
 -- 1) 该脚本是所有 demo 客户端的唯一种子数据来源。
--- 2) 支持的 demo / grant 类型：
---    - Demo.Bff + Demo.Web: authorization_code + refresh_token + OIDC
---    - Demo.ClientCredentials: client_credentials
---    - Demo.DeviceCode: device_code
---    - Demo.RefreshToken: refresh_token（复用 demo-device 客户端）
--- 3) 测试账号密码：alice / Pass@123, bob / Pass@123, admin / Pass@123
+-- 2) 所有 demo 客户端当前统一切到 private_key_jwt。
+-- 3) oauth_clients.client_secrets 使用统一多类型结构，预留后续扩展。
+-- 4) 测试账号密码：alice / Pass@123, bob / Pass@123, admin / Pass@123
 -- ============================================================
 
 \connect nexusauth
@@ -38,15 +35,22 @@ ON CONFLICT (name) DO UPDATE SET
 -- ------------------------------------------------------------
 -- OAuth2 / OIDC Demo 1: authorization_code + refresh_token
 -- 对应项目：Demo.Bff + Demo.Web
--- client_secret: demo-bff-secret
+-- auth_method: private_key_jwt
 -- 说明：authorization_code 已按 OAuth 2.1 风格收敛为强制 S256 PKCE。
 -- ------------------------------------------------------------
--- client_secret: demo-bff-secret
-INSERT INTO oauth_clients (id, client_id, client_secret_hash, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
+-- key_id: demo-pkjwt-key-1
+INSERT INTO oauth_clients (id, client_id, client_secrets, token_endpoint_auth_method, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
 VALUES (
     '20000000-0000-0000-0000-000000000001',
     'demo-bff',
-    '$2a$12$pw856E1CHH3FfcshE0NwCeETGR5hyYaeudBqZfQYCpXdbBuvOpuuy',
+    jsonb_build_array(
+        jsonb_build_object(
+            'Type', 'jwks',
+            'Value', '{"keys":[{"kty":"RSA","kid":"demo-pkjwt-key-1","use":"sig","alg":"RS256","n":"6w09s2hJkNzMwC9RyInQU4IoUtcaunsRp6dJRIS6VUHLxMCWJQyKeLtOH6_PiWHx6-pfddIRHdrP7LRJjB-Zdw9WJcaOLPquEOuXc9COJvENZZxp26Hg7t_T7LIJR366bMEyv1FsaaO0uKJj8AHQUOw6BaR0qD3qwGXrlzV1aDrJewnrwuXhlufhKZkgHXpAvUbi4vthCEvJqhgdHtagDFCHAUYJHupH8GYe5Hcg0iJ7VNw9lnIAkFcnqKiUPMimJ934m0sjZTGEcOSMtDMya02KZvD2wRxf5lyCmQK5ZP48mFNQdPuZezsvlVivVFhFzsEvoAynWbF6vhs5awCWwQ","e":"AQAB"}]}',
+            'Description', 'demo-bff-pkjwt-keyset'
+        )
+    ),
+    'private_key_jwt',
     'Demo Frontend BFF Client',
     'A front-end/back-end separated demo client for authorization code + OIDC',
     '["http://localhost:5201/signin-oidc"]',
@@ -58,7 +62,8 @@ VALUES (
     NOW()
 )
 ON CONFLICT (client_id) DO UPDATE SET
-    client_secret_hash = EXCLUDED.client_secret_hash,
+    client_secrets = EXCLUDED.client_secrets,
+    token_endpoint_auth_method = EXCLUDED.token_endpoint_auth_method,
     redirect_uris = EXCLUDED.redirect_uris,
     post_logout_redirect_uris = EXCLUDED.post_logout_redirect_uris,
     allowed_scopes = EXCLUDED.allowed_scopes,
@@ -69,14 +74,20 @@ ON CONFLICT (client_id) DO UPDATE SET
 -- ------------------------------------------------------------
 -- OAuth2 Demo 2: client_credentials
 -- 对应项目：Demo.ClientCredentials
--- client_secret: demo-bff-secret
+-- auth_method: private_key_jwt
 -- ------------------------------------------------------------
--- client_secret: demo-bff-secret
-INSERT INTO oauth_clients (id, client_id, client_secret_hash, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
+INSERT INTO oauth_clients (id, client_id, client_secrets, token_endpoint_auth_method, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
 VALUES (
     '20000000-0000-0000-0000-000000000101',
     'demo-cc',
-    '$2a$12$pw856E1CHH3FfcshE0NwCeETGR5hyYaeudBqZfQYCpXdbBuvOpuuy',
+    jsonb_build_array(
+        jsonb_build_object(
+            'Type', 'jwks',
+            'Value', '{"keys":[{"kty":"RSA","kid":"demo-pkjwt-key-1","use":"sig","alg":"RS256","n":"6w09s2hJkNzMwC9RyInQU4IoUtcaunsRp6dJRIS6VUHLxMCWJQyKeLtOH6_PiWHx6-pfddIRHdrP7LRJjB-Zdw9WJcaOLPquEOuXc9COJvENZZxp26Hg7t_T7LIJR366bMEyv1FsaaO0uKJj8AHQUOw6BaR0qD3qwGXrlzV1aDrJewnrwuXhlufhKZkgHXpAvUbi4vthCEvJqhgdHtagDFCHAUYJHupH8GYe5Hcg0iJ7VNw9lnIAkFcnqKiUPMimJ934m0sjZTGEcOSMtDMya02KZvD2wRxf5lyCmQK5ZP48mFNQdPuZezsvlVivVFhFzsEvoAynWbF6vhs5awCWwQ","e":"AQAB"}]}',
+            'Description', 'demo-cc-pkjwt-keyset'
+        )
+    ),
+    'private_key_jwt',
     'Demo Client Credentials Client',
     'Console demo client for OAuth2 client_credentials grant',
     '[]',
@@ -88,7 +99,8 @@ VALUES (
     NOW()
 )
 ON CONFLICT (client_id) DO UPDATE SET
-    client_secret_hash = EXCLUDED.client_secret_hash,
+    client_secrets = EXCLUDED.client_secrets,
+    token_endpoint_auth_method = EXCLUDED.token_endpoint_auth_method,
     redirect_uris = EXCLUDED.redirect_uris,
     post_logout_redirect_uris = EXCLUDED.post_logout_redirect_uris,
     allowed_scopes = EXCLUDED.allowed_scopes,
@@ -99,14 +111,20 @@ ON CONFLICT (client_id) DO UPDATE SET
 -- ------------------------------------------------------------
 -- OAuth2 Demo 3 + 4: device_code + refresh_token
 -- 对应项目：Demo.DeviceCode / Demo.RefreshToken
--- client_secret: demo-bff-secret
+-- auth_method: private_key_jwt
 -- ------------------------------------------------------------
--- client_secret: demo-bff-secret
-INSERT INTO oauth_clients (id, client_id, client_secret_hash, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
+INSERT INTO oauth_clients (id, client_id, client_secrets, token_endpoint_auth_method, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
 VALUES (
     '20000000-0000-0000-0000-000000000102',
     'demo-device',
-    '$2a$12$pw856E1CHH3FfcshE0NwCeETGR5hyYaeudBqZfQYCpXdbBuvOpuuy',
+    jsonb_build_array(
+        jsonb_build_object(
+            'Type', 'jwks',
+            'Value', '{"keys":[{"kty":"RSA","kid":"demo-pkjwt-key-1","use":"sig","alg":"RS256","n":"6w09s2hJkNzMwC9RyInQU4IoUtcaunsRp6dJRIS6VUHLxMCWJQyKeLtOH6_PiWHx6-pfddIRHdrP7LRJjB-Zdw9WJcaOLPquEOuXc9COJvENZZxp26Hg7t_T7LIJR366bMEyv1FsaaO0uKJj8AHQUOw6BaR0qD3qwGXrlzV1aDrJewnrwuXhlufhKZkgHXpAvUbi4vthCEvJqhgdHtagDFCHAUYJHupH8GYe5Hcg0iJ7VNw9lnIAkFcnqKiUPMimJ934m0sjZTGEcOSMtDMya02KZvD2wRxf5lyCmQK5ZP48mFNQdPuZezsvlVivVFhFzsEvoAynWbF6vhs5awCWwQ","e":"AQAB"}]}',
+            'Description', 'demo-device-pkjwt-keyset'
+        )
+    ),
+    'private_key_jwt',
     'Demo Device Flow Client',
     'Console demo client for OAuth2 device_code and refresh_token grants (public-client friendly)',
     '[]',
@@ -118,7 +136,44 @@ VALUES (
     NOW()
 )
 ON CONFLICT (client_id) DO UPDATE SET
-    client_secret_hash = EXCLUDED.client_secret_hash,
+    client_secrets = EXCLUDED.client_secrets,
+    token_endpoint_auth_method = EXCLUDED.token_endpoint_auth_method,
+    redirect_uris = EXCLUDED.redirect_uris,
+    post_logout_redirect_uris = EXCLUDED.post_logout_redirect_uris,
+    allowed_scopes = EXCLUDED.allowed_scopes,
+    allowed_grant_types = EXCLUDED.allowed_grant_types,
+    require_pkce = EXCLUDED.require_pkce,
+    is_active = EXCLUDED.is_active;
+
+-- ------------------------------------------------------------
+-- OAuth2 Demo 5: private_key_jwt (JWKS based)
+-- 对应项目：保留为独立 machine client，用于验证 private_key_jwt 客户端认证
+-- ------------------------------------------------------------
+INSERT INTO oauth_clients (id, client_id, client_secrets, token_endpoint_auth_method, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
+VALUES (
+    '20000000-0000-0000-0000-000000000103',
+    'demo-cert',
+    jsonb_build_array(
+        jsonb_build_object(
+            'Type', 'jwks',
+            'Value', '{"keys":[{"kty":"RSA","kid":"demo-pkjwt-key-1","use":"sig","alg":"RS256","n":"6w09s2hJkNzMwC9RyInQU4IoUtcaunsRp6dJRIS6VUHLxMCWJQyKeLtOH6_PiWHx6-pfddIRHdrP7LRJjB-Zdw9WJcaOLPquEOuXc9COJvENZZxp26Hg7t_T7LIJR366bMEyv1FsaaO0uKJj8AHQUOw6BaR0qD3qwGXrlzV1aDrJewnrwuXhlufhKZkgHXpAvUbi4vthCEvJqhgdHtagDFCHAUYJHupH8GYe5Hcg0iJ7VNw9lnIAkFcnqKiUPMimJ934m0sjZTGEcOSMtDMya02KZvD2wRxf5lyCmQK5ZP48mFNQdPuZezsvlVivVFhFzsEvoAynWbF6vhs5awCWwQ","e":"AQAB"}]}',
+            'Description', 'demo-pkjwt-keyset'
+        )
+    ),
+    'private_key_jwt',
+    'Demo Certificate Client',
+    'Console demo client for OAuth2 private_key_jwt token endpoint auth',
+    '[]',
+    '[]',
+    '["demo_api"]',
+    '["client_credentials"]',
+    false,
+    true,
+    NOW()
+)
+ON CONFLICT (client_id) DO UPDATE SET
+    client_secrets = EXCLUDED.client_secrets,
+    token_endpoint_auth_method = EXCLUDED.token_endpoint_auth_method,
     redirect_uris = EXCLUDED.redirect_uris,
     post_logout_redirect_uris = EXCLUDED.post_logout_redirect_uris,
     allowed_scopes = EXCLUDED.allowed_scopes,
@@ -189,5 +244,6 @@ VALUES
     ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001'),
     ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000002'),
     ('20000000-0000-0000-0000-000000000101', '10000000-0000-0000-0000-000000000001'),
-    ('20000000-0000-0000-0000-000000000102', '10000000-0000-0000-0000-000000000001')
+    ('20000000-0000-0000-0000-000000000102', '10000000-0000-0000-0000-000000000001'),
+    ('20000000-0000-0000-0000-000000000103', '10000000-0000-0000-0000-000000000001')
 ON CONFLICT (client_id, api_resource_id) DO NOTHING;

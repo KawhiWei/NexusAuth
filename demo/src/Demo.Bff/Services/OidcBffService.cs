@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using Demo.Bff.Models;
 using Demo.Bff.Options;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Options;
 
@@ -16,15 +17,18 @@ public class OidcBffService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly FrontendOptions _frontendOptions;
     private readonly NexusAuthBffOptions _authOptions;
+    private readonly IWebHostEnvironment _environment;
 
     public OidcBffService(
         IHttpClientFactory httpClientFactory,
         IOptions<FrontendOptions> frontendOptions,
-        IOptions<NexusAuthBffOptions> authOptions)
+        IOptions<NexusAuthBffOptions> authOptions,
+        IWebHostEnvironment environment)
     {
         _httpClientFactory = httpClientFactory;
         _frontendOptions = frontendOptions.Value;
         _authOptions = authOptions.Value;
+        _environment = environment;
     }
 
     public string FrontendBaseUrl => _frontendOptions.BaseUrl.TrimEnd('/');
@@ -33,7 +37,9 @@ public class OidcBffService
 
     public string ClientId => _authOptions.ClientId;
 
-    public string ClientSecret => _authOptions.ClientSecret;
+    public string? ClientSecret => _authOptions.ClientSecret;
+
+    public string TokenEndpointAuthMethod => _authOptions.TokenEndpointAuthMethod;
 
     public string RedirectUri => _authOptions.RedirectUri;
 
@@ -127,12 +133,15 @@ public class OidcBffService
             return;
 
         var client = _httpClientFactory.CreateClient();
-        ApplyClientAuthentication(client);
-        var request = new FormUrlEncodedContent(new Dictionary<string, string>
+        await ApplyClientAuthenticationAsync(client);
+        var form = new Dictionary<string, string>
         {
             ["token"] = token,
             ["token_type_hint"] = tokenTypeHint,
-        });
+        };
+        await AppendClientAuthenticationFormFieldsAsync(form, revocationEndpoint, ct);
+
+        var request = new FormUrlEncodedContent(form);
 
         await client.PostAsync(revocationEndpoint, request, ct);
     }
@@ -141,12 +150,87 @@ public class OidcBffService
     /// 给下游 Token/Revocation 请求附加 client_secret_basic 认证头。
     /// 主要调用方：Web BFF 调 NexusAuth 的后端交换 token 场景。
     /// </summary>
-    public void ApplyClientAuthentication(HttpClient client, string? clientId = null, string? clientSecret = null)
+    public Task ApplyClientAuthenticationAsync(HttpClient client, string? clientId = null, string? clientSecret = null)
     {
+        if (string.Equals(TokenEndpointAuthMethod, "private_key_jwt", StringComparison.Ordinal))
+            return Task.CompletedTask;
+
         var actualClientId = clientId ?? ClientId;
+
         var actualClientSecret = clientSecret ?? ClientSecret;
+        if (string.IsNullOrWhiteSpace(actualClientSecret))
+            throw new InvalidOperationException("ClientSecret is required for client_secret_basic authentication.");
+
         var credentialBytes = Encoding.UTF8.GetBytes($"{actualClientId}:{actualClientSecret}");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(credentialBytes));
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 追加客户端认证字段。
+    /// 主要调用方：BFF 向 /connect/token、/connect/revocation 发送表单请求时。
+    /// </summary>
+    public async Task AppendClientAuthenticationFormFieldsAsync(Dictionary<string, string> form, string endpointAudience, CancellationToken ct)
+    {
+        if (string.Equals(TokenEndpointAuthMethod, "private_key_jwt", StringComparison.Ordinal))
+        {
+            form["client_id"] = ClientId;
+            var assertion = await BuildClientAssertionAsync(ClientId, endpointAudience, ct);
+            form["client_assertion_type"] = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
+            form["client_assertion"] = assertion;
+        }
+    }
+
+    /// <summary>
+    /// 生成 private_key_jwt 所需的 client_assertion。
+    /// 主要调用方：BFF 在 token/revocation 请求前动态签名 JWT。
+    /// </summary>
+    private async Task<string> BuildClientAssertionAsync(string clientId, string audience, CancellationToken ct)
+    {
+        var privateKeyPem = await LoadPrivateKeyPemAsync(ct);
+        using var rsa = RSA.Create();
+        rsa.ImportFromPem(privateKeyPem);
+        var keyParameters = rsa.ExportParameters(true);
+
+        var now = DateTimeOffset.UtcNow;
+        var credentials = new SigningCredentials(new RsaSecurityKey(keyParameters)
+        {
+            KeyId = _authOptions.ClientAssertionSigningKid,
+        }, _authOptions.ClientAssertionSigningAlg);
+
+        var descriptor = new SecurityTokenDescriptor
+        {
+            Issuer = clientId,
+            Subject = new ClaimsIdentity([
+                new Claim(JwtRegisteredClaimNames.Sub, clientId),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
+            ]),
+            Audience = audience,
+            NotBefore = now.UtcDateTime,
+            IssuedAt = now.UtcDateTime,
+            Expires = now.AddMinutes(5).UtcDateTime,
+            SigningCredentials = credentials,
+        };
+
+        var handler = new JwtSecurityTokenHandler();
+        var token = handler.CreateToken(descriptor);
+        return handler.WriteToken(token);
+    }
+
+    private async Task<string> LoadPrivateKeyPemAsync(CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(_authOptions.ClientAssertionPrivateKeyPem))
+            return _authOptions.ClientAssertionPrivateKeyPem;
+
+        if (string.IsNullOrWhiteSpace(_authOptions.ClientAssertionPrivateKeyPath))
+            throw new InvalidOperationException("ClientAssertionPrivateKeyPem or ClientAssertionPrivateKeyPath must be configured for private_key_jwt.");
+
+        var configuredPath = _authOptions.ClientAssertionPrivateKeyPath;
+        var resolvedPath = Path.IsPathRooted(configuredPath)
+            ? configuredPath
+            : Path.Combine(_environment.ContentRootPath, configuredPath);
+
+        return await File.ReadAllTextAsync(resolvedPath, ct);
     }
 }
 

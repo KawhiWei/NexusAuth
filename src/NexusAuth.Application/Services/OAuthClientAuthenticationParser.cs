@@ -9,15 +9,23 @@ public static class OAuthClientAuthenticationParser
     /// 如果请求头不存在或格式错误，则回退到表单中的 client_id / client_secret。
     /// 主要调用方：Host 层的 token、introspect、revocation、device authorization 端点。
     /// </summary>
-    public static (string? ClientId, string? ClientSecret) ResolveClientAuthentication(
+    public static ClientAuthenticationInput ResolveClientAuthentication(
         string? authorizationHeader,
         string? formClientId,
-        string? formClientSecret)
+        string? formClientSecret,
+        string? formClientAssertionType = null,
+        string? formClientAssertion = null,
+        string? assertionAudience = null)
     {
         if (string.IsNullOrWhiteSpace(authorizationHeader)
             || !authorizationHeader.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
         {
-            return (formClientId, formClientSecret);
+            return new ClientAuthenticationInput(
+                formClientId,
+                formClientSecret,
+                formClientAssertionType,
+                formClientAssertion,
+                assertionAudience);
         }
 
         try
@@ -25,17 +33,32 @@ public static class OAuthClientAuthenticationParser
             var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(authorizationHeader[6..]));
             var separatorIndex = decoded.IndexOf(':');
             if (separatorIndex < 0)
-                return (formClientId, formClientSecret);
+            {
+                return new ClientAuthenticationInput(
+                    formClientId,
+                    formClientSecret,
+                    formClientAssertionType,
+                    formClientAssertion,
+                    assertionAudience);
+            }
 
             var headerClientId = decoded[..separatorIndex];
             var headerClientSecret = decoded[(separatorIndex + 1)..];
-            return (
+            return new ClientAuthenticationInput(
                 string.IsNullOrWhiteSpace(headerClientId) ? formClientId : headerClientId,
-                string.IsNullOrWhiteSpace(headerClientSecret) ? formClientSecret : headerClientSecret);
+                string.IsNullOrWhiteSpace(headerClientSecret) ? formClientSecret : headerClientSecret,
+                formClientAssertionType,
+                formClientAssertion,
+                assertionAudience);
         }
         catch (FormatException)
         {
-            return (formClientId, formClientSecret);
+            return new ClientAuthenticationInput(
+                formClientId,
+                formClientSecret,
+                formClientAssertionType,
+                formClientAssertion,
+                assertionAudience);
         }
     }
 }

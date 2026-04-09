@@ -25,8 +25,7 @@ public interface IAuthorizationService : IScopedDependency
         CancellationToken ct = default);
 
     Task<ClientCredentialsResult> ValidateClientCredentialsAsync(
-        string clientId,
-        string rawClientSecret,
+        ClientAuthenticationInput authentication,
         string scope,
         CancellationToken ct = default);
 

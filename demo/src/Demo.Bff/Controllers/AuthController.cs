@@ -76,14 +76,16 @@ public class AuthController : ControllerBase
 
         var discovery = await _oidcBffService.FetchDiscoveryAsync(ct);
         var httpClient = HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
-        _oidcBffService.ApplyClientAuthentication(httpClient);
-        var tokenRequest = new FormUrlEncodedContent(new Dictionary<string, string>
+        await _oidcBffService.ApplyClientAuthenticationAsync(httpClient);
+        var tokenForm = new Dictionary<string, string>
         {
             ["grant_type"] = "authorization_code",
             ["code"] = code,
             ["redirect_uri"] = _oidcBffService.RedirectUri,
             ["code_verifier"] = flow.CodeVerifier,
-        });
+        };
+        await _oidcBffService.AppendClientAuthenticationFormFieldsAsync(tokenForm, discovery.TokenEndpoint, ct);
+        var tokenRequest = new FormUrlEncodedContent(tokenForm);
 
         var tokenResponse = await httpClient.PostAsync(discovery.TokenEndpoint, tokenRequest, ct);
         var tokenJson = await tokenResponse.Content.ReadAsStringAsync(ct);
@@ -175,12 +177,14 @@ public class AuthController : ControllerBase
 
         var discovery = await _oidcBffService.FetchDiscoveryAsync(ct);
         var client = HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
-        _oidcBffService.ApplyClientAuthentication(client);
-        var refreshRequest = new FormUrlEncodedContent(new Dictionary<string, string>
+        await _oidcBffService.ApplyClientAuthenticationAsync(client);
+        var refreshForm = new Dictionary<string, string>
         {
             ["grant_type"] = "refresh_token",
             ["refresh_token"] = session.RefreshToken,
-        });
+        };
+        await _oidcBffService.AppendClientAuthenticationFormFieldsAsync(refreshForm, discovery.TokenEndpoint, ct);
+        var refreshRequest = new FormUrlEncodedContent(refreshForm);
 
         var response = await client.PostAsync(discovery.TokenEndpoint, refreshRequest, ct);
         if (!response.IsSuccessStatusCode)

@@ -4,9 +4,9 @@ namespace NexusAuth.Application.Services;
 
 public interface IDeviceAuthorizationService : IScopedDependency
 {
-    Task<DeviceAuthorizationStartResult> StartAsync(string clientId, string? clientSecret, string scope, CancellationToken ct = default);
+    Task<DeviceAuthorizationStartResult> StartAsync(ClientAuthenticationInput authentication, string scope, CancellationToken ct = default);
 
-    Task<DeviceAuthorizationPollResult> PollAsync(string clientId, string? clientSecret, string deviceCode, CancellationToken ct = default);
+    Task<DeviceAuthorizationPollResult> PollAsync(ClientAuthenticationInput authentication, string deviceCode, CancellationToken ct = default);
 
     Task<DeviceAuthorizationSessionResult> GetByUserCodeAsync(string userCode, CancellationToken ct = default);
 

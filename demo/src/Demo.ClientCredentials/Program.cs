@@ -1,16 +1,17 @@
 using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
 
 var authority = Environment.GetEnvironmentVariable("NEXUSAUTH_AUTHORITY") ?? "http://localhost:5100";
 var clientId = Environment.GetEnvironmentVariable("NEXUSAUTH_CLIENT_ID") ?? "demo-cc";
-var clientSecret = Environment.GetEnvironmentVariable("NEXUSAUTH_CLIENT_SECRET") ?? "demo-bff-secret";
+var privateKeyPath = Environment.GetEnvironmentVariable("NEXUSAUTH_CLIENT_PRIVATE_KEY_PATH") ?? Path.Combine(AppContext.BaseDirectory, "keys", "demo-client-private.pem");
+var keyId = Environment.GetEnvironmentVariable("NEXUSAUTH_CLIENT_KEY_ID") ?? "demo-pkjwt-key-1";
 var scope = Environment.GetEnvironmentVariable("NEXUSAUTH_SCOPE") ?? "demo_api";
 var apiUrl = Environment.GetEnvironmentVariable("DEMO_BFF_API") ?? "http://localhost:5201/api/m2m/profile";
 
 Console.WriteLine("=== Demo: client_credentials ===");
 Console.WriteLine($"Authority: {authority}");
 Console.WriteLine($"ClientId : {clientId}");
+Console.WriteLine($"Auth     : private_key_jwt ({keyId})");
 Console.WriteLine($"Scope    : {scope}");
 Console.WriteLine($"BFF API  : {apiUrl}");
 Console.WriteLine();
@@ -20,12 +21,13 @@ using var http = new HttpClient();
 var discovery = await GetDiscoveryAsync(http, authority);
 var tokenEndpoint = GetStringProperty(discovery, "token_endpoint");
 
-ApplyBasicAuth(http, clientId, clientSecret);
-using var request = new FormUrlEncodedContent(new Dictionary<string, string>
+var form = new Dictionary<string, string>
 {
     ["grant_type"] = "client_credentials",
     ["scope"] = scope,
-});
+};
+await ClientAssertionHelper.AppendPrivateKeyJwtAsync(form, clientId, tokenEndpoint, privateKeyPath, keyId);
+using var request = new FormUrlEncodedContent(form);
 
 var response = await http.PostAsync(tokenEndpoint, request);
 var payload = await response.Content.ReadAsStringAsync();
@@ -72,12 +74,6 @@ static string GetStringProperty(JsonElement element, string name)
         throw new InvalidOperationException($"Discovery missing '{name}'.");
 
     return value.GetString()!;
-}
-
-static void ApplyBasicAuth(HttpClient http, string clientId, string clientSecret)
-{
-    var raw = Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}");
-    http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(raw));
 }
 
 static void PrintJson(string json)

@@ -21,10 +21,28 @@ public class OAuthClientConfiguration : IEntityTypeConfiguration<OAuthClient>
             .HasMaxLength(128)
             .IsRequired();
 
-        builder.Property(c => c.ClientSecretHash)
-            .HasColumnName("client_secret_hash")
-            .HasMaxLength(256)
-            .IsRequired();
+        var clientSecretsConverter = new ValueConverter<List<OAuthClientSecret>, string>(
+            v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+            v => JsonSerializer.Deserialize<List<OAuthClientSecret>>(v, (JsonSerializerOptions?)null) ?? new List<OAuthClientSecret>());
+
+        var clientSecretsComparer = new ValueComparer<List<OAuthClientSecret>>(
+            (a, b) => JsonSerializer.Serialize(a, (JsonSerializerOptions?)null) == JsonSerializer.Serialize(b, (JsonSerializerOptions?)null),
+            v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null).GetHashCode(),
+            v => JsonSerializer.Deserialize<List<OAuthClientSecret>>(JsonSerializer.Serialize(v, (JsonSerializerOptions?)null), (JsonSerializerOptions?)null)!);
+
+        builder.Property(c => c.ClientSecrets)
+            .HasColumnName("client_secrets")
+            .HasColumnType("jsonb")
+            .HasConversion(clientSecretsConverter)
+            .IsRequired()
+            .HasDefaultValueSql("'[]'::jsonb")
+            .Metadata.SetValueComparer(clientSecretsComparer);
+
+        builder.Property(c => c.TokenEndpointAuthMethod)
+            .HasColumnName("token_endpoint_auth_method")
+            .HasMaxLength(64)
+            .IsRequired()
+            .HasDefaultValue("client_secret_basic");
 
         builder.Property(c => c.ClientName)
             .HasColumnName("client_name")

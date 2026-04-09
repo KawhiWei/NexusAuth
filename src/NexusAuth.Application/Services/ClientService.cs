@@ -1,4 +1,5 @@
 using NexusAuth.Domain.AggregateRoots.OAuthClients;
+using NexusAuth.Domain.Entities;
 using NexusAuth.Domain.Repositories;
 
 namespace NexusAuth.Application.Services;
@@ -7,13 +8,16 @@ public class ClientService : IClientService
 {
     private readonly IOAuthClientRepository _clientRepository;
     private readonly IApiResourceRepository _apiResourceRepository;
+    private readonly ITokenBlacklistRepository _tokenBlacklistRepository;
 
     public ClientService(
         IOAuthClientRepository clientRepository,
-        IApiResourceRepository apiResourceRepository)
+        IApiResourceRepository apiResourceRepository,
+        ITokenBlacklistRepository tokenBlacklistRepository)
     {
         _clientRepository = clientRepository;
         _apiResourceRepository = apiResourceRepository;
+        _tokenBlacklistRepository = tokenBlacklistRepository;
     }
 
     /// <summary>
@@ -21,7 +25,6 @@ public class ClientService : IClientService
     /// </summary>
     public async Task<OAuthClient> RegisterClientAsync(
         string clientId,
-        string rawClientSecret,
         string clientName,
         string? description = null,
         IEnumerable<string>? redirectUris = null,
@@ -29,6 +32,8 @@ public class ClientService : IClientService
         IEnumerable<string>? allowedScopes = null,
         IEnumerable<string>? allowedGrantTypes = null,
         bool requirePkce = true,
+        string tokenEndpointAuthMethod = OAuthClient.TokenEndpointAuthMethodClientSecretBasic,
+        IEnumerable<OAuthClientSecret>? clientSecrets = null,
         CancellationToken ct = default)
     {
         var existing = await _clientRepository.FindByClientIdAsync(clientId, ct);
@@ -37,14 +42,15 @@ public class ClientService : IClientService
 
         var client = OAuthClient.Create(
             clientId,
-            rawClientSecret,
             clientName,
             description,
             redirectUris,
             postLogoutRedirectUris,
             allowedScopes,
             allowedGrantTypes,
-            requirePkce);
+            requirePkce,
+            tokenEndpointAuthMethod,
+            clientSecrets);
 
         await _clientRepository.AddAsync(client, ct);
 
@@ -65,6 +71,66 @@ public class ClientService : IClientService
             return null;
 
         return client.VerifyClientSecret(rawClientSecret) ? client : null;
+    }
+
+    public async Task<ClientAuthenticationResult> AuthenticateClientAsync(
+        ClientAuthenticationInput input,
+        bool requireClientAuthentication,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(input.ClientId))
+            return ClientAuthenticationResult.Failure("invalid_client", "client_id is required.");
+
+        var client = await _clientRepository.FindByClientIdAsync(input.ClientId, ct);
+        if (client is null || !client.IsActive)
+            return ClientAuthenticationResult.Failure("invalid_client", "Client not found or inactive.");
+
+        if (!requireClientAuthentication)
+            return ClientAuthenticationResult.Success(client);
+
+        if (client.RequiresPrivateKeyJwtAuthentication())
+        {
+            if (!string.Equals(input.ClientAssertionType, OAuthClient.ClientAssertionTypeJwtBearer, StringComparison.Ordinal))
+            {
+                return ClientAuthenticationResult.Failure("invalid_client", "client_assertion_type is invalid for this client.");
+            }
+
+            if (string.IsNullOrWhiteSpace(input.ClientAssertion))
+                return ClientAuthenticationResult.Failure("invalid_client", "client_assertion is required.");
+
+            if (string.IsNullOrWhiteSpace(input.AssertionAudience))
+                return ClientAuthenticationResult.Failure("invalid_client", "assertion audience is required for private_key_jwt validation.");
+
+            var assertionValidation = ClientPrivateKeyJwtValidator.Validate(input.ClientAssertion, client, input.AssertionAudience);
+            if (!assertionValidation.IsSuccess)
+                return ClientAuthenticationResult.Failure("invalid_client", assertionValidation.Error ?? "Invalid client assertion.");
+
+            // 中文注释：private_key_jwt 必须防止 assertion 在有效期内被重复使用，
+            // 这里复用现有 token_blacklist_entries 记录 jti，作为一次性断言缓存。
+            if (string.IsNullOrWhiteSpace(assertionValidation.Jti) || assertionValidation.ExpiresAt is null)
+                return ClientAuthenticationResult.Failure("invalid_client", "client_assertion metadata is incomplete.");
+
+            var replayKey = BuildClientAssertionReplayKey(client.ClientId, assertionValidation.Jti);
+            if (await _tokenBlacklistRepository.ExistsActiveAsync(replayKey, DateTimeOffset.UtcNow, ct))
+                return ClientAuthenticationResult.Failure("invalid_client", "client_assertion has already been used.");
+
+            await _tokenBlacklistRepository.AddAsync(
+                TokenBlacklistEntry.Create(replayKey, "client_assertion", client.ClientId, assertionValidation.ExpiresAt.Value),
+                ct);
+
+            return ClientAuthenticationResult.Success(client);
+        }
+
+        if (string.IsNullOrWhiteSpace(input.ClientSecret))
+            return ClientAuthenticationResult.Failure("invalid_client", "client_secret is required.");
+
+        if (!client.AllowsClientSecretAuthentication())
+            return ClientAuthenticationResult.Failure("invalid_client", "Client does not allow client_secret authentication.");
+
+        if (!client.VerifyClientSecret(input.ClientSecret))
+            return ClientAuthenticationResult.Failure("invalid_client", "Invalid client secret.");
+
+        return ClientAuthenticationResult.Success(client);
     }
 
     /// <summary>
@@ -114,23 +180,8 @@ public class ClientService : IClientService
         bool requireSecret,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(clientId))
-            return ClientAuthenticationResult.Failure("invalid_client", "client_id is required.");
-
-        var client = await _clientRepository.FindByClientIdAsync(clientId, ct);
-        if (client is null || !client.IsActive)
-            return ClientAuthenticationResult.Failure("invalid_client", "Client not found or inactive.");
-
-        if (requireSecret)
-        {
-            if (string.IsNullOrWhiteSpace(rawClientSecret))
-                return ClientAuthenticationResult.Failure("invalid_client", "client_secret is required.");
-
-            if (!client.VerifyClientSecret(rawClientSecret))
-                return ClientAuthenticationResult.Failure("invalid_client", "Invalid client secret.");
-        }
-
-        return ClientAuthenticationResult.Success(client);
+        var input = new ClientAuthenticationInput(clientId, rawClientSecret, null, null, null);
+        return await AuthenticateClientAsync(input, requireSecret, ct);
     }
 
     /// <summary>
@@ -200,5 +251,10 @@ public class ClientService : IClientService
             || string.Equals(scope, "phone", StringComparison.Ordinal)
             || string.Equals(scope, "address", StringComparison.Ordinal)
             || string.Equals(scope, "offline_access", StringComparison.Ordinal);
+    }
+
+    private static string BuildClientAssertionReplayKey(string clientId, string assertionJti)
+    {
+        return $"client_assertion:{clientId}:{assertionJti}";
     }
 }

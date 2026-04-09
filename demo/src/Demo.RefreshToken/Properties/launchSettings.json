@@ -6,7 +6,8 @@
       "environmentVariables": {
         "NEXUSAUTH_AUTHORITY": "http://localhost:5100",
         "NEXUSAUTH_CLIENT_ID": "demo-device",
-        "NEXUSAUTH_CLIENT_SECRET": "demo-bff-secret",
+        "NEXUSAUTH_CLIENT_PRIVATE_KEY_PATH": "keys/demo-client-private.pem",
+        "NEXUSAUTH_CLIENT_KEY_ID": "demo-pkjwt-key-1",
         "NEXUSAUTH_REFRESH_TOKEN": ""
       }
     }

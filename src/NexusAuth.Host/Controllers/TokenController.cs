@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using NexusAuth.Application.Services;
 
 namespace NexusAuth.Host.Controllers;
@@ -10,17 +11,20 @@ public class TokenController : ControllerBase
     private readonly ITokenService _tokenService;
     private readonly IDeviceAuthorizationService _deviceAuthorizationService;
     private readonly IClientService _clientService;
+    private readonly JwtOptions _jwtOptions;
 
     public TokenController(
         IAuthorizationService authorizationService,
         ITokenService tokenService,
         IDeviceAuthorizationService deviceAuthorizationService,
-        IClientService clientService)
+        IClientService clientService,
+        IOptions<JwtOptions> jwtOptions)
     {
         _authorizationService = authorizationService;
         _tokenService = tokenService;
         _deviceAuthorizationService = deviceAuthorizationService;
         _clientService = clientService;
+        _jwtOptions = jwtOptions.Value;
     }
 
     /// <summary>
@@ -42,6 +46,8 @@ public class TokenController : ControllerBase
         [FromForm] string? scope = null,
         [FromForm(Name = "refresh_token")] string? refreshToken = null,
         [FromForm(Name = "device_code")] string? deviceCode = null,
+        [FromForm(Name = "client_assertion_type")] string? clientAssertionType = null,
+        [FromForm(Name = "client_assertion")] string? clientAssertion = null,
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(grantType))
@@ -53,23 +59,23 @@ public class TokenController : ControllerBase
         var resolvedClientAuthentication = OAuthClientAuthenticationParser.ResolveClientAuthentication(
             Request.Headers.Authorization.ToString(),
             clientId,
-            clientSecret);
-        clientId = resolvedClientAuthentication.ClientId;
-        clientSecret = resolvedClientAuthentication.ClientSecret;
+            clientSecret,
+            clientAssertionType,
+            clientAssertion,
+            GetEndpointAudience());
 
         return grantType switch
         {
-            "authorization_code" => await HandleAuthorizationCodeAsync(clientId, clientSecret, code, redirectUri, codeVerifier, ct),
-            "client_credentials" => await HandleClientCredentialsAsync(clientId, clientSecret, scope, ct),
-            "refresh_token" => await HandleRefreshTokenAsync(clientId, clientSecret, refreshToken, ct),
-            "urn:ietf:params:oauth:grant-type:device_code" => await HandleDeviceCodeAsync(clientId, clientSecret, deviceCode, ct),
+            "authorization_code" => await HandleAuthorizationCodeAsync(resolvedClientAuthentication, code, redirectUri, codeVerifier, ct),
+            "client_credentials" => await HandleClientCredentialsAsync(resolvedClientAuthentication, scope, ct),
+            "refresh_token" => await HandleRefreshTokenAsync(resolvedClientAuthentication, refreshToken, ct),
+            "urn:ietf:params:oauth:grant-type:device_code" => await HandleDeviceCodeAsync(resolvedClientAuthentication, deviceCode, ct),
             _ => BadRequest(new { error = "unsupported_grant_type", error_description = $"Grant type '{grantType}' is not supported." }),
         };
     }
 
     private async Task<IActionResult> HandleAuthorizationCodeAsync(
-        string? clientId,
-        string? clientSecret,
+        ClientAuthenticationInput authentication,
         string? code,
         string? redirectUri,
         string? codeVerifier,
@@ -81,11 +87,11 @@ public class TokenController : ControllerBase
         if (string.IsNullOrWhiteSpace(redirectUri))
             return BadRequest(new { error = "invalid_request", error_description = "redirect_uri is required." });
 
-        if (!string.IsNullOrWhiteSpace(clientId))
+        if (!string.IsNullOrWhiteSpace(authentication.ClientId))
         {
-            var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: true, ct);
-            if (!authentication.IsSuccess)
-                return Unauthorized(new { error = authentication.ErrorCode ?? "invalid_client", error_description = authentication.Error });
+            var clientAuthentication = await _clientService.AuthenticateClientAsync(authentication, requireClientAuthentication: true, ct);
+            if (!clientAuthentication.IsSuccess)
+                return Unauthorized(new { error = clientAuthentication.ErrorCode ?? "invalid_client", error_description = clientAuthentication.Error });
         }
 
         var result = await _authorizationService.ValidateAndConsumeCodeAsync(code, redirectUri, codeVerifier, ct);
@@ -126,21 +132,17 @@ public class TokenController : ControllerBase
     }
 
     private async Task<IActionResult> HandleClientCredentialsAsync(
-        string? clientId,
-        string? clientSecret,
+        ClientAuthenticationInput authentication,
         string? scope,
         CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(clientId))
+        if (string.IsNullOrWhiteSpace(authentication.ClientId))
             return BadRequest(new { error = "invalid_request", error_description = "client_id is required." });
-
-        if (string.IsNullOrWhiteSpace(clientSecret))
-            return BadRequest(new { error = "invalid_request", error_description = "client_secret is required." });
 
         if (string.IsNullOrWhiteSpace(scope))
             return BadRequest(new { error = "invalid_request", error_description = "scope is required." });
 
-        var result = await _authorizationService.ValidateClientCredentialsAsync(clientId, clientSecret, scope, ct);
+        var result = await _authorizationService.ValidateClientCredentialsAsync(authentication, scope, ct);
 
         if (!result.IsSuccess)
             return BadRequest(new { error = "invalid_client", error_description = result.Error });
@@ -156,22 +158,21 @@ public class TokenController : ControllerBase
     }
 
     private async Task<IActionResult> HandleRefreshTokenAsync(
-        string? clientId,
-        string? clientSecret,
+        ClientAuthenticationInput authentication,
         string? refreshToken,
         CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(refreshToken))
             return BadRequest(new { error = "invalid_request", error_description = "refresh_token is required." });
 
-        if (string.IsNullOrWhiteSpace(clientId))
+        if (string.IsNullOrWhiteSpace(authentication.ClientId))
             return BadRequest(new { error = "invalid_request", error_description = "client_id is required." });
 
-        var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: true, ct);
-        if (!authentication.IsSuccess)
-            return Unauthorized(new { error = authentication.ErrorCode ?? "invalid_client", error_description = authentication.Error });
+        var clientAuthentication = await _clientService.AuthenticateClientAsync(authentication, requireClientAuthentication: true, ct);
+        if (!clientAuthentication.IsSuccess)
+            return Unauthorized(new { error = clientAuthentication.ErrorCode ?? "invalid_client", error_description = clientAuthentication.Error });
 
-        var result = await _tokenService.RefreshAsync(refreshToken, clientId, ct);
+        var result = await _tokenService.RefreshAsync(refreshToken, authentication.ClientId!, ct);
 
         if (!result.IsSuccess)
             return BadRequest(new { error = "invalid_grant", error_description = result.Error });
@@ -186,18 +187,17 @@ public class TokenController : ControllerBase
     }
 
     private async Task<IActionResult> HandleDeviceCodeAsync(
-        string? clientId,
-        string? clientSecret,
+        ClientAuthenticationInput authentication,
         string? deviceCode,
         CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(clientId))
+        if (string.IsNullOrWhiteSpace(authentication.ClientId))
             return BadRequest(new { error = "invalid_request", error_description = "client_id is required." });
 
         if (string.IsNullOrWhiteSpace(deviceCode))
             return BadRequest(new { error = "invalid_request", error_description = "device_code is required." });
 
-        var result = await _deviceAuthorizationService.PollAsync(clientId, clientSecret, deviceCode, ct);
+        var result = await _deviceAuthorizationService.PollAsync(authentication, deviceCode, ct);
         if (!result.IsSuccess)
         {
             if (result.ErrorCode is "authorization_pending" or "slow_down" or "access_denied" or "expired_token")
@@ -224,6 +224,21 @@ public class TokenController : ControllerBase
             id_token = idToken,
             expires_in = 3600,
         });
+    }
+
+    private string GetEndpointAudience()
+    {
+        var request = HttpContext.Request;
+        var host = request.Host.HasValue ? request.Host.Value : null;
+        if (!string.IsNullOrWhiteSpace(host))
+            return $"{request.Scheme}://{host}{request.PathBase}{request.Path}";
+
+        return _jwtOptions.Issuer.TrimEnd('/') + "/connect/token";
+    }
+
+    private string GetIssuer()
+    {
+        return _jwtOptions.Issuer.TrimEnd('/');
     }
 
     private static bool ShouldIssueRefreshToken(string scope)

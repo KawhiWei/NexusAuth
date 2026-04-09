@@ -49,7 +49,12 @@ CREATE UNIQUE INDEX ix_users_phone_number ON nexusauth.users (phone_number) WHER
 CREATE TABLE nexusauth.oauth_clients (
     id                  uuid            NOT NULL,
     client_id           varchar(128)    NOT NULL,
-    client_secret_hash  varchar(256)    NOT NULL,
+    -- 统一的客户端凭据集合，预留扩展位。
+    -- 当前实际使用：
+    -- 1) shared_secret
+    -- 2) jwks（用于 private_key_jwt 验签）
+    client_secrets      jsonb           NOT NULL DEFAULT '[]'::jsonb,
+    token_endpoint_auth_method varchar(64) NOT NULL DEFAULT 'client_secret_basic',
     client_name         varchar(256)    NOT NULL,
     description         text,
     redirect_uris       jsonb           NOT NULL,

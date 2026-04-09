@@ -22,19 +22,21 @@ public class DeviceAuthorizationService : IDeviceAuthorizationService
     /// <summary>
     /// 发起 device authorization 请求，生成 device_code / user_code。
     /// </summary>
-    public async Task<DeviceAuthorizationStartResult> StartAsync(string clientId, string? clientSecret, string scope, CancellationToken ct = default)
+    public async Task<DeviceAuthorizationStartResult> StartAsync(ClientAuthenticationInput authentication, string scope, CancellationToken ct = default)
     {
         // 中文注释：设备授权常用于输入受限设备，应允许 public client 使用，
         // 因此这里不再强制要求 client_secret。
-        var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: false, ct);
-        if (!authentication.IsSuccess)
-            return DeviceAuthorizationStartResult.Failure(authentication.ErrorCode ?? "invalid_client", authentication.Error ?? "Invalid client.");
+        var clientAuthentication = await _clientService.AuthenticateClientAsync(authentication, requireClientAuthentication: true, ct);
+        if (!clientAuthentication.IsSuccess)
+            return DeviceAuthorizationStartResult.Failure(clientAuthentication.ErrorCode ?? "invalid_client", clientAuthentication.Error ?? "Invalid client.");
+
+        var clientId = clientAuthentication.Client!.ClientId;
 
         var policy = _securityPolicyService.CheckClient(clientId);
         if (!policy.IsSuccess)
             return DeviceAuthorizationStartResult.Failure("access_denied", policy.Error ?? "Client denied.");
 
-        if (!authentication.Client!.IsGrantTypeAllowed("urn:ietf:params:oauth:grant-type:device_code"))
+        if (!clientAuthentication.Client!.IsGrantTypeAllowed("urn:ietf:params:oauth:grant-type:device_code"))
             return DeviceAuthorizationStartResult.Failure("unauthorized_client", "Client is not allowed to use device_code grant type.");
 
         var scopeValidation = await _clientService.ValidateScopesAsync(clientId, scope, allowIdentityScopes: true, ct);
@@ -59,11 +61,13 @@ public class DeviceAuthorizationService : IDeviceAuthorizationService
     /// <summary>
     /// 轮询 device_code 状态，完成后返回用户信息用于签发 token。
     /// </summary>
-    public async Task<DeviceAuthorizationPollResult> PollAsync(string clientId, string? clientSecret, string deviceCode, CancellationToken ct = default)
+    public async Task<DeviceAuthorizationPollResult> PollAsync(ClientAuthenticationInput authentication, string deviceCode, CancellationToken ct = default)
     {
-        var authentication = await _clientService.AuthenticateClientAsync(clientId, clientSecret, requireSecret: false, ct);
-        if (!authentication.IsSuccess)
-            return DeviceAuthorizationPollResult.Failure(authentication.ErrorCode ?? "invalid_client", authentication.Error ?? "Invalid client.");
+        var clientAuthentication = await _clientService.AuthenticateClientAsync(authentication, requireClientAuthentication: true, ct);
+        if (!clientAuthentication.IsSuccess)
+            return DeviceAuthorizationPollResult.Failure(clientAuthentication.ErrorCode ?? "invalid_client", clientAuthentication.Error ?? "Invalid client.");
+
+        var clientId = clientAuthentication.Client!.ClientId;
 
         var authorization = await _deviceAuthorizationRepository.FindByDeviceCodeAsync(deviceCode, ct);
         if (authorization is null || !string.Equals(authorization.ClientId, clientId, StringComparison.Ordinal))

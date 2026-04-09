@@ -7,7 +7,6 @@ public interface IClientService : IScopedDependency
 {
     Task<OAuthClient> RegisterClientAsync(
         string clientId,
-        string rawClientSecret,
         string clientName,
         string? description = null,
         IEnumerable<string>? redirectUris = null,
@@ -15,6 +14,8 @@ public interface IClientService : IScopedDependency
         IEnumerable<string>? allowedScopes = null,
         IEnumerable<string>? allowedGrantTypes = null,
         bool requirePkce = true,
+        string tokenEndpointAuthMethod = OAuthClient.TokenEndpointAuthMethodClientSecretBasic,
+        IEnumerable<OAuthClientSecret>? clientSecrets = null,
         CancellationToken ct = default);
 
     Task<OAuthClient?> ValidateClientAsync(
@@ -40,6 +41,11 @@ public interface IClientService : IScopedDependency
         bool requireSecret,
         CancellationToken ct = default);
 
+    Task<ClientAuthenticationResult> AuthenticateClientAsync(
+        ClientAuthenticationInput input,
+        bool requireClientAuthentication,
+        CancellationToken ct = default);
+
     Task<ClientAuthenticationResult> AuthenticateClientForPostLogoutAsync(
         string clientId,
         string? postLogoutRedirectUri,
@@ -51,6 +57,13 @@ public interface IClientService : IScopedDependency
         bool allowIdentityScopes,
         CancellationToken ct = default);
 }
+
+public record ClientAuthenticationInput(
+    string? ClientId,
+    string? ClientSecret,
+    string? ClientAssertionType,
+    string? ClientAssertion,
+    string? AssertionAudience = null);
 
 public record ClientValidationResult(
     bool IsSuccess,

@@ -14,6 +14,7 @@ var authority = nexusAuthSection["Authority"]!;
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var issuer = jwtSection["Issuer"]!;
 var audience = jwtSection["Audience"]!;
+var sessionCookieName = builder.Configuration["Session:CookieName"] ?? ".Demo.Bff.Session";
 
 builder.Services.Configure<FrontendOptions>(builder.Configuration.GetSection("Frontend"));
 builder.Services.Configure<NexusAuthBffOptions>(builder.Configuration.GetSection("NexusAuth"));
@@ -21,7 +22,7 @@ builder.Services.Configure<NexusAuthBffOptions>(builder.Configuration.GetSection
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
-        options.Cookie.Name = ".Demo.Bff.Session";
+        options.Cookie.Name = sessionCookieName;
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Strict;
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;

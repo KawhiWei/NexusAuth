@@ -1,0 +1,33 @@
+sequenceDiagram
+    autonumber
+    actor User as End User
+    participant Web as Demo.Web
+    participant BFF as Demo.Bff
+    participant Auth as NexusAuth
+
+    User->>Web: 打开前端并点击登录
+    Web->>BFF: GET /api/auth/login
+    BFF->>Auth: GET /.well-known/openid-configuration
+    Auth-->>BFF: 返回 discovery
+    BFF-->>Web: 返回 302 到 /connect/authorize<br/>携带 state + nonce + PKCE
+    Web-->>User: 浏览器跳转到登录页
+
+    User->>Auth: 输入用户名密码并确认授权
+    Auth->>Auth: 校验用户身份<br/>校验 client_id / redirect_uri / PKCE 要求
+    Auth-->>BFF: 302 回调 /signin-oidc?code=...&state=...
+
+    BFF->>BFF: 校验 state<br/>取出 code_verifier
+    BFF->>Auth: POST /connect/token<br/>grant_type=authorization_code<br/>client_assertion(private_key_jwt)<br/>code + code_verifier
+    Auth->>Auth: 校验 client_assertion<br/>- 签名 / JWKS<br/>- iss == sub == client_id<br/>- aud == /connect/token<br/>- alg == RS256<br/>- jti 防重放
+    Auth->>Auth: 校验授权码与 PKCE
+    Auth-->>BFF: access_token + id_token + refresh_token
+
+    BFF->>Auth: GET /.well-known/jwks.json
+    Auth-->>BFF: 返回签名公钥
+    BFF->>BFF: 验证 id_token<br/>校验 nonce
+    BFF->>Auth: GET /connect/userinfo<br/>Bearer access_token
+    Auth-->>BFF: 返回用户 Claims
+    BFF->>BFF: 建立本地 Cookie Session
+    BFF-->>Web: 返回登录成功状态
+    Web->>BFF: GET /api/profile
+    BFF-->>Web: 返回当前登录用户信息

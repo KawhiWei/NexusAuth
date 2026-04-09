@@ -2,7 +2,8 @@
 -- NexusAuth demo seed data (single source of truth)
 -- 说明：
 -- 1) 该脚本是所有 demo 客户端的唯一种子数据来源。
--- 2) 所有 demo 客户端当前统一切到 private_key_jwt。
+-- 2) Demo.Bff / Demo.Web 保持为 private_key_jwt。
+-- 3) 另外提供一套 Demo.Bff.ClientSecret / Demo.Web.ClientSecret 用于 client_secret_basic 演示。
 -- 3) oauth_clients.client_secrets 使用统一多类型结构，预留后续扩展。
 -- 4) 测试账号密码：alice / Pass@123, bob / Pass@123, admin / Pass@123
 -- ============================================================
@@ -55,6 +56,43 @@ VALUES (
     'A front-end/back-end separated demo client for authorization code + OIDC',
     '["http://localhost:5201/signin-oidc"]',
     '["http://localhost:5200/"]',
+    '["openid","profile","email","phone","offline_access","demo_api","profile_api"]',
+    '["authorization_code","refresh_token"]',
+    true,
+    true,
+    NOW()
+)
+ON CONFLICT (client_id) DO UPDATE SET
+    client_secrets = EXCLUDED.client_secrets,
+    token_endpoint_auth_method = EXCLUDED.token_endpoint_auth_method,
+    redirect_uris = EXCLUDED.redirect_uris,
+    post_logout_redirect_uris = EXCLUDED.post_logout_redirect_uris,
+    allowed_scopes = EXCLUDED.allowed_scopes,
+    allowed_grant_types = EXCLUDED.allowed_grant_types,
+    require_pkce = EXCLUDED.require_pkce,
+    is_active = EXCLUDED.is_active;
+
+-- ------------------------------------------------------------
+-- OAuth2 Demo 1B: authorization_code + refresh_token + OIDC (client_secret_basic)
+-- 对应项目：Demo.Bff.ClientSecret + Demo.Web.ClientSecret
+-- client_secret: demo-bff-secret
+-- ------------------------------------------------------------
+INSERT INTO oauth_clients (id, client_id, client_secrets, token_endpoint_auth_method, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
+VALUES (
+    '20000000-0000-0000-0000-000000000002',
+    'demo-bff-secret',
+    jsonb_build_array(
+        jsonb_build_object(
+            'Type', 'shared_secret',
+            'Value', '$2a$12$pw856E1CHH3FfcshE0NwCeETGR5hyYaeudBqZfQYCpXdbBuvOpuuy',
+            'Description', 'demo-bff-secret'
+        )
+    ),
+    'client_secret_basic',
+    'Demo Frontend BFF Client Secret',
+    'A front-end/back-end separated demo client for authorization code + OIDC using client_secret_basic',
+    '["http://localhost:5301/signin-oidc"]',
+    '["http://localhost:5300/"]',
     '["openid","profile","email","phone","offline_access","demo_api","profile_api"]',
     '["authorization_code","refresh_token"]',
     true,
@@ -243,6 +281,8 @@ INSERT INTO client_api_resources (client_id, api_resource_id)
 VALUES
     ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001'),
     ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000002'),
+    ('20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001'),
+    ('20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000002'),
     ('20000000-0000-0000-0000-000000000101', '10000000-0000-0000-0000-000000000001'),
     ('20000000-0000-0000-0000-000000000102', '10000000-0000-0000-0000-000000000001'),
     ('20000000-0000-0000-0000-000000000103', '10000000-0000-0000-0000-000000000001')

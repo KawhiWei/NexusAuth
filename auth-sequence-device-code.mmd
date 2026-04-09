@@ -1,0 +1,35 @@
+sequenceDiagram
+    autonumber
+    actor User as End User
+    participant Device as Demo.DeviceCode
+    participant Auth as NexusAuth
+    participant Api as Demo.Bff /api/m2m/profile
+
+    Device->>Auth: GET /.well-known/openid-configuration
+    Auth-->>Device: 返回 discovery
+
+    Device->>Device: 使用本地私钥生成 client_assertion<br/>aud = /connect/deviceauthorization
+    Device->>Auth: POST /connect/deviceauthorization<br/>scope=openid profile offline_access demo_api<br/>client_assertion(private_key_jwt)
+    Auth->>Auth: 校验 client_assertion<br/>校验 client 是否允许 device_code
+    Auth-->>Device: device_code + user_code + verification_uri
+
+    Device-->>User: 展示 user_code 与 verification_uri
+    User->>Auth: 打开 verification_uri 并登录
+    Auth->>Auth: 绑定 device_code 与当前用户<br/>用户同意授权
+    Auth-->>User: 授权完成
+
+    loop 轮询直到成功或超时
+        Device->>Device: 重新生成 client_assertion<br/>aud = /connect/token
+        Device->>Auth: POST /connect/token<br/>grant_type=device_code<br/>device_code<br/>client_assertion(private_key_jwt)
+        Auth->>Auth: 校验 client_assertion + device_code 状态
+        alt 用户尚未授权
+            Auth-->>Device: authorization_pending / slow_down
+        else 授权成功
+            Auth-->>Device: access_token + refresh_token
+        end
+    end
+
+    Device->>Api: GET /api/m2m/profile<br/>Authorization: Bearer access_token
+    Api->>Auth: 使用资源服务器 JWT 校验配置验证 access_token
+    Auth-->>Api: access_token 有效
+    Api-->>Device: 返回机器客户端信息

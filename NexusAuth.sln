@@ -13,6 +13,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "0.Solution Items", "0.Solut
 		Directory.Packages.props = Directory.Packages.props
 		Directory.Build.props = Directory.Build.props
 		README.md = README.md
+		auth-flow.md = auth-flow.md
+		production-init.sql = production-init.sql
+		auth-sequence-authorization-code.mmd = auth-sequence-authorization-code.mmd
+		auth-sequence-device-code.mmd = auth-sequence-device-code.mmd
+		auth-sequence-client-credentials.mmd = auth-sequence-client-credentials.mmd
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"

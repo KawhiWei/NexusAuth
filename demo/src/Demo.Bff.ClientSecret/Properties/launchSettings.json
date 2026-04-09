@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "Demo.Bff.ClientSecret": {
+      "commandName": "Project",
+      "applicationUrl": "http://localhost:5301",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

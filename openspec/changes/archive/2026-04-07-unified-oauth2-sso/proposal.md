@@ -1,35 +1,133 @@
 ## Why
 
-NexusAuth 项目需要一个基于 OAuth2.0 协议的统一认证中心（SSO），为后续接入 QQ、微信、GitHub 等第三方登录提供统一入口与标准协议基础。当前项目已完成基础骨架（Domain、Application、Persistence、Shared 四个类库，基于 Luck 框架与 PostgreSQL），但尚无任何认证逻辑，需要从零构建核心 OAuth2.0 SSO 能力。
+NexusAuth 需要从一个“只有 Domain / Application / Persistence 基础骨架”的项目，演进成一个真正可运行、可集成、可演示的 OAuth2.0 / OpenID Connect 认证授权中心。
 
-## What Changes
+最初的设想主要集中在：
 
-- 在 `Directory.Packages.props` 中补充 OAuth2.0/JWT 相关 NuGet 包版本声明（Central Package Management）
-- 新增 `NexusAuth.Domain` 中的用户聚合根（User，含 Nickname、Gender 枚举、Ethnicity 等用户画像字段）、OAuth2 客户端聚合根（OAuthClient）、授权码实体（AuthorizationCode）、刷新令牌实体（RefreshToken）
-- 新增 `NexusAuth.Domain` 中的仓储接口定义（IUserRepository、IOAuthClientRepository、IAuthorizationCodeRepository、IRefreshTokenRepository）
-- 新增 `NexusAuth.Application` 中的应用服务：UserService（用户注册与凭证验证）、ClientService（OAuth2 Client 管理）、AuthorizationService（Authorization Code 流程 + PKCE 校验）、TokenService（JWT 颁发 + Refresh Token 管理）
-- 新增 `NexusAuth.Persistence` 中的 EF 实体配置（`IEntityTypeConfiguration<T>`）、DbSet 注册与数据库迁移
+- 用户身份管理
+- OAuth2 Client 管理
+- Authorization Code / Client Credentials / Refresh Token 的基础领域逻辑
+- PostgreSQL 持久化映射
 
-## Capabilities
+但随着实现推进，项目实际已经扩展为一个完整可运行的认证系统，包含：
 
-### New Capabilities
+- `NexusAuth.Host` Web 宿主
+- OAuth 2.0 + OIDC 标准端点
+- 登录页 / Consent 页 / Device 验证页
+- `private_key_jwt` 与 `client_secret_basic/post` 双模式客户端认证
+- `device_code` 授权模式
+- `refresh_token` 自动续期与轮换
+- 多套 demo（Web + BFF、ClientSecret、ClientCredentials、DeviceCode、RefreshToken）
+- 生产初始化 SQL 与完整 Mermaid 架构 / 调用流程图
 
-- `build-infrastructure`: 工程基础设施 —— 在 `Directory.Packages.props` 中补全 JWT/BCrypt/EF Design 相关包版本，统一项目依赖管理
-- `user-identity`: 用户身份管理 —— 用户聚合根，支持账号/密码、手机号、邮箱三种登录凭证，含 BCrypt 密码哈希；包含用户画像字段（昵称 Nickname、性别 Gender 枚举、民族 Ethnicity）
-- `client-management`: OAuth2 Client 管理 —— 注册与验证 OAuth2 应用（ClientId、ClientSecret、RedirectUri、Scope、GrantType）
-- `oauth2-core`: OAuth2.0 授权核心 —— Authorization Code + PKCE 流程、Client Credentials 流程、Refresh Token 流程的领域逻辑与应用服务
-- `token-management`: 令牌管理 —— JWT Access Token 颁发与验证，Refresh Token 持久化与吊销
-- `persistence-mappings`: 持久化层映射 —— 使用 `IEntityTypeConfiguration<T>` 完成所有实体的数据库字段映射，覆盖所有新增实体
-- `api-resource-management`: API 资源管理 —— 注册可保护的 API 资源（对应 OAuth2 scope），支持管理界面展示与为 OAuthClient 分配 API 资源访问权限；包含 `api_resources` 表与 `client_api_resources` 关联表
+因此，原始归档计划已经不能准确反映当前代码现实，需要同步修正文档，避免后续维护者误以为该变更只覆盖了“核心类库而不含 Host 与 demo”。
 
-### Modified Capabilities
+## What Changed
 
-（`openspec/specs/` 目录当前为空，无已有规格需要修改）
+当前这项归档变更实际已经落地为以下完整能力：
+
+- 新增 `NexusAuth.Host`，提供完整 OAuth2 / OIDC Web 宿主能力
+- 提供 OAuth 2.0 标准端点：
+  - `/connect/authorize`
+  - `/connect/token`
+  - `/connect/deviceauthorization`
+  - `/connect/revocation`
+  - `/connect/introspect`
+- 提供 OIDC 标准端点：
+  - `/.well-known/openid-configuration`
+  - `/.well-known/jwks.json`
+  - `/connect/userinfo`
+  - `/connect/endsession`
+- 新增浏览器交互页：
+  - 登录页
+  - Consent 页
+  - Device 验证页
+- 客户端认证能力从最初的 `client_secret` 扩展为：
+  - `client_secret_basic`
+  - `client_secret_post`
+  - `private_key_jwt`
+- 授权模式从最初的 3 类扩展为：
+  - `authorization_code + PKCE`
+  - `client_credentials`
+  - `refresh_token`
+  - `device_code`
+- OIDC 能力已补齐到可对接 Grafana / BFF / 外部 OIDC Client 的程度
+- demo 已形成两套浏览器登录模式：
+  - `private_key_jwt` 版 Web + BFF
+  - `client_secret_basic` 版 Web + BFF
+- 增加了控制台 demo：
+  - `Demo.ClientCredentials`
+  - `Demo.DeviceCode`
+  - `Demo.RefreshToken`
+- 增加了：
+  - `production-init.sql`
+  - Mermaid 架构图与完整代码调用流程图
+
+## Current Capabilities
+
+### Core OAuth2 / OIDC
+
+- `oauth2-core`
+  - Authorization Code + PKCE（仅允许 `S256`）
+  - Client Credentials
+  - Refresh Token
+  - Device Code
+
+- `token-management`
+  - Access Token 签发
+  - Id Token 签发
+  - Refresh Token 轮换
+  - Access Token 吊销 / Introspection
+
+- `client-management`
+  - OAuthClient 管理
+  - `shared_secret` 与 `jwks` 多类型客户端凭据
+  - `client_secret_basic/post`
+  - `private_key_jwt`
+
+- `user-identity`
+  - 用户注册与凭证校验
+  - 用户画像字段（Nickname / Gender / Ethnicity）
+
+- `api-resource-management`
+  - API 资源注册
+  - Client 与 API Resource 授权映射
+
+### Host / Interaction
+
+- `host-web-endpoints`
+  - OAuth / OIDC 标准端点
+  - 登录态 Cookie 管理
+  - Consent 交互
+  - Device 验证与批准
+
+### Demo / Integration
+
+- `demo-web-private-key-jwt`
+- `demo-web-client-secret`
+- `demo-client-credentials`
+- `demo-device-code`
+- `demo-refresh-token`
 
 ## Impact
 
-- **修改文件**: `Directory.Packages.props`（新增包版本声明）
-- **修改项目**: `NexusAuth.Domain`（新增聚合根、实体、仓储接口）、`NexusAuth.Application`（新增应用服务、DTO）、`NexusAuth.Persistence`（新增 EF 配置、DbSet、迁移）
-- **新增 NuGet 包**: `Microsoft.AspNetCore.Authentication.JwtBearer`、`System.IdentityModel.Tokens.Jwt`、`BCrypt.Net-Next`、`Microsoft.EntityFrameworkCore.Design`
-- **数据库**: PostgreSQL，新增表 `users`、`oauth_clients`、`authorization_codes`、`refresh_tokens`
-- **不影响**: 当前无 Host 项目，本次不创建 API 端点，仅实现领域逻辑与持久化层
+- **新增项目**：`NexusAuth.Host`
+- **新增 demo 项目**：
+  - `Demo.Bff`
+  - `Demo.Web`
+  - `Demo.Bff.ClientSecret`
+  - `Demo.Web.ClientSecret`
+  - `Demo.ClientCredentials`
+  - `Demo.DeviceCode`
+  - `Demo.RefreshToken`
+- **数据库结构**：从最初的 4 表扩展到包含：
+  - `users`
+  - `oauth_clients`
+  - `api_resources`
+  - `client_api_resources`
+  - `authorization_codes`
+  - `refresh_tokens`
+  - `device_authorizations`
+  - `token_blacklist_entries`
+- **认证方式**：已不再局限于 `ClientSecretHash`，而是统一抽象为 `client_secrets`
+- **文档与可视化**：新增 README、生产初始化 SQL、Mermaid 架构与调用流程图

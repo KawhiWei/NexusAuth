@@ -1,237 +1,200 @@
 ## Context
 
-NexusAuth 是一个基于 .NET 9.0 / Luck 框架的统一认证中心项目，使用 PostgreSQL 数据库，遵循 DDD 分层架构（Domain / Application / Persistence / Shared）。项目当前已完成基础骨架，但没有任何认证逻辑。本次设计的目标是在不引入第三方 OAuth2 框架（如 OpenIddict、IdentityServer）的前提下，手工实现符合 RFC 6749 标准的 OAuth2.0 核心流程，为后续扩展第三方登录打下基础。
+NexusAuth 当前已经不再只是“基础类库实现”，而是一个完整的 OAuth2.0 / OIDC 认证系统。项目结构现状如下：
 
-本次变更**不创建** Web API 宿主项目（`NexusAuth.Host`），仅实现领域层、应用服务层、持久化层。API 端点注册将在后续独立 change 中完成。
+- `NexusAuth.Host`
+  - OAuth / OIDC 端点
+  - 登录页、Consent 页、Device 页
+  - Cookie 登录会话
+- `NexusAuth.Application`
+  - 客户端认证、授权码流程、Token 签发、Device Flow、Refresh Token 轮换
+- `NexusAuth.Domain`
+  - 聚合根、实体、Repository 接口
+- `NexusAuth.Persistence`
+  - Repository 实现、EF Core 映射、PostgreSQL 持久化
+- `demo/`
+  - 两套浏览器登录 demo
+  - 多个控制台 grant demo
 
-## Goals / Non-Goals
+因此，这份设计文档需要从“仅核心库设计”更新为“完整系统设计”。
 
-**Goals:**
-- 实现 OAuth2.0 Authorization Code + PKCE 流程的完整领域逻辑
-- 实现 Client Credentials 流程
-- 实现 Refresh Token 流程与吊销
-- 实现用户身份：账号/密码、手机号、邮箱三种凭证，BCrypt 密码哈希
-- 实现 OAuth2 Client 注册与验证（ClientId、ClientSecretHash、RedirectUri、Scope、GrantType）
-- 实现 JWT Access Token 颁发（RS256 或 HS256）
-- 使用 `IEntityTypeConfiguration<T>` 完成所有实体的 EF Core 映射
-- 通过 `Directory.Packages.props` 集中管理所有新增 NuGet 包版本
+## Goals
 
-**Non-Goals:**
-- 本次不实现 HTTP API 端点（`/connect/authorize`、`/connect/token` 等）
-- 本次不实现 OpenID Connect Discovery 端点
-- 本次不实现第三方登录（QQ、微信、GitHub）
-- 本次不实现管理界面或 Client 自助注册 API
-- 本次不引入 OpenIddict / IdentityServer / Duende 等第三方 OAuth2 框架
+### Goals
 
-## Decisions
+- 提供完整可运行的 OAuth2.0 / OIDC Authorization Server
+- 支持浏览器交互登录与 BFF 模式
+- 支持机器到机器调用
+- 支持设备授权模式
+- 支持 refresh token 轮换
+- 同时支持：
+  - `client_secret_basic`
+  - `client_secret_post`
+  - `private_key_jwt`
+- 形成一套可演示、可对接外部客户端、可继续生产化演进的基础能力
 
-### 1. 手工实现 OAuth2 端点逻辑，不引入第三方框架
+### Non-Goals
 
-**决策**：所有 OAuth2 流程逻辑（授权码生成、PKCE 校验、Token 颁发）均手工实现于 Application 层。
+- 当前仍未实现第三方社交登录（QQ / 微信 / GitHub）
+- 当前仍未实现完整的租户隔离模型
+- 当前未引入第三方 OAuth Server 框架（OpenIddict / IdentityServer / Duende）
 
-**理由**：
-- 项目基于 Luck 自有框架，与 OpenIddict / IdentityServer 的 DI 模型存在冲突风险
-- 手工实现可完全控制数据模型与存储结构，便于后续扩展第三方登录适配器
-- OAuth2 核心流程逻辑并不复杂，过度依赖框架反而增加维护成本
+## Architecture Decisions
 
-**备选方案**：OpenIddict（被排除，因其要求特定的 Entity 模型与 DI 注册方式，与 Luck 框架集成复杂）
+### 1. 手工实现 OAuth2 / OIDC 协议逻辑
 
----
+**Decision**
+- 继续手工实现 OAuth2 / OIDC 协议逻辑，而不是引入第三方认证服务器框架。
 
-### 2. JWT 签名算法：HS256（对称）
+**Why**
+- 与 Luck 框架和现有分层架构更容易融合
+- 可完全控制数据模型、协议细节与扩展点
+- 更适合继续演进 `private_key_jwt`、device flow、BFF 自动 refresh 等自定义需求
 
-**决策**：使用 HMAC-SHA256（HS256）签名 Access Token，密钥通过配置注入。
+### 2. 采用 Host + Application + Domain + Persistence 的 DDD 分层
 
-**理由**：
-- 当前为单体服务，无需非对称密钥分发
-- 配置简单，后续可升级为 RS256（通过替换 `ITokenSigningCredentialsProvider` 实现）
+**Decision**
+- `Host` 只承载 HTTP 端点与交互页
+- `Application` 承载协议编排与业务流程
+- `Domain` 承载实体、聚合根与仓储接口
+- `Persistence` 实现仓储接口并对接 PostgreSQL
 
-**备选方案**：RS256（非对称）—— 后续如需跨服务验证 Token，可通过扩展点升级
+**Why**
+- 保持高内聚、低耦合
+- 有利于后续继续加 demo、管理端、第三方登录适配器
 
----
+### 3. 客户端认证方式采用“按 token_endpoint_auth_method 分发”
 
-### 3. 领域层定义仓储接口，Persistence 层实现
+**Decision**
+- 每个 client 通过 `token_endpoint_auth_method` 决定认证方式
+- 当前支持：
+  - `client_secret_basic`
+  - `client_secret_post`
+  - `private_key_jwt`
 
-**决策**：在 `NexusAuth.Domain` 中定义 `IUserRepository` 等接口，在 `NexusAuth.Persistence` 中实现。
+**Why**
+- 可以让同一个 `NexusAuth.Host` 同时承载多种类型客户端
+- 更适合 Web、机器、设备、Grafana 等多场景接入
 
-**理由**：
-- 遵循 DDD 仓储模式，领域层不依赖 EF Core
-- 符合 Luck 框架的模块化架构惯例
+### 4. 客户端凭据统一抽象为 `client_secrets`
 
----
+**Decision**
+- 不再使用单一 `ClientSecretHash`
+- 统一改成 `client_secrets jsonb`
+- 当前类型：
+  - `shared_secret`
+  - `jwks`
 
-### 4. EF 映射使用 `IEntityTypeConfiguration<T>`，通过 `ApplyConfigurationsFromAssembly` 自动注册
+**Why**
+- 预留扩展能力
+- 与 `client_secret` 与 `private_key_jwt` 双模式共存更匹配
 
-**决策**：每个实体对应一个独立的配置类，`NexusAuthDbContext.OnModelCreating` 中调用 `ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly())` 统一注册。
+### 5. `private_key_jwt` 增加生产化最小安全收敛
 
-**理由**：
-- 现有 `DbContext.cs` 已有此模式，保持一致性
-- 配置类职责单一，便于维护和审查
+**Decision**
+- 只允许 `RS256`
+- 校验 `iss == sub == client_id`
+- 校验 `aud == endpoint`
+- 要求 `jti`
+- 对 `jti` 做防重放记录
 
----
+**Why**
+- 避免 demo 虽能用，但完全不具备上线基础
 
-### 5. 密码哈希：BCrypt
+### 6. Refresh Token 采用轮换模型
 
-**决策**：使用 `BCrypt.Net-Next` 进行密码哈希，work factor = 12。
+**Decision**
+- 每次 refresh 成功：
+  - 吊销旧 refresh token
+  - 生成新 refresh token
+  - 生成新 access token
 
-**理由**：BCrypt 是业界标准密码哈希算法，自带盐值，抗彩虹表攻击。
+**Why**
+- 更符合生产实践
+- 降低 refresh token 重用风险
 
----
+### 7. BFF 自动续期放在 Cookie ValidatePrincipal 事件中
 
-### 6. Authorization Code 存储于数据库，使用后立即标记失效
+**Decision**
+- 不在每个 Controller 里手工刷新 access token
+- 统一放到 `CookieAuthenticationEvents.ValidatePrincipal`
 
-**决策**：授权码持久化到 `authorization_codes` 表，使用后设置 `IsUsed = true`，过期时间 10 分钟。
+**Why**
+- 更贴近 ASP.NET Core 标准模式
+- 保持 BFF Controller 简洁
+- 前端无感知自动续期
 
-**理由**：防止授权码重放攻击（RFC 6749 §10.5）。内存存储无法支持多实例部署。
+## High-Level Architecture
+
+系统当前已经形成两个视角：
+
+### 协议角色视角
+- Resource Owner
+- OAuth Client
+- Authorization Server
+- Resource Server
+
+### DDD 分层视角
+- Client Layer
+- Presentation Layer (`NexusAuth.Host`)
+- Application Layer (`NexusAuth.Application`)
+- Domain Layer (`NexusAuth.Domain`)
+- Infrastructure Layer (`NexusAuth.Persistence`)
+- Storage Layer (`PostgreSQL`, signing key storage)
+
+对应图文件：
+
+- `architecture-overview.mmd`
+- `architecture-layered.mmd`
 
 ## Data Model
 
-> 所有表使用 PostgreSQL，主键为 `uuid`，时间类型为 `timestamptz`。
+当前系统实际落地的数据模型已经扩展为：
 
----
+- `users`
+- `oauth_clients`
+- `api_resources`
+- `client_api_resources`
+- `authorization_codes`
+- `refresh_tokens`
+- `device_authorizations`
+- `token_blacklist_entries`
 
-### `users` — 用户表
+其中关键差异点：
 
-| 列名 | 类型 | 约束 | 说明 |
-|---|---|---|---|
-| `id` | `uuid` | PK | 用户唯一标识 |
-| `username` | `varchar(100)` | NOT NULL, UNIQUE | 登录账号 |
-| `password_hash` | `varchar(256)` | NOT NULL | BCrypt 哈希密码（work factor=12） |
-| `nickname` | `varchar(100)` | NOT NULL | 用户昵称（显示名称） |
-| `gender` | `smallint` | NOT NULL, DEFAULT 0 | 性别：0=Unknown, 1=Male, 2=Female |
-| `ethnicity` | `varchar(50)` | NULLABLE | 民族 |
-| `email` | `varchar(256)` | NULLABLE, UNIQUE | 邮箱，可用于登录 |
-| `phone_number` | `varchar(20)` | NULLABLE, UNIQUE | 手机号，可用于登录 |
-| `is_active` | `boolean` | NOT NULL, DEFAULT true | 账号是否启用 |
-| `created_at` | `timestamptz` | NOT NULL | 创建时间 |
-| `updated_at` | `timestamptz` | NOT NULL | 最后更新时间 |
+### `oauth_clients`
+- `client_secrets jsonb`
+- `token_endpoint_auth_method`
+- `post_logout_redirect_uris`
 
-索引：`username`（unique）、`email`（unique, partial where not null）、`phone_number`（unique, partial where not null）
+### `device_authorizations`
+- device flow 状态机持久化
 
----
+### `token_blacklist_entries`
+- access token 吊销黑名单
+- `private_key_jwt` 的 `jti` 防重放记录
 
-### `oauth_clients` — OAuth2 客户端表
+## Operational Notes
 
-| 列名 | 类型 | 约束 | 说明 |
-|---|---|---|---|
-| `id` | `uuid` | PK | 内部唯一标识 |
-| `client_id` | `varchar(128)` | NOT NULL, UNIQUE | OAuth2 协议中的 client_id |
-| `client_secret_hash` | `varchar(256)` | NOT NULL | BCrypt 哈希后的 client_secret |
-| `client_name` | `varchar(256)` | NOT NULL | 客户端显示名称（管理界面展示） |
-| `description` | `text` | NULLABLE | 客户端描述 |
-| `redirect_uris` | `jsonb` | NOT NULL, DEFAULT '[]' | 允许的回调地址列表 |
-| `allowed_scopes` | `jsonb` | NOT NULL, DEFAULT '[]' | 允许申请的 scope 列表 |
-| `allowed_grant_types` | `jsonb` | NOT NULL, DEFAULT '[]' | 允许的授权类型（`authorization_code`、`client_credentials`、`refresh_token`） |
-| `require_pkce` | `boolean` | NOT NULL, DEFAULT true | 是否强制要求 PKCE（Authorization Code 流程） |
-| `is_active` | `boolean` | NOT NULL, DEFAULT true | 客户端是否启用 |
-| `created_at` | `timestamptz` | NOT NULL | 创建时间 |
+### Demo 环境
+- 使用 `demo/schema.sql` + `demo/seed.sql`
 
-索引：`client_id`（unique）
+### 生产初始化
+- 使用 `production-init.sql`
+- 不带 demo client / demo user
 
----
+### 当前测试配置
+- `access_token = 1 分钟`
+- `refresh_token = 3 分钟`
+- `BFF cookie = 3 分钟`
 
-### `api_resources` — API 资源表
+目的是更方便验证 refresh token 自动续期链路。
 
-| 列名 | 类型 | 约束 | 说明 |
-|---|---|---|---|
-| `id` | `uuid` | PK | 资源唯一标识 |
-| `name` | `varchar(128)` | NOT NULL, UNIQUE | 资源标识符（对应 scope 名称，如 `orders.read`） |
-| `display_name` | `varchar(256)` | NOT NULL | 管理界面展示名称 |
-| `description` | `text` | NULLABLE | 资源描述 |
-| `is_active` | `boolean` | NOT NULL, DEFAULT true | 是否启用 |
-| `created_at` | `timestamptz` | NOT NULL | 创建时间 |
+## Residual Risks
 
-索引：`name`（unique）
-
-**说明**：`api_resources.name` 与 OAuth2 scope 对应。OAuthClient 的 `allowed_scopes` 中的每一项均应在 `api_resources.name` 中存在（应用层校验，非 FK 约束）。管理界面通过此表展示可分配的 API 资源列表，供管理员为 OAuthClient 勾选授权。
-
----
-
-### `client_api_resources` — 客户端与 API 资源关联表
-
-| 列名 | 类型 | 约束 | 说明 |
-|---|---|---|---|
-| `client_id` | `uuid` | NOT NULL, FK → `oauth_clients.id` | 关联的客户端 |
-| `api_resource_id` | `uuid` | NOT NULL, FK → `api_resources.id` | 关联的 API 资源 |
-
-主键：`(client_id, api_resource_id)` 联合主键
-
-**说明**：此表记录某个 OAuthClient 被授权可访问哪些 API 资源。`oauth_clients.allowed_scopes` 字段存储实际 Token 中携带的 scope 字符串，`client_api_resources` 表用于管理界面的可视化展示与权限分配，两者保持同步。
-
----
-
-### `authorization_codes` — 授权码表
-
-| 列名 | 类型 | 约束 | 说明 |
-|---|---|---|---|
-| `id` | `uuid` | PK | 内部唯一标识 |
-| `code` | `varchar(256)` | NOT NULL, UNIQUE | 授权码值（URL-safe 随机字符串，≥32 字符） |
-| `client_id` | `varchar(128)` | NOT NULL | 对应 `oauth_clients.client_id` |
-| `user_id` | `uuid` | NOT NULL | 授权用户，对应 `users.id` |
-| `redirect_uri` | `varchar(2048)` | NOT NULL | 本次授权请求的 redirect_uri |
-| `scope` | `varchar(512)` | NOT NULL | 本次授权申请的 scope（空格分隔） |
-| `code_challenge` | `varchar(256)` | NULLABLE | PKCE code_challenge |
-| `code_challenge_method` | `varchar(10)` | NULLABLE | `S256` 或 `plain` |
-| `is_used` | `boolean` | NOT NULL, DEFAULT false | 是否已被兑换（防重放） |
-| `expires_at` | `timestamptz` | NOT NULL | 过期时间（创建后 10 分钟） |
-| `created_at` | `timestamptz` | NOT NULL | 创建时间 |
-
-索引：`code`（unique）、`expires_at`（普通索引，用于清理过期记录）
-
----
-
-### `refresh_tokens` — 刷新令牌表
-
-| 列名 | 类型 | 约束 | 说明 |
-|---|---|---|---|
-| `id` | `uuid` | PK | 内部唯一标识 |
-| `token` | `varchar(512)` | NOT NULL, UNIQUE | Refresh Token 值（URL-safe 随机字符串，≥64 字符） |
-| `client_id` | `varchar(128)` | NOT NULL | 对应 `oauth_clients.client_id` |
-| `user_id` | `uuid` | NOT NULL | 授权用户，对应 `users.id` |
-| `scope` | `varchar(512)` | NOT NULL | 此 Token 携带的 scope |
-| `is_revoked` | `boolean` | NOT NULL, DEFAULT false | 是否已吊销 |
-| `expires_at` | `timestamptz` | NOT NULL | 过期时间（创建后 30 天） |
-| `created_at` | `timestamptz` | NOT NULL | 创建时间 |
-
-索引：`token`（unique）、`user_id`（普通索引，用于全量吊销）、`expires_at`（普通索引，用于清理）
-
----
-
-### 实体关系概览
-
-```
-users ──────────────────────────────────────┐
-                                             │ user_id (逻辑关联)
-oauth_clients ──── client_api_resources ──── api_resources
-      │                                      
-      │ client_id (逻辑关联)                 
-      ├── authorization_codes                
-      └── refresh_tokens                     
-```
-
-所有跨表关联均为**应用层逻辑关联**，数据库不设 FOREIGN KEY 约束，以保持 PostgreSQL 写入性能与部署灵活性。
-
-## Risks / Trade-offs
-
-- **[Risk] HS256 密钥泄漏** → Mitigation：密钥通过环境变量/Secret 管理注入，不硬编码
-- **[Risk] Authorization Code 表数据量增长** → Mitigation：后续添加定时清理过期记录的后台任务
-- **[Risk] Refresh Token 无法强制下线所有设备** → Mitigation：当前实现支持单 Token 吊销；全局下线可通过后续扩展 `user_sessions` 表实现
-- **[Trade-off] 手工实现 vs 框架**：手工实现增加了初期代码量，但避免了框架升级绑定与模型侵入问题
-- **[Risk] EF 迁移在 CI/CD 中需要数据库连接** → Mitigation：迁移脚本通过 `dotnet ef migrations script` 生成 SQL 文件，与代码分离执行
-
-## Migration Plan
-
-1. 在 `Directory.Packages.props` 中新增包版本声明
-2. 在各项目 `.csproj` 中引用新包（不指定版本，由 CPM 管理）
-3. 实现 Domain 层聚合根与实体
-4. 实现 Application 层服务接口与实现
-5. 实现 Persistence 层 EF 配置与 DbSet
-6. 数据库表结构由**手动 SQL 脚本**创建，不使用 EF Migrations；`Microsoft.EntityFrameworkCore.Design` 包不引入；`DbContext` 启动时不调用 `Database.Migrate()`
-
-**回滚**：回退对应代码提交即可，数据库表若已手动创建可单独通过 `DROP TABLE` 回滚
-
-## Open Questions
-
-- JWT Access Token 过期时间是否需要可配置（当前建议默认 1 小时）？
-- Refresh Token 过期时间建议值（当前建议默认 30 天）？
-- 是否需要在本次实现 `id_token`（OpenID Connect）？（当前设计排除在外，作为后续 change）
+- 当前 demo 私钥仍存放在仓库中，仅适合演示
+- 生产环境仍需：
+  - Secret 管理
+  - 多 key 轮换
+  - 更完整审计日志
+  - DataProtection 多副本共享

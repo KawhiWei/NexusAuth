@@ -4,160 +4,323 @@
     Layout = null;
 }
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html class="dark" lang="zh-CN">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Login - NexusAuth</title>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>登录 - React-Design-Template</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;family=Manrope:wght@500;700&amp;display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        tertiary: "#ffaaf7",
+                        "on-secondary-fixed-variant": "#3a45ac",
+                        "surface-variant": "#1a2056",
+                        "primary-fixed": "#799dff",
+                        outline: "#6e729d",
+                        "tertiary-fixed": "#f797f0",
+                        "tertiary-dim": "#e88ae1",
+                        "on-secondary-container": "#c9cdff",
+                        "outline-variant": "#41456c",
+                        "on-tertiary-container": "#610e63",
+                        "on-error-container": "#ffa8a3",
+                        "on-tertiary-fixed-variant": "#6c1a6c",
+                        "primary-container": "#799dff",
+                        "secondary": "#8a95ff",
+                        "on-primary-fixed-variant": "#00276c",
+                        "tertiary-fixed-dim": "#e88ae1",
+                        "on-secondary-fixed": "#19248e",
+                        "secondary-fixed-dim": "#babfff",
+                        "error-dim": "#d7383b",
+                        "tertiary-container": "#f797f0",
+                        "surface-tint": "#156aff"
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.125rem",
+                        lg: "0.25rem",
+                        xl: "0.5rem",
+                        full: "0.75rem"
+                    },
+                    fontFamily: {
+                        headline: ["Space Grotesk"],
+                        body: ["Inter"],
+                        label: ["Manrope"]
+                    }
+                }
+            }
+        };
+    </script>
     <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #f0f2f5;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            color: #1f2937;
+        html.dark {
+            --background: #06092f;
+            --on-background: #e3e3ff;
+            --surface: #06092f;
+            --surface-bright: #1f2660;
+            --surface-container: #0f1442;
+            --surface-container-high: #141a4c;
+            --surface-container-highest: #1a2056;
+            --surface-container-low: #090e38;
+            --surface-container-lowest: #000000;
+            --on-surface: #e3e3ff;
+            --on-surface-variant: #a4a8d5;
+            --primary: #8eabff;
+            --primary-dim: #156aff;
+            --secondary: #8a95ff;
+            --outline: #6e729d;
+            --outline-variant: #41456c;
+            --danger: #ff716c;
+            --card-accent: linear-gradient(90deg, rgba(255,255,255,0.92), rgba(227,227,255,0.78), rgba(255,255,255,0.92));
+            color-scheme: dark;
         }
 
-        .login-container {
-            width: 100%;
-            max-width: 400px;
-            padding: 0 16px;
+        html.light {
+            --background: #fdfdfd;
+            --on-background: #06092f;
+            --surface: #fdfdfd;
+            --surface-bright: #ffffff;
+            --surface-container: #f8f9fc;
+            --surface-container-high: #f0f2f9;
+            --surface-container-highest: #e2e5f0;
+            --surface-container-low: #fcfcfd;
+            --surface-container-lowest: #ffffff;
+            --on-surface: #06092f;
+            --on-surface-variant: #41456c;
+            --primary: #156aff;
+            --primary-dim: #156aff;
+            --secondary: #8a95ff;
+            --outline: #6e729d;
+            --outline-variant: #41456c;
+            --danger: #d7383b;
+            --card-accent: linear-gradient(90deg, #156aff, #156aff, #8a95ff);
+            color-scheme: light;
         }
 
-        .login-card {
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-            padding: 40px 32px;
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
         }
 
-        .login-header {
-            text-align: center;
-            margin-bottom: 32px;
+        .glass-panel {
+            background: color-mix(in srgb, var(--surface-container) 78%, transparent);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
         }
 
-        .login-header h1 {
-            font-size: 24px;
-            font-weight: 600;
-            color: #111827;
-            margin-bottom: 8px;
+        .tech-gradient-bg {
+            background: radial-gradient(circle at 50% 50%, var(--surface-container) 0%, var(--surface) 100%);
         }
 
-        .login-header p {
-            font-size: 14px;
-            color: #6b7280;
+        .data-grid {
+            background-image:
+                linear-gradient(color-mix(in srgb, var(--primary) 5%, transparent) 1px, transparent 1px),
+                linear-gradient(90deg, color-mix(in srgb, var(--primary) 5%, transparent) 1px, transparent 1px);
+            background-size: 44px 44px;
+            filter: blur(0.4px);
+            opacity: 0.55;
         }
 
-        .form-group {
-            margin-bottom: 20px;
+        .theme-toggle {
+            border: 1px solid color-mix(in srgb, var(--outline-variant) 40%, transparent);
+            background: color-mix(in srgb, var(--surface-container-high) 75%, transparent);
         }
 
-        .form-group label {
-            display: block;
-            font-size: 14px;
-            font-weight: 500;
-            color: #374151;
-            margin-bottom: 6px;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 10px 12px;
-            font-size: 14px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        .form-group input:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-
-        .error-message {
-            background: #fef2f2;
-            color: #dc2626;
-            border: 1px solid #fecaca;
-            border-radius: 6px;
-            padding: 10px 12px;
-            font-size: 14px;
-            margin-bottom: 20px;
-        }
-
-        .btn-login {
-            width: 100%;
-            padding: 10px 16px;
-            font-size: 15px;
-            font-weight: 500;
-            color: #fff;
-            background: #3b82f6;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .btn-login:hover {
-            background: #2563eb;
-        }
-
-        .btn-login:active {
-            background: #1d4ed8;
-        }
-
-        .client-info {
-            margin-top: 24px;
-            padding-top: 16px;
-            border-top: 1px solid #e5e7eb;
-            font-size: 12px;
-            color: #9ca3af;
-            text-align: center;
+        html.light .login-decoration {
+            display: none;
         }
     </style>
 </head>
-<body>
-    <div class="login-container">
-        <div class="login-card">
-            <div class="login-header">
-                <h1>NexusAuth</h1>
-                <p>Sign in to continue</p>
+<body class="bg-[var(--background)] text-[var(--on-background)] font-body min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
+    <div class="absolute inset-0 z-0 tech-gradient-bg data-grid"></div>
+    <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[color:var(--primary)]/10 blur-[120px] rounded-full"></div>
+    <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[color:var(--secondary)]/10 blur-[120px] rounded-full"></div>
+
+    <header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 md:px-8 h-16 bg-transparent backdrop-blur-xl">
+        <div class="text-2xl font-bold bg-gradient-to-r from-[color:var(--primary)] to-[color:var(--primary-dim)] bg-clip-text text-transparent font-headline tracking-tight">
+            React-Design-Template
+        </div>
+        <div class="flex gap-3 items-center">
+            <button id="theme-toggle" type="button" class="theme-toggle px-4 py-2 rounded-lg text-xs md:text-sm text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-colors">
+                亮色模式
+            </button>
+        </div>
+    </header>
+
+    <main class="relative z-10 grid min-h-screen w-full grid-cols-1 gap-10 px-6 pb-24 pt-24 lg:grid-cols-[minmax(0,1fr)_475px] lg:items-center lg:px-8">
+        <section class="hidden min-w-0 lg:grid lg:gap-8 lg:pl-8 xl:pl-16">
+            <div class="max-w-[720px]">
+                <p class="mt-6 max-w-[56ch] text-base leading-8 text-[var(--on-surface-variant)] xl:text-lg">
+                    NexusAuth 负责承载 OAuth 2.0 与 OpenID Connect 授权流程，统一处理浏览器登录、BFF 会话、设备授权和外部系统接入。
+                    当前页面沿用《科技登录界面》的视觉语言，用更克制的玻璃层与深蓝色域组织登录体验。
+                </p>
             </div>
+            <div class="grid max-w-[760px] grid-cols-3 gap-4">
+                <div class="rounded-2xl bg-[var(--surface-variant)]/60 p-5 backdrop-blur-xl">
+                    <strong class="block font-headline text-sm text-[var(--on-surface)]">OAuth Core</strong>
+                    <span class="mt-2 block text-sm leading-6 text-[var(--on-surface-variant)]">Authorization Code、Refresh Token、Device Code 等能力统一落在一个认证核心中。</span>
+                </div>
+                <div class="rounded-2xl bg-[var(--surface-variant)]/60 p-5 backdrop-blur-xl">
+                    <strong class="block font-headline text-sm text-[var(--on-surface)]">Dual Client Auth</strong>
+                    <span class="mt-2 block text-sm leading-6 text-[var(--on-surface-variant)]">同一认证中心兼容 client_secret 和 private_key_jwt 两种客户端认证方式。</span>
+                </div>
+                <div class="rounded-2xl bg-[var(--surface-variant)]/60 p-5 backdrop-blur-xl">
+                    <strong class="block font-headline text-sm text-[var(--on-surface)]">OIDC Ready</strong>
+                    <span class="mt-2 block text-sm leading-6 text-[var(--on-surface-variant)]">Discovery、JWKS、UserInfo、Logout 等端点已经具备对接外部系统的基础能力。</span>
+                </div>
+            </div>
+        </section>
 
-            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
-            {
-                <div class="error-message">@Model.ErrorMessage</div>
-            }
+        <section class="z-10 flex w-full justify-center lg:justify-end lg:pr-8 xl:pr-16">
+            <div class="w-full max-w-[475px]">
+                <div class="glass-panel border border-[color:var(--outline-variant)]/20 rounded-[18px] p-8 md:p-9 shadow-2xl relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-full h-1" style="background: var(--card-accent);"></div>
+                    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                    {
+                        <div class="mb-6 rounded-xl border border-[color:var(--danger)]/30 bg-[color:var(--danger)]/10 px-4 py-3 text-sm text-[color:var(--danger)]">
+                            @Model.ErrorMessage
+                        </div>
+                    }
 
-            <form method="post">
-                <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+                    <form class="space-y-6" method="post">
+                        <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
 
-                <div class="form-group">
-                    <label for="username">Username</label>
-                    <input type="text" id="username" name="Username" value="@Model.Username"
-                           placeholder="Enter your username" required autofocus />
+                        <div class="space-y-2">
+                            <label class="ml-1 block font-label text-[10px] tracking-widest uppercase text-[var(--on-surface-variant)]/80">用户名 / 邮箱</label>
+                            <div class="relative group">
+                                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <span class="material-symbols-outlined text-[var(--outline)] text-lg transition-colors group-focus-within:text-[color:var(--primary)]">alternate_email</span>
+                                </div>
+                                <input class="block w-full rounded-t-lg border-0 border-b-2 border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] py-4 pl-12 pr-4 text-[var(--on-surface)] placeholder:text-[var(--outline)]/50 focus:border-[color:var(--primary)] focus:outline-none focus:ring-0 transition-all"
+                                       id="username"
+                                       name="Username"
+                                       placeholder="admin@react-template.tech"
+                                       required
+                                       type="text"
+                                       value="@Model.Username"
+                                       autofocus />
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <div class="ml-1 flex items-center justify-between">
+                                <label class="block font-label text-[10px] tracking-widest uppercase text-[var(--on-surface-variant)]/80">密码</label>
+                                <span class="text-[10px] uppercase tracking-widest font-bold text-[color:var(--primary)]">安全接入</span>
+                            </div>
+                            <div class="relative group">
+                                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <span class="material-symbols-outlined text-[var(--outline)] text-lg transition-colors group-focus-within:text-[color:var(--primary)]">lock</span>
+                                </div>
+                                <input class="block w-full rounded-t-lg border-0 border-b-2 border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] py-4 pl-12 pr-12 text-[var(--on-surface)] placeholder:text-[var(--outline)]/50 focus:border-[color:var(--primary)] focus:outline-none focus:ring-0 transition-all"
+                                       id="password"
+                                       name="Password"
+                                       placeholder="••••••••"
+                                       required
+                                       type="password" />
+                                <button class="absolute inset-y-0 right-0 pr-4 flex items-center text-[var(--outline)] hover:text-[var(--on-surface)] transition-colors" type="button" id="password-toggle">
+                                    <span class="material-symbols-outlined text-lg">visibility</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between py-2">
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input class="h-4 w-4 rounded border-[var(--outline-variant)] bg-[var(--surface-container-low)] text-[color:var(--primary)] focus:ring-[color:var(--primary)] focus:ring-offset-[var(--background)]" type="checkbox" />
+                                <span class="text-sm text-[var(--on-surface-variant)]">记住我</span>
+                            </label>
+                            <span class="text-sm text-[color:var(--primary)] font-medium">统一认证</span>
+                        </div>
+
+                        <button class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[color:var(--primary)] to-[color:var(--primary-dim)] px-6 py-4 font-bold text-white shadow-[0_0_20px_rgba(21,106,255,0.30)] transition-all hover:-translate-y-0.5 hover:shadow-[0_0_30px_rgba(21,106,255,0.45)] active:translate-y-0" type="submit">
+                            <span class="font-headline tracking-wide">登录</span>
+                            <span class="material-symbols-outlined text-xl">arrow_forward</span>
+                        </button>
+                    </form>
+
+                    <div class="mt-10 border-t border-[var(--outline-variant)]/10 pt-8">
+                        <p class="mb-6 text-center font-label text-[10px] uppercase tracking-widest text-[var(--on-surface-variant)]/60">其他访问方式</p>
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <button type="button" class="flex items-center justify-center gap-2 rounded-xl border border-[color:var(--outline-variant)]/20 px-4 py-3 text-xs text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-highest)]/70">
+                                <span class="material-symbols-outlined text-lg">fingerprint</span>
+                                <span>生物识别</span>
+                            </button>
+                            <button type="button" class="flex items-center justify-center gap-2 rounded-xl border border-[color:var(--outline-variant)]/20 px-4 py-3 text-xs text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-highest)]/70">
+                                <span class="material-symbols-outlined text-lg">qr_code_2</span>
+                                <span>扫码登录</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(Model.ClientName))
+                    {
+                        <div class="mt-8 text-center text-[11px] text-[var(--on-surface-variant)]">
+                            当前授权客户端：<span class="font-semibold text-[var(--on-surface)]">@Model.ClientName</span>
+                        </div>
+                    }
                 </div>
 
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="Password"
-                           placeholder="Enter your password" required />
+                <div class="mt-8 flex items-center justify-center gap-6 opacity-40 grayscale transition-all hover:opacity-100 hover:grayscale-0 cursor-default">
+                    <div class="flex items-center gap-2">
+                        <div class="h-1.5 w-1.5 rounded-full bg-emerald-400"></div>
+                        <span class="font-label text-[10px] uppercase tracking-widest">系统在线</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-label text-[10px] uppercase tracking-widest">OAuth Ready</span>
+                    </div>
                 </div>
+            </div>
+        </section>
+    </main>
 
-                <button type="submit" class="btn-login">Sign In</button>
-            </form>
+    <footer class="fixed bottom-0 w-full z-50 flex flex-col gap-3 px-6 py-5 text-[10px] md:flex-row md:items-center md:justify-between md:px-8 md:py-6 font-body tracking-widest uppercase">
+        <div class="text-slate-500">
+            © 2024 React-Design-Template. 保留所有权利。
+        </div>
+        <div class="flex gap-6">
+            <span class="text-slate-500 hover:text-blue-300 transition-colors">隐私政策</span>
+            <span class="text-slate-500 hover:text-blue-300 transition-colors">服务条款</span>
+            <span class="text-slate-500 hover:text-blue-300 transition-colors">联系我们</span>
+        </div>
+    </footer>
 
-            @if (!string.IsNullOrEmpty(Model.ClientName))
-            {
-                <div class="client-info">
-                    Authorizing for <strong>@Model.ClientName</strong>
-                </div>
-            }
+    <div class="login-decoration fixed top-1/2 right-[-100px] transform -translate-y-1/2 opacity-20 pointer-events-none hidden lg:block">
+        <div class="w-[400px] h-[600px] rounded-full overflow-hidden border border-[color:var(--primary)]/20 rotate-12">
+            <img alt="abstract" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBswZ3WRm_5iPnXX2RFwLEO77a5cXAgIoMWY8H4E3UryFE8vL-Iy0a7ojtnGDxSD-ann7myAs5BGDGTCEZOUkppEGwQ2y-mLz6V5L1BCLA5op896ZtL0grH_txgSV9SJK88ydBprF1wnwKiFZk9BOB0DDsdZARTB_ppSInKWqV2mh5ZaiY_1A1vh7bj0rdmgXotCd69qev3Z7lgWcKmKtut9Q6Rg9VeiLy1Hx2OBPlPVfUTCIzA1FCetWXq2i-sqiJcTIi3MuKCip8" />
         </div>
     </div>
+
+    <script>
+        (function () {
+            const root = document.documentElement;
+            const toggle = document.getElementById('theme-toggle');
+            const storageKey = 'nexusauth-login-theme';
+            const stored = window.localStorage.getItem(storageKey);
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+            function applyTheme(theme) {
+                root.classList.remove('light', 'dark');
+                root.classList.add(theme);
+                toggle.textContent = theme === 'dark' ? '亮色模式' : '暗色模式';
+            }
+
+            applyTheme(stored || (prefersDark ? 'dark' : 'light'));
+
+            toggle.addEventListener('click', function () {
+                const next = root.classList.contains('dark') ? 'light' : 'dark';
+                window.localStorage.setItem(storageKey, next);
+                applyTheme(next);
+            });
+
+            const passwordInput = document.getElementById('password');
+            const passwordToggle = document.getElementById('password-toggle');
+            passwordToggle.addEventListener('click', function () {
+                const showing = passwordInput.type === 'text';
+                passwordInput.type = showing ? 'password' : 'text';
+                passwordToggle.querySelector('span').textContent = showing ? 'visibility' : 'visibility_off';
+            });
+        })();
+    </script>
 </body>
 </html>

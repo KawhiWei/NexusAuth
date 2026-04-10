@@ -1,0 +1,15 @@
+global using Luck.Framework.Infrastructure.DependencyInjectionModule;
+global using Microsoft.Extensions.Hosting;
+global using Microsoft.Extensions.Logging;
+global using Microsoft.Extensions.Options;
+global using Microsoft.IdentityModel.Tokens;
+global using NexusAuth.Domain.AggregateRoots.ApiResources;
+global using NexusAuth.Domain.AggregateRoots.OAuthClients;
+global using NexusAuth.Domain.AggregateRoots.Users;
+global using NexusAuth.Domain.Entities;
+global using NexusAuth.Domain.Repositories;
+global using System.IdentityModel.Tokens.Jwt;
+global using System.Security.Claims;
+global using System.Security.Cryptography;
+global using System.Text;
+global using System.Text.Json;

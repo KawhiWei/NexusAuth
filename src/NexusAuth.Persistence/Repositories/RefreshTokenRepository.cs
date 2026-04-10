@@ -7,17 +7,10 @@ using NexusAuth.Domain.Repositories;
 
 namespace NexusAuth.Persistence.Repositories;
 
-public class RefreshTokenRepository : EfCoreEntityRepository<RefreshToken, Guid>, IRefreshTokenRepository
+public class RefreshTokenRepository(IUnitOfWork unitOfWork) : EfCoreEntityRepository<RefreshToken, Guid>(unitOfWork), IRefreshTokenRepository
 {
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly LuckDbContextBase _dbContext;
-
-    public RefreshTokenRepository(IUnitOfWork unitOfWork) : base(unitOfWork)
-    {
-        _unitOfWork = unitOfWork;
-        _dbContext = unitOfWork.GetLuckDbContext() as LuckDbContextBase
-                     ?? throw new InvalidOperationException("Failed to resolve LuckDbContext.");
-    }
+    private readonly LuckDbContextBase _dbContext = unitOfWork.GetLuckDbContext() as LuckDbContextBase
+        ?? throw new InvalidOperationException("Failed to resolve LuckDbContext.");
 
     public async Task<RefreshToken?> FindByTokenAsync(string token, CancellationToken ct = default)
     {
@@ -27,7 +20,7 @@ public class RefreshTokenRepository : EfCoreEntityRepository<RefreshToken, Guid>
     public async Task AddAsync(RefreshToken token, CancellationToken ct = default)
     {
         await _dbContext.Set<RefreshToken>().AddAsync(token, ct);
-        await _unitOfWork.CommitAsync(ct);
+        await unitOfWork.CommitAsync(ct);
     }
 
     public async Task RevokeAsync(Guid id, CancellationToken ct = default)
@@ -36,7 +29,7 @@ public class RefreshTokenRepository : EfCoreEntityRepository<RefreshToken, Guid>
         if (entity is not null)
         {
             entity.Revoke();
-            await _unitOfWork.CommitAsync(ct);
+            await unitOfWork.CommitAsync(ct);
         }
     }
 
@@ -50,6 +43,6 @@ public class RefreshTokenRepository : EfCoreEntityRepository<RefreshToken, Guid>
             token.Revoke();
         }
 
-        await _unitOfWork.CommitAsync();
+        await unitOfWork.CommitAsync();
     }
 }

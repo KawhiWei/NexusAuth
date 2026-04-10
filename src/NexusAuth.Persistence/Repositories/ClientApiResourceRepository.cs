@@ -11,15 +11,10 @@ namespace NexusAuth.Persistence.Repositories;
 /// ClientApiResource uses composite PK, so it cannot use EfCoreEntityRepository.
 /// Uses IUnitOfWork to access DbContext directly.
 /// </summary>
-public class ClientApiResourceRepository : IClientApiResourceRepository
+public class ClientApiResourceRepository(IUnitOfWork unitOfWork) : IClientApiResourceRepository
 {
-    private readonly LuckDbContextBase _dbContext;
-
-    public ClientApiResourceRepository(IUnitOfWork unitOfWork)
-    {
-        _dbContext = unitOfWork.GetLuckDbContext() as LuckDbContextBase
-                     ?? throw new InvalidOperationException("Failed to resolve LuckDbContext.");
-    }
+    private readonly LuckDbContextBase _dbContext = unitOfWork.GetLuckDbContext() as LuckDbContextBase
+        ?? throw new InvalidOperationException("Failed to resolve LuckDbContext.");
 
     public async Task<IReadOnlyList<ApiResource>> GetResourcesByClientIdAsync(Guid clientId, CancellationToken ct = default)
     {

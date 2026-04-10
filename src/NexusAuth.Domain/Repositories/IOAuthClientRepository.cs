@@ -9,4 +9,12 @@ public interface IOAuthClientRepository : IAggregateRootRepository<OAuthClient, 
     Task<OAuthClient?> FindByClientIdAsync(string clientId, CancellationToken ct = default);
 
     Task AddAsync(OAuthClient client, CancellationToken ct = default);
+
+    Task UpdateAsync(OAuthClient client, CancellationToken ct = default);
+
+    Task DeleteAsync(OAuthClient client, CancellationToken ct = default);
+
+    Task<List<OAuthClient>> GetAllAsync(CancellationToken ct = default);
+
+    Task<OAuthClient?> GetByIdAsync(Guid id, CancellationToken ct = default);
 }

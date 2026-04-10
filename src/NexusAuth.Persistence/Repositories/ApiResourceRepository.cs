@@ -6,15 +6,8 @@ using NexusAuth.Domain.Repositories;
 
 namespace NexusAuth.Persistence.Repositories;
 
-public class ApiResourceRepository : EfCoreAggregateRootRepository<ApiResource, Guid>, IApiResourceRepository
+public class ApiResourceRepository(IUnitOfWork unitOfWork) : EfCoreAggregateRootRepository<ApiResource, Guid>(unitOfWork), IApiResourceRepository
 {
-    private readonly IUnitOfWork _unitOfWork;
-
-    public ApiResourceRepository(IUnitOfWork unitOfWork) : base(unitOfWork)
-    {
-        _unitOfWork = unitOfWork;
-    }
-
     /// <summary>
     /// 按资源名称查询单个 API 资源。
     /// </summary>
@@ -61,6 +54,6 @@ public class ApiResourceRepository : EfCoreAggregateRootRepository<ApiResource, 
     public async Task AddAsync(ApiResource resource, CancellationToken ct = default)
     {
         Add(resource);
-        await _unitOfWork.CommitAsync(ct);
+        await unitOfWork.CommitAsync(ct);
     }
 }

@@ -1,0 +1,16 @@
+namespace NexusAuth.Application.Services.Tokens;
+
+public class JwtOptions
+{
+    public string Issuer { get; set; } = default!;
+
+    public string DefaultAudience { get; set; } = default!;
+
+    public string SigningKeyPath { get; set; } = "App_Data/signing-key.json";
+
+    public int AccessTokenLifetimeMinutes { get; set; } = 60;
+
+    public int DeviceCodeLifetimeMinutes { get; set; } = 15;
+
+    public int RefreshTokenLifetimeMinutes { get; set; } = 43200;
+}

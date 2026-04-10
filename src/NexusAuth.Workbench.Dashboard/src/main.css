@@ -1,0 +1,74 @@
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+html[theme-mode='dark'] {
+  color-scheme: dark;
+
+  --td-gray-color-1: #f3f3f3;
+  --td-gray-color-2: #eee;
+  --td-gray-color-3: #e8e8e8;
+  --td-gray-color-4: #ddd;
+  --td-gray-color-5: #c6c6c6;
+  --td-gray-color-6: #a6a6a6;
+  --td-gray-color-7: #8b8b8b;
+  --td-gray-color-8: #777;
+  --td-gray-color-9: #5e5e5e;
+  --td-gray-color-10: #4b4b4b;
+  --td-gray-color-11: #393939;
+  --td-gray-color-12: #2c2c2c;
+  --td-gray-color-13: #242424;
+  --td-gray-color-14: #181818;
+
+  --td-bg-color-page: var(--td-gray-color-14);
+  --td-bg-color-container: var(--td-gray-color-13);
+  --td-bg-color-container-hover: var(--td-gray-color-12);
+  --td-bg-color-container-active: var(--td-gray-color-10);
+  --td-bg-color-container-select: var(--td-gray-color-9);
+  --td-bg-color-secondarycontainer: var(--td-gray-color-12);
+  --td-bg-color-secondarycontainer-hover: var(--td-gray-color-11);
+  --td-bg-color-secondarycontainer-active: var(--td-gray-color-9);
+  --td-bg-color-component: var(--td-gray-color-11);
+  --td-bg-color-component-hover: var(--td-gray-color-10);
+  --td-bg-color-component-active: var(--td-gray-color-9);
+  --td-bg-color-component-disabled: var(--td-gray-color-12);
+  --td-bg-color-secondarycomponent: var(--td-gray-color-10);
+  --td-bg-color-secondarycomponent-hover: var(--td-gray-color-9);
+  --td-bg-color-secondarycomponent-active: var(--td-gray-color-8);
+  --td-bg-color-specialcomponent: transparent;
+
+  --td-text-color-primary: rgba(255, 255, 255, 0.9);
+  --td-text-color-secondary: rgba(255, 255, 255, 0.55);
+  --td-text-color-placeholder: rgba(255, 255, 255, 0.35);
+  --td-text-color-disabled: rgba(255, 255, 255, 0.22);
+  --td-text-color-anti: #fff;
+
+  --td-brand-color: #4582e6;
+  --td-brand-color-hover: #2667d4;
+  --td-brand-color-active: #699ef5;
+  --td-brand-color-disabled: #143975;
+  --td-brand-color-light: #1b2f51;
+  --td-brand-color-focus: #173463;
+
+  --td-component-stroke: var(--td-gray-color-11);
+  --td-component-border: var(--td-gray-color-9);
+  --td-border-level-1-color: var(--td-gray-color-11);
+  --td-border-level-2-color: var(--td-gray-color-9);
+
+  --td-shadow-1: 0 4px 6px rgba(0, 0, 0, 0.06), 0 1px 10px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.12);
+  --td-shadow-2: 0 8px 10px rgba(0, 0, 0, 0.12), 0 3px 14px rgba(0, 0, 0, 0.1), 0 5px 5px rgba(0, 0, 0, 0.16);
+  --td-shadow-3: 0 16px 24px rgba(0, 0, 0, 0.14), 0 6px 30px rgba(0, 0, 0, 0.12), 0 8px 10px rgba(0, 0, 0, 0.2);
+
+  --td-mask-active: rgba(0, 0, 0, 0.4);
+  --td-mask-disabled: rgba(0, 0, 0, 0.6);
+
+  --td-scrollbar-color: rgba(255, 255, 255, 0.1);
+  --td-scrollbar-hover-color: rgba(255, 255, 255, 0.3);
+
+  --td-error-color: #c64751;
+  --td-warning-color: #cf6e2d;
+  --td-success-color: #059465;
+}

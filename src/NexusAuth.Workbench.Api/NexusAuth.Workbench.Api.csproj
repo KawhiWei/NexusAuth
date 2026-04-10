@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Luck.AutoDependencyInjection" />
+        <PackageReference Include="Luck.AspNetCore" />
+        <PackageReference Include="Luck.AppModule" />
+        <PackageReference Include="Swashbuckle.AspNetCore" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\NexusAuth.Application\NexusAuth.Application.csproj" />
+        <ProjectReference Include="..\NexusAuth.Domain\NexusAuth.Domain.csproj" />
+        <ProjectReference Include="..\NexusAuth.Persistence\NexusAuth.Persistence.csproj" />
+        <ProjectReference Include="..\NexusAuth.Shared\NexusAuth.Shared.csproj" />
+    </ItemGroup>
+
+</Project>

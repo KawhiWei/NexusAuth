@@ -26,7 +26,6 @@ public class AppWebModule : LuckAppModule
 
         services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
         services.Configure<NexusAuthSecurityOptions>(configuration.GetSection("Security"));
-        services.AddSingleton<ITokenSigningCredentialsProvider, RsaTokenSigningCredentialsProvider>();
 
         // Cookie Authentication for SSO login session
         services.AddAuthentication(AuthenticationScheme)

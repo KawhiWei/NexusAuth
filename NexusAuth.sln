@@ -32,6 +32,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Host", "src\NexusAuth.Host\NexusAuth.Host.csproj", "{F758C060-689F-445D-BD0A-7CE7C78B4467}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Workbench.Api", "src\NexusAuth.Workbench.Api\NexusAuth.Workbench.Api.csproj", "{4D964FCE-8B6A-403D-98B1-E445F849DE57}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -102,11 +104,24 @@ Global
 		{F758C060-689F-445D-BD0A-7CE7C78B4467}.Release|x64.Build.0 = Release|Any CPU
 		{F758C060-689F-445D-BD0A-7CE7C78B4467}.Release|x86.ActiveCfg = Release|Any CPU
 		{F758C060-689F-445D-BD0A-7CE7C78B4467}.Release|x86.Build.0 = Release|Any CPU
+		{4D964FCE-8B6A-403D-98B1-E445F849DE57}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4D964FCE-8B6A-403D-98B1-E445F849DE57}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4D964FCE-8B6A-403D-98B1-E445F849DE57}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4D964FCE-8B6A-403D-98B1-E445F849DE57}.Debug|x64.Build.0 = Debug|Any CPU
+		{4D964FCE-8B6A-403D-98B1-E445F849DE57}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4D964FCE-8B6A-403D-98B1-E445F849DE57}.Debug|x86.Build.0 = Debug|Any CPU
+		{4D964FCE-8B6A-403D-98B1-E445F849DE57}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4D964FCE-8B6A-403D-98B1-E445F849DE57}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4D964FCE-8B6A-403D-98B1-E445F849DE57}.Release|x64.ActiveCfg = Release|Any CPU
+		{4D964FCE-8B6A-403D-98B1-E445F849DE57}.Release|x64.Build.0 = Release|Any CPU
+		{4D964FCE-8B6A-403D-98B1-E445F849DE57}.Release|x86.ActiveCfg = Release|Any CPU
+		{4D964FCE-8B6A-403D-98B1-E445F849DE57}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{F758C060-689F-445D-BD0A-7CE7C78B4467} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{4D964FCE-8B6A-403D-98B1-E445F849DE57} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

@@ -127,6 +127,45 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
         return AllowedGrantTypes.Contains(grantType, StringComparer.OrdinalIgnoreCase);
     }
 
+    public void Update(
+        string? clientName = null,
+        string? description = null,
+        IEnumerable<string>? redirectUris = null,
+        IEnumerable<string>? postLogoutRedirectUris = null,
+        IEnumerable<string>? allowedScopes = null,
+        IEnumerable<string>? allowedGrantTypes = null,
+        bool? requirePkce = null,
+        bool? isActive = null,
+        IEnumerable<OAuthClientSecret>? clientSecrets = null)
+    {
+        if (!string.IsNullOrWhiteSpace(clientName))
+            ClientName = clientName;
+        
+        if (description is { } || clientName is { })
+            Description = description;
+        
+        if (redirectUris is { })
+            RedirectUris = redirectUris.ToList();
+        
+        if (postLogoutRedirectUris is { })
+            PostLogoutRedirectUris = postLogoutRedirectUris.ToList();
+        
+        if (allowedScopes is { })
+            AllowedScopes = allowedScopes.ToList();
+        
+        if (allowedGrantTypes is { })
+            AllowedGrantTypes = allowedGrantTypes.ToList();
+        
+        if (requirePkce is { } requirePkceValue)
+            RequirePkce = requirePkceValue;
+        
+        if (isActive is { } isActiveValue)
+            IsActive = isActiveValue;
+        
+        if (clientSecrets is { } secrets)
+            ClientSecrets = secrets.ToList();
+    }
+
     private static void ValidateTokenEndpointAuthentication(
         string tokenEndpointAuthMethod,
         IReadOnlyCollection<OAuthClientSecret> clientSecrets)

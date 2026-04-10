@@ -6,15 +6,8 @@ using NexusAuth.Domain.Repositories;
 
 namespace NexusAuth.Persistence.Repositories;
 
-public class UserRepository : EfCoreAggregateRootRepository<User, Guid>, IUserRepository
+public class UserRepository(IUnitOfWork unitOfWork) : EfCoreAggregateRootRepository<User, Guid>(unitOfWork), IUserRepository
 {
-    private readonly IUnitOfWork _unitOfWork;
-
-    public UserRepository(IUnitOfWork unitOfWork) : base(unitOfWork)
-    {
-        _unitOfWork = unitOfWork;
-    }
-
     public async Task<User?> FindByUsernameAsync(string username, CancellationToken ct = default)
     {
         return await FindAll(u => u.Username == username).FirstOrDefaultAsync(ct);
@@ -39,6 +32,6 @@ public class UserRepository : EfCoreAggregateRootRepository<User, Guid>, IUserRe
     public async Task AddAsync(User user, CancellationToken ct = default)
     {
         Add(user);
-        await _unitOfWork.CommitAsync(ct);
+        await unitOfWork.CommitAsync(ct);
     }
 }

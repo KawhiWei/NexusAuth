@@ -1,0 +1,13 @@
+global using Luck.EntityFrameworkCore.DbContexts;
+global using Luck.EntityFrameworkCore.Repositories;
+global using Luck.Framework.UnitOfWorks;
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.EntityFrameworkCore.ChangeTracking;
+global using Microsoft.EntityFrameworkCore.Metadata.Builders;
+global using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+global using NexusAuth.Domain.AggregateRoots.ApiResources;
+global using NexusAuth.Domain.AggregateRoots.OAuthClients;
+global using NexusAuth.Domain.AggregateRoots.Users;
+global using NexusAuth.Domain.Entities;
+global using NexusAuth.Domain.Repositories;
+global using System.Text.Json;

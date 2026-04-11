@@ -1,8 +1,24 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { checkAuth } from '../api/login';
 
-export const TOKEN_STORAGE_KEY = 'token';
+let cachedAuthStatus: boolean | null = null;
 
-export const hasToken = () => Boolean(localStorage.getItem(TOKEN_STORAGE_KEY));
+export const getCachedAuthStatus = () => cachedAuthStatus;
+
+export const setCachedAuthStatus = (status: boolean) => {
+  cachedAuthStatus = status;
+};
+
+export const checkAuthenticated = async () => {
+  try {
+    const isAuth = await checkAuth();
+    setCachedAuthStatus(isAuth);
+    return isAuth;
+  } catch {
+    setCachedAuthStatus(false);
+    return false;
+  }
+};
 
 export const getSafeRedirectPath = (redirect: string | null | undefined) => {
   if (!redirect || !redirect.startsWith('/') || redirect.startsWith('//')) {
@@ -24,7 +40,7 @@ const getLoginPath = (location: { pathname: string; search?: string; hash?: stri
 export const RequireAuth = () => {
   const location = useLocation();
 
-  if (!hasToken()) {
+  if (!getCachedAuthStatus()) {
     return <Navigate to={getLoginPath(location)} replace state={{ from: location }} />;
   }
 
@@ -34,7 +50,7 @@ export const RequireAuth = () => {
 export const RedirectIfAuthenticated = () => {
   const location = useLocation();
 
-  if (hasToken()) {
+  if (getCachedAuthStatus()) {
     const redirect = getSafeRedirectPath(new URLSearchParams(location.search).get('redirect'));
     return <Navigate to={redirect || '/dashboard'} replace />;
   }
@@ -43,5 +59,5 @@ export const RedirectIfAuthenticated = () => {
 };
 
 export const HomeRedirect = () => {
-  return <Navigate to={hasToken() ? '/dashboard' : '/login'} replace />;
+  return <Navigate to={getCachedAuthStatus() ? '/dashboard' : '/login'} replace />;
 };

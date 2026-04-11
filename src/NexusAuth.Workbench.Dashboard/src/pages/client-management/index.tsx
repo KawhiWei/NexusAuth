@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Card, Dialog, Form, Input, Pagination, Select, Space, Table, Tag, type TableProps } from 'tdesign-react';
+import { Button, Card, DialogPlugin, Form, Input, Pagination, Select, Space, Table, Tag, type TableProps } from 'tdesign-react';
 import { getClients, deleteClient, type Client } from '../../api/client';
 
 type FilterState = {
@@ -115,14 +115,14 @@ const ClientManagementPage = () => {
   };
 
   const handleDelete = async (row: Client) => {
-    const confirm = await Dialog.confirm({
+    const confirmed = await DialogPlugin.confirm({
       header: '确认删除',
       body: `确定要删除客户端 "${row.clientName}" 吗？`,
       confirmBtn: '确定',
       cancelBtn: '取消'
     });
 
-    if (confirm) {
+    if (confirmed) {
       try {
         await deleteClient(row.id);
         fetchData();

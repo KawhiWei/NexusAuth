@@ -82,9 +82,9 @@ const UserManagementPage = () => {
         title: '状态',
         width: 100,
         cell: ({ row }) => (
-          <Tag theme={row.status === '活跃' ? 'success' : 'danger'} variant="dot">
-            {row.status}
-          </Tag>
+<Tag theme={row.status === '活跃' ? 'success' : 'danger'} variant="outline">
+             {row.status}
+           </Tag>
         ),
       },
       { colKey: 'createdAt', title: '注册时间', width: 180 },

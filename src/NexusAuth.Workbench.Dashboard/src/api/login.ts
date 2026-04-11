@@ -1,50 +1,41 @@
-export type LoginParams = {
-  username: string;
-  password: string;
+import request from './request';
+
+export interface UserInfo {
+  id: string;
+  name: string;
+}
+
+export interface LoginResponse {
+  isAuthenticated: boolean;
+  user: UserInfo;
+}
+
+export interface ConfigResponse {
+  authority: string;
+  clientId: string;
+}
+
+export const getConfig = (): Promise<ConfigResponse> => {
+  return request.get<ConfigResponse>('/auth/config');
 };
 
-export type LoginResponse = {
-  token: string;
-  userInfo: {
-    id: string;
-    name: string;
-    username: string;
-  };
+export const startLogin = (): Promise<{ authorizeUrl: string }> => {
+  return request.get<{ authorizeUrl: string }>('/auth/login');
 };
 
-const mockAccounts = [
-  {
-    id: '1',
-    name: '管理员',
-    username: 'admin@react-template.tech',
-    password: '123456',
-  },
-  {
-    id: '2',
-    name: '系统管理员',
-    username: 'admin',
-    password: '123456',
-  },
-];
+export const getCurrentUser = (): Promise<LoginResponse> => {
+  return request.get<LoginResponse>('/auth/me');
+};
 
-export const mockLogin = (params: LoginParams) => {
-  return new Promise<LoginResponse>((resolve, reject) => {
-    window.setTimeout(() => {
-      const matchedUser = mockAccounts.find((item) => item.username === params.username && item.password === params.password);
+export const logout = () => {
+  return request.post('/auth/logout');
+};
 
-      if (!matchedUser) {
-        reject(new Error('账号或密码错误'));
-        return;
-      }
-
-      resolve({
-        token: `mock-token-${matchedUser.id}`,
-        userInfo: {
-          id: matchedUser.id,
-          name: matchedUser.name,
-          username: matchedUser.username,
-        },
-      });
-    }, 500);
-  });
+export const checkAuth = async (): Promise<boolean> => {
+  try {
+    const result = await getCurrentUser();
+    return result.isAuthenticated;
+  } catch {
+    return false;
+  }
 };

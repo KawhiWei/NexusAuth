@@ -52,7 +52,7 @@ export type ClientFilter = {
   isActive?: boolean;
 };
 
-export const getClients = (filter?: ClientFilter) => {
+export const getClients = (filter?: ClientFilter): Promise<Client[]> => {
   const params = new URLSearchParams();
   if (filter?.keyword) params.append('keyword', filter.keyword);
   if (filter?.isActive !== undefined) params.append('isActive', String(filter.isActive));
@@ -60,18 +60,18 @@ export const getClients = (filter?: ClientFilter) => {
   return request.get<Client[]>(query ? `/clients?${query}` : '/clients');
 };
 
-export const getClient = (id: string) => {
+export const getClient = (id: string): Promise<Client> => {
   return request.get<Client>(`/clients/${id}`);
 };
 
-export const createClient = (data: CreateClientRequest) => {
+export const createClient = (data: CreateClientRequest): Promise<Client> => {
   return request.post<Client>('/clients', data);
 };
 
-export const updateClient = (id: string, data: UpdateClientRequest) => {
+export const updateClient = (id: string, data: UpdateClientRequest): Promise<Client> => {
   return request.put<Client>(`/clients/${id}`, data);
 };
 
-export const deleteClient = (id: string) => {
+export const deleteClient = (id: string): Promise<void> => {
   return request.delete<void>(`/clients/${id}`);
 };

@@ -4,7 +4,14 @@ import ErrorPage from '../components/error';
 import GlobalLoading from '../components/global-loading';
 import PublicLayout from '../layouts/layout';
 import Login from '../pages/login';
-import { HomeRedirect, RedirectIfAuthenticated, RequireAuth } from './auth';
+import Dashboard from '../pages/dashboard';
+import { HomeRedirect, RedirectIfAuthenticated, RequireAuth, setCachedAuthStatus } from './auth';
+
+const AuthCallback = () => {
+  setCachedAuthStatus(true);
+  window.location.href = '/dashboard';
+  return null;
+};
 
 export const routes: RouteObject[] = [
   {
@@ -13,6 +20,10 @@ export const routes: RouteObject[] = [
       {
         path: '/login',
         Component: Login,
+      },
+      {
+        path: '/auth/callback',
+        Component: AuthCallback,
       },
     ],
   },
@@ -28,6 +39,10 @@ export const routes: RouteObject[] = [
         path: '/',
         Component: PublicLayout,
         children: [
+          {
+            path: 'dashboard',
+            Component: Dashboard,
+          },
           {
             path: '*',
             Component: GlobalLoading,

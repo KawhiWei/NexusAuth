@@ -3,7 +3,8 @@ import type { DropdownOption } from 'tdesign-react';
 import { PoweroffIcon, UserIcon } from 'tdesign-icons-react';
 
 import { router } from "../../../router";
-import { TOKEN_STORAGE_KEY } from '../../../router/auth';
+import { setCachedAuthStatus } from '../../../router/auth';
+import { logout } from '../../../api/login';
 
 const AvatarComponent = () => {
   const iconStyle: React.CSSProperties = {
@@ -33,11 +34,14 @@ const AvatarComponent = () => {
     },
   ];
 
-  const handleClickMenuItem = (dropdownItem: DropdownOption) => {
+  const handleClickMenuItem = async (dropdownItem: DropdownOption) => {
     if (dropdownItem.value === 'logout') {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
-      localStorage.removeItem('userInfo');
-      router.navigate('/login', { replace: true });
+      try {
+        await logout();
+      } finally {
+        setCachedAuthStatus(false);
+        router.navigate('/login', { replace: true });
+      }
     }
   };
 

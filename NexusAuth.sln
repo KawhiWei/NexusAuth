@@ -15,17 +15,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "0.Solution Items", "0.Solut
 		README.md = README.md
 		auth-flow.md = auth-flow.md
 		production-init.sql = production-init.sql
-		auth-sequence-authorization-code.mmd = auth-sequence-authorization-code.mmd
-		auth-sequence-device-code.mmd = auth-sequence-device-code.mmd
-		auth-sequence-client-credentials.mmd = auth-sequence-client-credentials.mmd
-		architecture-layered.mmd = architecture-layered.mmd
 		diagram-index.md = diagram-index.md
-		code-flow-refresh-token.mmd = code-flow-refresh-token.mmd
-		code-flow-device-code.mmd = code-flow-device-code.mmd
-		code-flow-client-authentication.mmd = code-flow-client-authentication.mmd
-		code-flow-authorization-code.mmd = code-flow-authorization-code.mmd
-		architecture-overview.mmd = architecture-overview.mmd
-		auth-sequence-refresh-token.mmd = auth-sequence-refresh-token.mmd
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"

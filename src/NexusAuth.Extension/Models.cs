@@ -40,4 +40,5 @@ public class WorkbenchAuthOptions
     public required string RedirectUri { get; set; }
     public required string PostLogoutRedirectUri { get; set; }
     public required string Scope { get; set; }
+    public bool SignOutProvider { get; set; } = true;
 }

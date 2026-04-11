@@ -37,10 +37,16 @@ const AvatarComponent = () => {
   const handleClickMenuItem = async (dropdownItem: DropdownOption) => {
     if (dropdownItem.value === 'logout') {
       try {
-        await logout();
-      } finally {
+        const result: { logoutUrl: string } = await logout();
         setCachedAuthStatus(false);
-        router.navigate('/login', { replace: true });
+        if (result.logoutUrl) {
+          window.location.href = result.logoutUrl;
+        } else {
+          window.location.replace('/login');
+        }
+      } catch {
+        setCachedAuthStatus(false);
+        window.location.replace('/login');
       }
     }
   };

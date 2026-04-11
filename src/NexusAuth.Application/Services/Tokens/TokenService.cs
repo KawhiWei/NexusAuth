@@ -343,7 +343,7 @@ public class TokenService(
                 jwt.Issuer,
                 principal.FindFirst("token_use")?.Value);
         }
-        catch
+        catch(Exception e)
         {
             return TokenIntrospectionResult.Inactive();
         }

@@ -131,12 +131,27 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("/api/auth/logout")]
-    public async Task<IActionResult> Logout()
+    public async Task<IActionResult> Logout(CancellationToken ct)
     {
-        var logoutUrl = $"{_oidcService.Authority.TrimEnd('/')}/connect/endsession" +
-            $"?post_logout_redirect_uri={Uri.EscapeDataString(_oidcService.PostLogoutRedirectUri)}";
+        var logoutUrl = string.Empty;
+        var idToken = User.FindFirstValue("id_token");
 
-        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        if (_oidcService.SignOutProvider && !string.IsNullOrWhiteSpace(idToken))
+        {
+            logoutUrl = $"{_oidcService.Authority.TrimEnd('/')}/connect/endsession" +
+                $"?id_token_hint={Uri.EscapeDataString(idToken)}" +
+                $"&post_logout_redirect_uri={Uri.EscapeDataString(_oidcService.PostLogoutRedirectUri)}";
+        }
+
+        if (User.Identity?.IsAuthenticated == true)
+        {
+            Response.Cookies.Append(".NexusAuth.Workbench", "", new CookieOptions
+            {
+                Path = "/",
+                HttpOnly = true,
+                Expires = DateTimeOffset.UtcNow.AddDays(-1)
+            });
+        }
 
         return Ok(new { logoutUrl });
     }

@@ -30,6 +30,8 @@ public class OidcWorkbenchService(
 
     public string Scope => _options.Scope;
 
+    public bool SignOutProvider => _options.SignOutProvider;
+
     public IFlowStateStore FlowStateStore { get; } = flowStateStore;
 
     public async Task<DiscoveryDocument> FetchDiscoveryAsync(CancellationToken ct)

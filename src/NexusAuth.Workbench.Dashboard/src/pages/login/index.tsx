@@ -16,6 +16,7 @@ const Login = () => {
   }, []);
 
   async function checkAuthStatus() {
+    setCachedAuthStatus(false);
     const authenticated = await checkAuthenticated();
     setCachedAuthStatus(authenticated);
     if (authenticated) {

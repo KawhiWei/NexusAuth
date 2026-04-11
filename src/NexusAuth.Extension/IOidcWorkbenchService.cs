@@ -7,6 +7,7 @@ public interface IOidcWorkbenchService
     string RedirectUri { get; }
     string PostLogoutRedirectUri { get; }
     string Scope { get; }
+    bool SignOutProvider { get; }
     IFlowStateStore FlowStateStore { get; }
     Task<DiscoveryDocument> FetchDiscoveryAsync(CancellationToken ct);
     string GenerateCodeVerifier();

@@ -200,10 +200,10 @@ const ClientManagementPage = () => {
         width: 160,
         cell: ({ row }) => (
           <Space>
-            <Button size="small" variant="text" onClick={() => handleEdit(row)}>
+            <Button size="small" variant="text" theme="warning" onClick={() => handleEdit(row)}>
               编辑
             </Button>
-            <Button size="small" variant="text" onClick={() => handleDelete(row)}>
+            <Button size="small" variant="text" theme="danger" onClick={() => handleDelete(row)}>
               删除
             </Button>
           </Space>
@@ -416,7 +416,7 @@ const ClientManagementPage = () => {
             />
           </Form.FormItem>
 
-          <Form.FormList name="clientSecrets" initialData={[{ type: 'shared_secret', value: '', description: '' }]}>
+          <Form.FormList name="clientSecrets" initialData={[{ type: '', value: '', description: '' }]}>
             {(fields, { add, remove }) => (
               <>
                 {fields.map(({ key, name }) => (

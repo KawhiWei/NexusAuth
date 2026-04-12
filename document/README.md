@@ -22,24 +22,24 @@ NexusAuth 是一个开源的统一身份认证平台（OAuth 2.0 / OIDC Provider
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │   Dashboard     │     │   Workbench API │     │  Other Apps     │
-│  (Frontend)    │◄───►│  (BFF/Backend)  │◄───►│                │
+│  (Frontend)     │◄───►│  (BFF/Backend)  │◄───►│                 │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
          │                        │                        │
          │    OAuth 2.0 / OIDC    │                        │
-         └──────────────────────┼────────────────────────┘
-                                │
-                                ▼
-                        ┌─────────────────┐
-                        │  NexusAuth      │
-                        │  Provider      │
-                        │  :5100         │
-                        └─────────────────┘
-                                │
-                                ▼
-                        ┌─────────────────┐
-                        │   PostgreSQL    │
-                        │   Database     │
-                        └─────────────────┘
+         └────────────────────────┼────────────────────────┘
+                                  │
+                                  ▼
+                          ┌─────────────────┐
+                          │  NexusAuth      │
+                          │  Provider       │
+                          │  :5100          │
+                          └─────────────────┘
+                                  │
+                                  ▼
+                          ┌─────────────────┐
+                          │   PostgreSQL    │
+                          │   Database      │
+                          └─────────────────┘
 ```
 
 ## 快速导航
@@ -51,8 +51,8 @@ NexusAuth 是一个开源的统一身份认证平台（OAuth 2.0 / OIDC Provider
 | [数据库配置](./03-数据库配置.md) | PostgreSQL 配置 |
 | [启动 Provider](./04-启动NexusAuth.Provider.md) | 启动认证服务 |
 | [配置 OAuth 客户端](./05-配置OAuth客户端.md) | 添加客户端应用 |
-| [对接 Workbench API](./06-对接NexusAuth.Workbench.Api.md) | 对接后端服务 |
-| [对接 Dashboard](./07-对接NexusAuth.Workbench.Dashboard.md) | 对接前端应用 |
+| [启动 Workbench](./06-对接NexusAuth.Workbench.md) | 启动管理端 |
+| [启动 Dashboard](./07-对接NexusAuth.Workbench.Dashboard.md) | 启动前端 |
 | [高级配置](./08-高级配置.md) | 高级功能配置 |
 | [常见问题](./09-常见问题.md) | FAQ |
 

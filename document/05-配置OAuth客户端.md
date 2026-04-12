@@ -76,7 +76,7 @@ ON CONFLICT (client_id, api_resource_id) DO NOTHING;
 ### 执行 seed.sql
 
 ```bash
-psql -U nexusauth -d nexusauth -f src/NexusAuth.Workbench.Api/seed.sql
+psql -U nexusauth -d nexusauth -f NexusAuth.Workbench/NexusAuth.Workbench.Api/seed.sql
 ```
 
 ## 配置字段说明

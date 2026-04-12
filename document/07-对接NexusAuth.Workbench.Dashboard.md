@@ -1,17 +1,13 @@
-# 对接 NexusAuth.Workbench.Dashboard
+# 启动 NexusAuth.Workbench.Dashboard
 
-本文档介绍如何将前端应用对接到 NexusAuth 统一认证平台。
-
-## 概述
-
-NexusAuth.Workbench.Dashboard 是一个示例前端应用，展示如何使用授权码 + PKCE 流程登录。
+本文档介绍如何启动 NexusAuth Workbench 前端管理界面。
 
 ## 快速开始
 
 ### 安装依赖
 
 ```bash
-cd src/NexusAuth.Workbench.Dashboard
+cd NexusAuth.Workbench/NexusAuth.Workbench.Dashboard
 npm install
 ```
 

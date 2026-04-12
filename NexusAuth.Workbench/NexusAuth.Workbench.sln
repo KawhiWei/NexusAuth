@@ -1,0 +1,51 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Workbench.Api", "NexusAuth.Workbench.Api\NexusAuth.Workbench.Api.csproj", "{D98CB79B-9360-427D-AF3E-8D44335FC93A}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{BB8C138D-5197-42D8-87C8-CB6B2A25AB0A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Application", "..\src\NexusAuth.Application\NexusAuth.Application.csproj", "{B455BA8F-EDCF-430D-AF35-54FE62AB66DA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Domain", "..\src\NexusAuth.Domain\NexusAuth.Domain.csproj", "{549DF4B5-F54E-4286-B617-9A22C4BECC4D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Extension", "..\src\NexusAuth.Extension\NexusAuth.Extension.csproj", "{491A9768-5950-40DF-B3C3-FC6B8DF094DA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Persistence", "..\src\NexusAuth.Persistence\NexusAuth.Persistence.csproj", "{C71E0D1A-DB81-4431-96D7-15320236CBF1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Shared", "..\src\NexusAuth.Shared\NexusAuth.Shared.csproj", "{A6436D3E-CC3C-431A-8A17-935B1D41B8D8}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D98CB79B-9360-427D-AF3E-8D44335FC93A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D98CB79B-9360-427D-AF3E-8D44335FC93A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D98CB79B-9360-427D-AF3E-8D44335FC93A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D98CB79B-9360-427D-AF3E-8D44335FC93A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B455BA8F-EDCF-430D-AF35-54FE62AB66DA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B455BA8F-EDCF-430D-AF35-54FE62AB66DA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B455BA8F-EDCF-430D-AF35-54FE62AB66DA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B455BA8F-EDCF-430D-AF35-54FE62AB66DA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{549DF4B5-F54E-4286-B617-9A22C4BECC4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{549DF4B5-F54E-4286-B617-9A22C4BECC4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{549DF4B5-F54E-4286-B617-9A22C4BECC4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{549DF4B5-F54E-4286-B617-9A22C4BECC4D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{491A9768-5950-40DF-B3C3-FC6B8DF094DA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{491A9768-5950-40DF-B3C3-FC6B8DF094DA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{491A9768-5950-40DF-B3C3-FC6B8DF094DA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{491A9768-5950-40DF-B3C3-FC6B8DF094DA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C71E0D1A-DB81-4431-96D7-15320236CBF1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C71E0D1A-DB81-4431-96D7-15320236CBF1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C71E0D1A-DB81-4431-96D7-15320236CBF1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C71E0D1A-DB81-4431-96D7-15320236CBF1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A6436D3E-CC3C-431A-8A17-935B1D41B8D8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A6436D3E-CC3C-431A-8A17-935B1D41B8D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A6436D3E-CC3C-431A-8A17-935B1D41B8D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A6436D3E-CC3C-431A-8A17-935B1D41B8D8}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{D98CB79B-9360-427D-AF3E-8D44335FC93A} = {BB8C138D-5197-42D8-87C8-CB6B2A25AB0A}
+	EndGlobalSection
+EndGlobal

@@ -14,6 +14,10 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\src\NexusAuth.Application\NexusAuth.Application.csproj" />
+        <ProjectReference Include="..\..\src\NexusAuth.Extension\NexusAuth.Extension.csproj" />
+        <ProjectReference Include="..\..\src\NexusAuth.Persistence\NexusAuth.Persistence.csproj" />
+        <ProjectReference Include="..\..\src\NexusAuth.Shared\NexusAuth.Shared.csproj" />
         <ProjectReference Include="..\NexusAuth.Application\NexusAuth.Application.csproj" />
         <ProjectReference Include="..\NexusAuth.Domain\NexusAuth.Domain.csproj" />
         <ProjectReference Include="..\NexusAuth.Extension\NexusAuth.Extension.csproj" />

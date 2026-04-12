@@ -256,10 +256,16 @@ const ClientManagementPage = () => {
   };
 
   useEffect(() => {
-    if (dialogVisible && !editingClient) {
+    if (dialogVisible && editingClient) {
       const form = formRef.current;
-      if (form) {
-        form.setFieldsValue({ clientSecrets: [{ type: 'shared_secret', value: '', description: '' }] });
+      if (form && editingClient.clientSecrets) {
+        form.setFieldsValue({ 
+          clientSecrets: editingClient.clientSecrets.map((s: any) => ({ 
+            type: s.type, 
+            value: s.value, 
+            description: s.description ?? '' 
+          })) 
+        });
       }
     }
   }, [dialogVisible, editingClient]);
@@ -410,7 +416,7 @@ const ClientManagementPage = () => {
             />
           </Form.FormItem>
 
-          <Form.FormList name={['clientSecrets']}>
+          <Form.FormList name={['clientSecrets']} initialData={[{ type: 'shared_secret', value: '', description: '' }]}>
             {(fields, { add, remove }) => (
               <>
                 {fields.map(({ key, name }) => (

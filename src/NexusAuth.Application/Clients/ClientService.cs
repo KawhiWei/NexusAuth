@@ -1,9 +1,12 @@
+using NexusAuth.Domain.Entities;
+
 namespace NexusAuth.Application.Clients;
 
 public class ClientService(
     IOAuthClientRepository clientRepository,
     IApiResourceRepository apiResourceRepository,
-    ITokenBlacklistRepository tokenBlacklistRepository) : IClientService
+    ITokenBlacklistRepository tokenBlacklistRepository,
+    IClientApiResourceRepository clientApiResourceRepository) : IClientService
 {
 
     #region OAuth 授权服务 (Host API 使用)
@@ -239,6 +242,15 @@ public class ClientService(
 
         await clientRepository.AddAsync(client, ct);
 
+        if (request.ApiResourceIds?.Count > 0)
+        {
+            foreach (var apiResourceId in request.ApiResourceIds)
+            {
+                var association = ClientApiResource.Create(client.Id, apiResourceId);
+                await clientApiResourceRepository.AddAsync(association, ct);
+            }
+        }
+
         return client;
     }
 
@@ -262,6 +274,25 @@ public class ClientService(
             secrets);
 
         await clientRepository.UpdateAsync(client, ct);
+
+        if (request.ApiResourceIds is { Count: > 0 })
+        {
+            var existing = await clientApiResourceRepository.GetResourcesByClientIdAsync(id, ct);
+            var existingIds = existing.Select(r => r.Id).ToHashSet();
+
+            var toAdd = request.ApiResourceIds.Except(existingIds);
+            foreach (var apiResourceId in toAdd)
+            {
+                var association = ClientApiResource.Create(client.Id, apiResourceId);
+                await clientApiResourceRepository.AddAsync(association, ct);
+            }
+
+            var toRemove = existingIds.Except(request.ApiResourceIds);
+            foreach (var apiResourceId in toRemove)
+            {
+                await clientApiResourceRepository.RemoveAsync(client.Id, apiResourceId, ct);
+            }
+        }
 
         return client;
     }

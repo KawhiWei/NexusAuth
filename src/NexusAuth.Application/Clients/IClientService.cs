@@ -124,7 +124,8 @@ public record CreateClientRequest(
     List<string>? AllowedGrantTypes,
     bool RequirePkce,
     string TokenEndpointAuthMethod,
-    List<ClientSecretInput>? ClientSecrets);
+    List<ClientSecretInput>? ClientSecrets,
+    List<Guid>? ApiResourceIds);
 
 public record UpdateClientRequest(
     string? ClientName,
@@ -135,7 +136,8 @@ public record UpdateClientRequest(
     List<string>? AllowedGrantTypes,
     bool? RequirePkce,
     bool? IsActive,
-    List<ClientSecretInput>? ClientSecrets);
+    List<ClientSecretInput>? ClientSecrets,
+    List<Guid>? ApiResourceIds);
 
 public record ClientSecretInput(
     string Type,

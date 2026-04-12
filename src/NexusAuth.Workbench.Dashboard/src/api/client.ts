@@ -17,6 +17,7 @@ export type CreateClientRequest = {
   requirePkce: boolean;
   tokenEndpointAuthMethod: string;
   clientSecrets?: ClientSecretInput[];
+  apiResourceIds?: string[];
 };
 
 export type UpdateClientRequest = {
@@ -29,6 +30,7 @@ export type UpdateClientRequest = {
   requirePkce?: boolean;
   isActive?: boolean;
   clientSecrets?: ClientSecretInput[];
+  apiResourceIds?: string[];
 };
 
 export type Client = {
@@ -45,6 +47,7 @@ export type Client = {
   tokenEndpointAuthMethod: string;
   clientSecrets: ClientSecretInput[];
   createdAt: string;
+  apiResourceIds?: string[];
 };
 
 export type ClientFilter = {

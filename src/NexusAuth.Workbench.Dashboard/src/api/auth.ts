@@ -47,6 +47,17 @@ export const getMenuList = () => {
                     children: [],
                 },
                 {
+                    id: 'oauth-api-resource',
+                    route: '/oauth/api-resource-management',
+                    componentPath: '/api-resource-management/index.tsx',
+                    name: 'API 资源管理',
+                    show: true,
+                    iconName: null,
+                    parentId: 'oauth',
+                    parentPaths: Array<string>,
+                    children: [],
+                },
+                {
                     id: '3',
                     route: '/ai-agent',
                     componentPath: '/ai-agent/index.tsx',

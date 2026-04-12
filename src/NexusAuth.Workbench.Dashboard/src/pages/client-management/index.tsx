@@ -416,7 +416,7 @@ const ClientManagementPage = () => {
             />
           </Form.FormItem>
 
-          <Form.FormList name={['clientSecrets']} initialData={[{ type: 'shared_secret', value: '', description: '' }]}>
+          <Form.FormList name="clientSecrets" initialData={[{ type: 'shared_secret', value: '', description: '' }]}>
             {(fields, { add, remove }) => (
               <>
                 {fields.map(({ key, name }) => (

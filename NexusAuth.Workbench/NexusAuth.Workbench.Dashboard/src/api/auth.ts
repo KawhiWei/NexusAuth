@@ -19,7 +19,7 @@ export const getMenuList = () => {
                     componentPath: null,
                     name: 'OAuth 管理',
                     show: true,
-                    iconName: "lock",
+                    iconName: "key",
                     parentId: null,
                     parentPaths: Array<string>,
                     children: []

@@ -2,7 +2,6 @@ import { Avatar, Dropdown, Button } from 'tdesign-react';
 import type { DropdownOption } from 'tdesign-react';
 import { PoweroffIcon, UserIcon } from 'tdesign-icons-react';
 
-import { router } from "../../../router";
 import { setCachedAuthStatus } from '../../../router/auth';
 import { logout } from '../../../api/login';
 

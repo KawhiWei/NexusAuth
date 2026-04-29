@@ -10,9 +10,24 @@ public interface IApiResourceRepository : IAggregateRootRepository<ApiResource, 
 
     Task<IReadOnlyList<ApiResource>> FindByNamesAsync(IEnumerable<string> names, CancellationToken ct = default);
 
+    Task<ApiResource?> FindByAudienceAsync(string audience, CancellationToken ct = default);
+
+    Task<IReadOnlyList<ApiResource>> FindByAudiencesAsync(IEnumerable<string> audiences, CancellationToken ct = default);
+
     Task<ApiResource?> FindByIdAsync(Guid id, CancellationToken ct = default);
+
+    Task<(List<ApiResource> Items, int Total)> GetPagedAsync(
+        string? keyword,
+        bool? isActive,
+        int page,
+        int pageSize,
+        CancellationToken ct = default);
 
     Task<IReadOnlyList<ApiResource>> GetAllActiveAsync(CancellationToken ct = default);
 
     Task AddAsync(ApiResource resource, CancellationToken ct = default);
+
+    Task UpdateAsync(ApiResource resource, CancellationToken ct = default);
+
+    Task DeleteAsync(ApiResource resource, CancellationToken ct = default);
 }

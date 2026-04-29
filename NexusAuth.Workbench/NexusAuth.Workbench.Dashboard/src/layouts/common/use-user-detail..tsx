@@ -6,6 +6,20 @@ import { lazyLoad } from '../../lazyLoad/lazy'
 import { replaceRoutes } from "../../router/router-utils";
 import { router } from "../../router";
 
+const resolveMenuPath = (route: string, parentMenu?: { parentPaths?: string[] }) => {
+    if (!parentMenu) {
+        return route || '';
+    }
+
+    const parentPaths = parentMenu.parentPaths || [];
+    const parentPath = parentPaths[parentPaths.length - 1] || '';
+    if (parentPath && route.startsWith(`${parentPath}/`)) {
+        return route;
+    }
+
+    return `${parentPath}${route}`;
+};
+
 const useUserDetail = () => {
     const [loading, setLoading] = useState(true);
     const [requestLoading] = useState(true);
@@ -29,8 +43,7 @@ const useUserDetail = () => {
                      */
                     const children = menuGroup[menu.id!];
                     const parentPaths = parentMenu?.parentPaths || [];
-                    const lastPath = parentPaths[parentPaths.length - 1];
-                    const path = (parentMenu ? `${lastPath}${menu.route}` : menu.route) || '';
+                    const path = resolveMenuPath(menu.route, parentMenu) || '';
                     routes.push({
                         ...menu,
                         path,

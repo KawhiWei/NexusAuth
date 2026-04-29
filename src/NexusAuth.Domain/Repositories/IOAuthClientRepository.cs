@@ -14,7 +14,12 @@ public interface IOAuthClientRepository : IAggregateRootRepository<OAuthClient, 
 
     Task DeleteAsync(OAuthClient client, CancellationToken ct = default);
 
-    Task<List<OAuthClient>> GetAllAsync(CancellationToken ct = default);
+    Task<(List<OAuthClient> Items, int Total)> GetPagedAsync(
+        string? keyword,
+        bool? isActive,
+        int page,
+        int pageSize,
+        CancellationToken ct = default);
 
     Task<OAuthClient?> GetByIdAsync(Guid id, CancellationToken ct = default);
 }

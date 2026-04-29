@@ -28,6 +28,22 @@ public class ClientApiResourceRepository(IUnitOfWork unitOfWork) : IClientApiRes
             .ToListAsync(ct);
     }
 
+    public async Task<Dictionary<Guid, List<Guid>>> GetApiResourceIdsByClientIdsAsync(IEnumerable<Guid> clientIds, CancellationToken ct = default)
+    {
+        var clientIdList = clientIds.Distinct().ToList();
+        if (clientIdList.Count == 0)
+            return [];
+
+        var mappings = await _dbContext.Set<ClientApiResource>()
+            .Where(x => clientIdList.Contains(x.ClientId))
+            .Select(x => new { x.ClientId, x.ApiResourceId })
+            .ToListAsync(ct);
+
+        return mappings
+            .GroupBy(x => x.ClientId)
+            .ToDictionary(group => group.Key, group => group.Select(item => item.ApiResourceId).ToList());
+    }
+
     public async Task AddAsync(ClientApiResource association, CancellationToken ct = default)
     {
         await _dbContext.Set<ClientApiResource>().AddAsync(association, ct);
@@ -44,5 +60,18 @@ public class ClientApiResourceRepository(IUnitOfWork unitOfWork) : IClientApiRes
             _dbContext.Set<ClientApiResource>().Remove(entity);
             await _dbContext.SaveChangesAsync(ct);
         }
+    }
+
+    public async Task RemoveByApiResourceIdAsync(Guid apiResourceId, CancellationToken ct = default)
+    {
+        var entities = await _dbContext.Set<ClientApiResource>()
+            .Where(x => x.ApiResourceId == apiResourceId)
+            .ToListAsync(ct);
+
+        if (entities.Count == 0)
+            return;
+
+        _dbContext.Set<ClientApiResource>().RemoveRange(entities);
+        await _dbContext.SaveChangesAsync(ct);
     }
 }

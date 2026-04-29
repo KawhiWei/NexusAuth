@@ -37,6 +37,19 @@ interface ParentMenuNode {
     parentPaths: string[];
 }
 
+const resolveMenuPath = (route: string, parentMenu?: ParentMenuNode) => {
+    if (!parentMenu) {
+        return route || '';
+    }
+
+    const parentPath = parentMenu.parentPaths[parentMenu.parentPaths.length - 1] || '';
+    if (parentPath && route.startsWith(`${parentPath}/`)) {
+        return route;
+    }
+
+    return `${parentPath}${route}`;
+};
+
 const MenuComponent = (props: IProp) => {
     const { pathname } = useLocation();
     const navigate = useNavigate();
@@ -55,8 +68,7 @@ const MenuComponent = (props: IProp) => {
         const parentId = parentMenu ? parentMenu.id : null;
         return menuList.filter(item => item.parentId === parentId).map(item => {
             const parentPaths = parentMenu?.parentPaths || [];
-            const lastPath = parentPaths.length > 0 ? parentPaths[parentPaths.length - 1] : '';
-            const path = (parentMenu ? `${lastPath}${item.route}` : item.route) || '';
+            const path = resolveMenuPath(item.route, parentMenu);
             return {
                 ...item,
                 path,

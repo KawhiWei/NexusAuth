@@ -1,3 +1,4 @@
+using NexusAuth.Application;
 using NexusAuth.Domain.Entities;
 
 namespace NexusAuth.Application.Clients;
@@ -202,7 +203,7 @@ public class ClientService(
             if (allowIdentityScopes && IsIdentityScope(requestedScope))
                 continue;
 
-            var resource = await apiResourceRepository.FindByNameAsync(requestedScope, ct);
+            var resource = await apiResourceRepository.FindByAudienceAsync(requestedScope, ct);
             if (resource is null || !resource.IsActive)
                 return ScopeValidationResult.Failure("invalid_scope", $"Scope '{requestedScope}' does not correspond to an active resource.");
         }
@@ -214,19 +215,36 @@ public class ClientService(
 
     #region 管理服务 (Workbench 使用)
 
-    public async Task<List<OAuthClient>> GetAllAsync(CancellationToken ct = default)
+    public async Task<List<ClientDto>> GetAllAsync(string? keyword = null, bool? isActive = null, CancellationToken ct = default)
     {
-        return await clientRepository.GetAllAsync(ct);
+        var (clients, _) = await clientRepository.GetPagedAsync(keyword, isActive, 1, int.MaxValue, ct);
+        return await MapClientsAsync(clients, ct);
     }
 
-    public async Task<OAuthClient?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    public async Task<PagedResult<ClientDto>> GetPagedAsync(
+        string? keyword = null,
+        bool? isActive = null,
+        int page = 1,
+        int pageSize = 10,
+        CancellationToken ct = default)
     {
-        return await clientRepository.GetByIdAsync(id, ct);
+        var normalizedPage = Math.Max(1, page);
+        var normalizedPageSize = NormalizePageSize(pageSize);
+        var (clients, total) = await clientRepository.GetPagedAsync(keyword, isActive, normalizedPage, normalizedPageSize, ct);
+        var items = await MapClientsAsync(clients, ct);
+        return new PagedResult<ClientDto>(items, total, normalizedPage, normalizedPageSize);
+    }
+
+    public async Task<ClientDto?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        var client = await clientRepository.GetByIdAsync(id, ct);
+        return client is null ? null : await MapClientAsync(client, ct);
     }
 
     public async Task<OAuthClient> CreateAsync(CreateClientRequest request, CancellationToken ct = default)
     {
-        var clientSecrets = request.ClientSecrets?.Select(s => CreateClientSecret(s.Type, s.Value, s.Description)).ToList();
+        ValidateClientSecrets(request.TokenEndpointAuthMethod, request.ClientSecrets);
+        var clientSecrets = request.ClientSecrets?.Select(s => CreateClientSecret(request.TokenEndpointAuthMethod, s.Value, s.Description)).ToList();
 
         var client = OAuthClient.Create(
             request.ClientId,
@@ -260,7 +278,8 @@ public class ClientService(
         if (client is null)
             throw new InvalidOperationException($"Client with id {id} not found.");
 
-        var secrets = request.ClientSecrets?.Select(s => CreateClientSecret(s.Type, s.Value, s.Description));
+        ValidateClientSecrets(client.TokenEndpointAuthMethod, request.ClientSecrets);
+        var secrets = request.ClientSecrets?.Select(s => CreateClientSecret(client.TokenEndpointAuthMethod, s.Value, s.Description));
 
         client.Update(
             request.ClientName,
@@ -275,7 +294,7 @@ public class ClientService(
 
         await clientRepository.UpdateAsync(client, ct);
 
-        if (request.ApiResourceIds is { Count: > 0 })
+        if (request.ApiResourceIds is not null)
         {
             var existing = await clientApiResourceRepository.GetResourcesByClientIdAsync(id, ct);
             var existingIds = existing.Select(r => r.Id).ToHashSet();
@@ -321,10 +340,82 @@ public class ClientService(
         return $"client_assertion:{clientId}:{assertionJti}";
     }
 
-    private static OAuthClientSecret CreateClientSecret(string type, string value, string? description)
+    private static OAuthClientSecret CreateClientSecret(string tokenEndpointAuthMethod, string value, string? description)
     {
-        return string.Equals(type, OAuthClientSecret.TypeJwks, StringComparison.Ordinal)
+        return string.Equals(tokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal)
             ? OAuthClientSecret.CreateJwks(value, description)
             : OAuthClientSecret.CreateSharedSecret(value, description);
+    }
+
+    private static void ValidateClientSecrets(string tokenEndpointAuthMethod, List<ClientSecretInput>? clientSecrets)
+    {
+        var secrets = clientSecrets ?? [];
+
+        if (string.Equals(tokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal))
+        {
+            if (secrets.Count != 1)
+                throw new InvalidOperationException("private_key_jwt clients must provide exactly one jwks secret.");
+
+            return;
+        }
+
+        if (string.Equals(tokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretBasic, StringComparison.Ordinal)
+            || string.Equals(tokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretPost, StringComparison.Ordinal))
+        {
+            if (secrets.Count == 0)
+                throw new InvalidOperationException($"{tokenEndpointAuthMethod} clients must provide at least one client secret.");
+
+            return;
+        }
+
+        throw new InvalidOperationException($"Unsupported token_endpoint_auth_method '{tokenEndpointAuthMethod}'.");
+    }
+
+    private static int NormalizePageSize(int pageSize)
+    {
+        return pageSize <= 0 ? 10 : Math.Min(pageSize, 100);
+    }
+
+    private async Task<List<ClientDto>> MapClientsAsync(IEnumerable<OAuthClient> clients, CancellationToken ct)
+    {
+        var clientList = clients.ToList();
+        if (clientList.Count == 0)
+        {
+            return [];
+        }
+
+        var apiResourceLookup = await clientApiResourceRepository.GetApiResourceIdsByClientIdsAsync(clientList.Select(client => client.Id), ct);
+
+        return clientList
+            .Select(client => MapClient(client, apiResourceLookup.TryGetValue(client.Id, out var apiResourceIds) ? apiResourceIds : []))
+            .ToList();
+    }
+
+    private async Task<ClientDto> MapClientAsync(OAuthClient client, CancellationToken ct)
+    {
+        var apiResourceIds = (await clientApiResourceRepository.GetResourcesByClientIdAsync(client.Id, ct))
+            .Select(resource => resource.Id)
+            .ToList();
+
+        return MapClient(client, apiResourceIds);
+    }
+
+    private static ClientDto MapClient(OAuthClient client, List<Guid> apiResourceIds)
+    {
+        return new ClientDto(
+            client.Id,
+            client.ClientId,
+            client.ClientSecrets,
+            client.TokenEndpointAuthMethod,
+            client.ClientName,
+            client.Description,
+            client.RedirectUris,
+            client.PostLogoutRedirectUris,
+            client.AllowedScopes,
+            client.AllowedGrantTypes,
+            client.RequirePkce,
+            client.IsActive,
+            client.CreatedAt,
+            apiResourceIds);
     }
 }

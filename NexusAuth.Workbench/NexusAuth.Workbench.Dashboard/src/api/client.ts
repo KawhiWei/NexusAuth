@@ -1,7 +1,6 @@
 import request from './request';
 
 export type ClientSecretInput = {
-  type: string;
   value: string;
   description?: string;
 };
@@ -50,17 +49,36 @@ export type Client = {
   apiResourceIds?: string[];
 };
 
+export type PagedResult<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 export type ClientFilter = {
   keyword?: string;
   isActive?: boolean;
+  page?: number;
+  pageSize?: number;
 };
 
-export const getClients = (filter?: ClientFilter): Promise<Client[]> => {
+export const getClients = (filter?: ClientFilter): Promise<PagedResult<Client>> => {
+  const params = new URLSearchParams();
+  if (filter?.keyword) params.append('keyword', filter.keyword);
+  if (filter?.isActive !== undefined) params.append('isActive', String(filter.isActive));
+  if (filter?.page !== undefined) params.append('page', String(filter.page));
+  if (filter?.pageSize !== undefined) params.append('pageSize', String(filter.pageSize));
+  const query = params.toString();
+  return request.get<PagedResult<Client>>(query ? `/clients?${query}` : '/clients');
+};
+
+export const getAllClients = (filter?: Omit<ClientFilter, 'page' | 'pageSize'>): Promise<Client[]> => {
   const params = new URLSearchParams();
   if (filter?.keyword) params.append('keyword', filter.keyword);
   if (filter?.isActive !== undefined) params.append('isActive', String(filter.isActive));
   const query = params.toString();
-  return request.get<Client[]>(query ? `/clients?${query}` : '/clients');
+  return request.get<Client[]>(query ? `/clients/all?${query}` : '/clients/all');
 };
 
 export const getClient = (id: string): Promise<Client> => {

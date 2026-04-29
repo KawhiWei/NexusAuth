@@ -39,4 +39,23 @@ public class ApiResource : AggregateRootWithIdentity<Guid>
             CreatedAt = DateTimeOffset.UtcNow,
         };
     }
+
+    public void Update(
+        string? displayName = null,
+        string? audience = null,
+        string? description = null,
+        bool? isActive = null)
+    {
+        if (!string.IsNullOrWhiteSpace(displayName))
+            DisplayName = displayName;
+
+        if (!string.IsNullOrWhiteSpace(audience))
+            Audience = audience;
+
+        if (displayName is not null || audience is not null || description is not null)
+            Description = description;
+
+        if (isActive is { } nextIsActive)
+            IsActive = nextIsActive;
+    }
 }

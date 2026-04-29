@@ -15,6 +15,10 @@ export interface ConfigResponse {
   clientId: string;
 }
 
+export interface LogoutResponse {
+  logoutUrl: string;
+}
+
 export const getConfig = (): Promise<ConfigResponse> => {
   return request.get<ConfigResponse>('/auth/config');
 };
@@ -27,8 +31,8 @@ export const getCurrentUser = (): Promise<LoginResponse> => {
   return request.get<LoginResponse>('/auth/me');
 };
 
-export const logout = () => {
-  return request.post('/auth/logout');
+export const logout = (): Promise<LogoutResponse> => {
+  return request.post<LogoutResponse>('/auth/logout');
 };
 
 export const checkAuth = async (): Promise<boolean> => {

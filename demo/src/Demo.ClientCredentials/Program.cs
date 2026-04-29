@@ -5,7 +5,7 @@ var authority = Environment.GetEnvironmentVariable("NEXUSAUTH_AUTHORITY") ?? "ht
 var clientId = Environment.GetEnvironmentVariable("NEXUSAUTH_CLIENT_ID") ?? "demo-cc";
 var privateKeyPath = Environment.GetEnvironmentVariable("NEXUSAUTH_CLIENT_PRIVATE_KEY_PATH") ?? Path.Combine(AppContext.BaseDirectory, "keys", "demo-client-private.pem");
 var keyId = Environment.GetEnvironmentVariable("NEXUSAUTH_CLIENT_KEY_ID") ?? "demo-cc-key-1";
-var scope = Environment.GetEnvironmentVariable("NEXUSAUTH_SCOPE") ?? "demo_api";
+var scope = Environment.GetEnvironmentVariable("NEXUSAUTH_SCOPE") ?? "demo-bff-api";
 var apiUrl = Environment.GetEnvironmentVariable("DEMO_BFF_API") ?? "http://localhost:5201/api/m2m/profile";
 
 Console.WriteLine("=== Demo: client_credentials ===");

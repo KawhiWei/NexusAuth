@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Card, Drawer, Form, Input, Pagination, Select, Space, Switch, Table, Tag, Textarea, Transfer, type TableProps } from 'tdesign-react';
-import { getClients, deleteClient, createClient, updateClient, type Client, type CreateClientRequest, type UpdateClientRequest } from '../../api/client';
-import { getApiResources, type ApiResource } from '../../api/api-resource';
+import type { AxiosError } from 'axios';
+import { Button, Card, Drawer, Form, Input, MessagePlugin, Pagination, Select, Space, Switch, Table, Tag, Textarea, Transfer, type TableProps } from 'tdesign-react';
+import { getClients, getClient, deleteClient, createClient, updateClient, type Client, type CreateClientRequest, type UpdateClientRequest } from '../../api/client';
+import { getAllApiResources, type ApiResource } from '../../api/api-resource';
 import { MinusCircleIcon } from 'tdesign-icons-react';
 
 type FilterState = {
@@ -40,10 +41,28 @@ const scopeOptions = [
 ];
 
 type ClientSecretItem = {
-  type: string;
   value: string;
   description: string;
 };
+
+const getSecretTypeByAuthMethod = (tokenEndpointAuthMethod: string) => {
+  return tokenEndpointAuthMethod === 'private_key_jwt' ? 'jwks' : 'shared_secret';
+};
+
+const getSecretLabelByAuthMethod = (tokenEndpointAuthMethod: string) => {
+  return tokenEndpointAuthMethod === 'private_key_jwt' ? 'JWKS' : 'Client Secret';
+};
+
+const getSecretDescriptionByAuthMethod = (tokenEndpointAuthMethod: string) => {
+  return tokenEndpointAuthMethod === 'private_key_jwt'
+    ? 'private_key_jwt 只支持一条 JWKS 配置，JWKS 内可包含多个 key。'
+    : 'client_secret_basic / client_secret_post 支持多条 Client Secret，用于密钥轮换。';
+};
+
+const createDefaultSecret = (): ClientSecretItem => ({
+  value: '',
+  description: '',
+});
 
 type DialogFormData = {
   clientId: string;
@@ -69,10 +88,18 @@ const defaultFormData: DialogFormData = {
   allowedScopes: [],
   allowedGrantTypes: [],
   requirePkce: false,
-  tokenEndpointAuthMethod: '',
-  clientSecrets: [{ type: '', value: '', description: '' }],
+  tokenEndpointAuthMethod: 'client_secret_basic',
+  clientSecrets: [createDefaultSecret()],
   isActive: false,
   apiResourceIds: [],
+};
+
+const getRequestErrorMessage = (error: unknown, fallback: string) => {
+  const axiosError = error as AxiosError<{ title?: string; detail?: string; message?: string }>;
+  return axiosError.response?.data?.detail
+    || axiosError.response?.data?.message
+    || axiosError.response?.data?.title
+    || fallback;
 };
 
 const ClientManagementPage = () => {
@@ -82,6 +109,7 @@ const ClientManagementPage = () => {
   const [pageSize, setPageSize] = useState(10);
   const [loading, setLoading] = useState(false);
   const [sourceData, setSourceData] = useState<Client[]>([]);
+  const [total, setTotal] = useState(0);
   const [apiResources, setApiResources] = useState<ApiResource[]>([]);
   const [tableMaxHeight, setTableMaxHeight] = useState(() => Math.max(window.innerHeight - 200, 260));
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
@@ -90,6 +118,8 @@ const ClientManagementPage = () => {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [formData, setFormData] = useState<DialogFormData>(defaultFormData);
   const formRef = useRef<any>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   const addRedirectUri = (type: 'redirectUris' | 'postLogoutRedirectUris') => {
     const newId = String(Date.now());
@@ -113,14 +143,27 @@ const ClientManagementPage = () => {
     }));
   };
 
+  const handleTokenEndpointAuthMethodChange = (value: string) => {
+    setFormData((prev) => {
+      return {
+        ...prev,
+        tokenEndpointAuthMethod: value,
+        clientSecrets: value === 'private_key_jwt'
+          ? [prev.clientSecrets[0] ?? createDefaultSecret()]
+          : (prev.clientSecrets.length > 0 ? prev.clientSecrets : [createDefaultSecret()]),
+      };
+    });
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
-      const filter: { keyword?: string; isActive?: boolean } = {};
+      const filter: { keyword?: string; isActive?: boolean; page: number; pageSize: number } = { page: current, pageSize };
       if (appliedFilters.keyword) filter.keyword = appliedFilters.keyword;
       if (appliedFilters.isActive !== '') filter.isActive = appliedFilters.isActive;
       const result = await getClients(filter);
-      setSourceData(result);
+      setSourceData(result.items);
+      setTotal(result.total);
     } catch (error) {
       console.error('Failed to fetch clients:', error);
     } finally {
@@ -130,7 +173,7 @@ const ClientManagementPage = () => {
 
   const fetchApiResources = async () => {
     try {
-      const resources = await getApiResources();
+      const resources = await getAllApiResources();
       setApiResources(resources);
     } catch (error) {
       console.error('Failed to fetch api resources:', error);
@@ -139,11 +182,36 @@ const ClientManagementPage = () => {
 
   useEffect(() => {
     fetchData();
-  }, [appliedFilters]);
+  }, [appliedFilters, current, pageSize]);
 
   useEffect(() => {
     fetchApiResources();
   }, []);
+
+  useEffect(() => {
+    if (!dialogVisible || loadingDetail) {
+      return;
+    }
+
+    const form = formRef.current;
+    if (!form) {
+      return;
+    }
+
+    form.setFieldsValue({
+      clientId: formData.clientId,
+      clientName: formData.clientName,
+      tokenEndpointAuthMethod: formData.tokenEndpointAuthMethod,
+      allowedScopes: formData.allowedScopes,
+      allowedGrantTypes: formData.allowedGrantTypes,
+      requirePkce: formData.requirePkce,
+      isActive: formData.isActive,
+      clientSecrets: formData.clientSecrets.map((s) => ({
+        value: s.value,
+        description: s.description,
+      })),
+    });
+  }, [dialogVisible, loadingDetail, formData]);
 
   useEffect(() => {
     const updateTableMaxHeight = () => {
@@ -226,28 +294,46 @@ const ClientManagementPage = () => {
         fetchData();
       } catch (error) {
         console.error('Failed to delete client:', error);
+        MessagePlugin.error(getRequestErrorMessage(error, '删除客户端失败'));
       }
     }
   };
 
-  const handleEdit = (row: Client) => {
-    setEditingClient(row);
-    setFormData({
-      clientId: row.clientId,
-      clientName: row.clientName,
-      description: row.description ?? '',
-      redirectUris: row.redirectUris?.map((uri, i) => ({ id: String(i + 1), value: uri })) ?? [{ id: '1', value: '' }],
-      postLogoutRedirectUris: row.postLogoutRedirectUris?.map((uri, i) => ({ id: String(i + 1), value: uri })) ?? [{ id: '1', value: '' }],
-      allowedScopes: row.allowedScopes ?? ['openid'],
-      allowedGrantTypes: row.allowedGrantTypes ?? ['authorization_code'],
-      requirePkce: row.requirePkce,
-      tokenEndpointAuthMethod: row.tokenEndpointAuthMethod,
-      clientSecrets: row.clientSecrets?.map((s, i) => ({ id: String(i + 1), type: s.type, value: s.value, description: s.description ?? '' })) ?? [{ id: '1', type: 'SharedSecret', value: '', description: '' }],
-      isActive: row.isActive,
-      apiResourceIds: row.apiResourceIds ?? [],
-    });
-    setDialogVisible(true);
+  const handleEdit = async (row: Client) => {
+    try {
+      setLoadingDetail(true);
+      const detail = await getClient(row.id);
+      const nextFormData = {
+        clientId: detail.clientId,
+        clientName: detail.clientName,
+        description: detail.description ?? '',
+        redirectUris: detail.redirectUris?.map((uri, i) => ({ id: String(i + 1), value: uri })) ?? [{ id: '1', value: '' }],
+        postLogoutRedirectUris: detail.postLogoutRedirectUris?.map((uri, i) => ({ id: String(i + 1), value: uri })) ?? [{ id: '1', value: '' }],
+        allowedScopes: detail.allowedScopes ?? ['openid'],
+        allowedGrantTypes: detail.allowedGrantTypes ?? ['authorization_code'],
+        requirePkce: detail.requirePkce,
+        tokenEndpointAuthMethod: detail.tokenEndpointAuthMethod,
+        clientSecrets: detail.clientSecrets?.map((s) => ({ value: s.value, description: s.description ?? '' }))
+          ?? [createDefaultSecret()],
+        isActive: detail.isActive,
+        apiResourceIds: detail.apiResourceIds ?? [],
+      };
+
+      setEditingClient(detail);
+      setFormData(nextFormData);
+    } catch (error) {
+      console.error('Failed to fetch client detail:', error);
+      MessagePlugin.error(getRequestErrorMessage(error, '加载客户端详情失败'));
+    } finally {
+      setLoadingDetail(false);
+    }
   };
+
+  useEffect(() => {
+    if (!loadingDetail && editingClient) {
+      setDialogVisible(true);
+    }
+  }, [loadingDetail, editingClient]);
 
   const handleAdd = () => {
     setEditingClient(null);
@@ -255,23 +341,10 @@ const ClientManagementPage = () => {
     setDialogVisible(true);
   };
 
-  useEffect(() => {
-    if (dialogVisible && editingClient) {
-      const form = formRef.current;
-      if (form && editingClient.clientSecrets) {
-        form.setFieldsValue({ 
-          clientSecrets: editingClient.clientSecrets.map((s: any) => ({ 
-            type: s.type, 
-            value: s.value, 
-            description: s.description ?? '' 
-          })) 
-        });
-      }
-    }
-  }, [dialogVisible, editingClient]);
-
   const handleClose = () => {
     setDialogVisible(false);
+    setEditingClient(null);
+    setFormData(defaultFormData);
     const form = formRef.current;
     if (form) {
       form.reset();
@@ -290,11 +363,15 @@ const ClientManagementPage = () => {
     const redirectUris = formData.redirectUris.map((r) => r.value).filter((v) => v.trim());
     const postLogoutRedirectUris = formData.postLogoutRedirectUris.map((r) => r.value).filter((v) => v.trim());
     const clientSecretsFromForm = form.getFieldValue('clientSecrets') || [];
+    const requirePkce = Boolean(form.getFieldValue('requirePkce'));
+    const isActive = Boolean(form.getFieldValue('isActive'));
+    const secretType = getSecretTypeByAuthMethod(formData.tokenEndpointAuthMethod);
     const clientSecrets = clientSecretsFromForm
       .filter((s: any) => s.value?.trim())
-      .map((s: any) => ({ type: s.type, value: s.value, description: s.description || undefined }));
+      .map((s: any) => ({ type: secretType, value: s.value, description: s.description || undefined }));
 
     try {
+      setSubmitting(true);
       if (editingClient) {
         const request: UpdateClientRequest = {
           clientName: formData.clientName,
@@ -303,8 +380,8 @@ const ClientManagementPage = () => {
           postLogoutRedirectUris: postLogoutRedirectUris.length > 0 ? postLogoutRedirectUris : undefined,
           allowedScopes: formData.allowedScopes,
           allowedGrantTypes: formData.allowedGrantTypes,
-          requirePkce: formData.requirePkce,
-          isActive: formData.isActive,
+          requirePkce,
+          isActive,
           clientSecrets: clientSecrets.length > 0 ? clientSecrets : undefined,
           apiResourceIds: formData.apiResourceIds,
         };
@@ -318,7 +395,7 @@ const ClientManagementPage = () => {
           postLogoutRedirectUris: postLogoutRedirectUris.length > 0 ? postLogoutRedirectUris : undefined,
           allowedScopes: formData.allowedScopes,
           allowedGrantTypes: formData.allowedGrantTypes,
-          requirePkce: formData.requirePkce,
+          requirePkce,
           tokenEndpointAuthMethod: formData.tokenEndpointAuthMethod,
           clientSecrets: clientSecrets.length > 0 ? clientSecrets : undefined,
           apiResourceIds: formData.apiResourceIds,
@@ -327,25 +404,14 @@ const ClientManagementPage = () => {
       }
 
       setDialogVisible(false);
-      fetchData();
+      await fetchData();
     } catch (error) {
       console.error('Failed to save client:', error);
+      MessagePlugin.error(getRequestErrorMessage(error, editingClient ? '更新客户端失败' : '创建客户端失败'));
+    } finally {
+      setSubmitting(false);
     }
   };
-
-  const total = sourceData.length;
-
-  useEffect(() => {
-    const maxPage = Math.max(1, Math.ceil(total / pageSize));
-    if (current > maxPage) {
-      setCurrent(maxPage);
-    }
-  }, [current, pageSize, total]);
-
-  const pagedData = useMemo(() => {
-    const start = (current - 1) * pageSize;
-    return sourceData.slice(start, start + pageSize);
-  }, [current, sourceData, pageSize]);
 
   const transferData = useMemo(
     () => apiResources.map((r) => ({ value: r.id, label: r.displayName || r.name })),
@@ -361,7 +427,15 @@ const ClientManagementPage = () => {
         footer={false}
         size="85%"
       >
-        <Form ref={formRef} layout="vertical" labelAlign="right" labelWidth={200} colon initialData={defaultFormData}>
+        <Form
+          key={editingClient?.id ?? 'new-client'}
+          ref={formRef}
+          layout="vertical"
+          labelAlign="right"
+          labelWidth={200}
+          colon
+          initialData={formData}
+        >
           <Form.FormItem label="Client ID" name="clientId" rules={[{ required: true, message: '请输入 Client ID', type: 'error' }]}>
             <Input
               value={formData.clientId}
@@ -382,7 +456,7 @@ const ClientManagementPage = () => {
               value={formData.tokenEndpointAuthMethod}
               placeholder="请选择"
               options={authMethodOptions}
-              onChange={(value) => setFormData((prev) => ({ ...prev, tokenEndpointAuthMethod: value as string }))}
+              onChange={(value) => handleTokenEndpointAuthMethodChange(value as string)}
             />
           </Form.FormItem>
           <Form.FormItem label="允许的 Scope" name="allowedScopes" rules={[{ required: true, message: '请选择 Scope', type: 'error' }]}>
@@ -403,48 +477,58 @@ const ClientManagementPage = () => {
               onChange={(value) => setFormData((prev) => ({ ...prev, allowedGrantTypes: value as string[] }))}
             />
           </Form.FormItem>
-          <Form.FormItem label="启用 PKCE">
+          <Form.FormItem label="启用 PKCE" name="requirePkce">
             <Switch
-              value={formData.requirePkce}
+              key={`client-pkce-${editingClient?.id ?? 'new'}-${String(formData.requirePkce)}`}
+              value={Boolean(formData.requirePkce)}
               onChange={(value) => setFormData((prev) => ({ ...prev, requirePkce: value }))}
             />
           </Form.FormItem>
-          <Form.FormItem label="状态">
+          <Form.FormItem label="状态" name="isActive">
             <Switch
-              value={formData.isActive}
+              key={`client-active-${editingClient?.id ?? 'new'}-${String(formData.isActive)}`}
+              value={Boolean(formData.isActive)}
               onChange={(value) => setFormData((prev) => ({ ...prev, isActive: value }))}
             />
           </Form.FormItem>
 
-          <Form.FormList name="clientSecrets" initialData={[{ type: '', value: '', description: '' }]}>
+          <Form.FormList name="clientSecrets" initialData={[{ type: '', value: '', description: '' }]}> 
             {(fields, { add, remove }) => (
               <>
+                <Form.FormItem label="凭据说明">
+                  <div style={{ color: 'var(--td-text-color-secondary)' }}>
+                    {getSecretDescriptionByAuthMethod(formData.tokenEndpointAuthMethod)}
+                  </div>
+                </Form.FormItem>
                 {fields.map(({ key, name }) => (
                   <Form.FormItem key={key}>
-                    <Form.FormItem name={[name, 'type']} label="Secret类型" rules={[{ required: true, type: 'error' }]}>
-                      <Select
-                        style={{ flex: 1, minWidth: 200 }}
-                        options={[
-                          { label: 'SharedSecret', value: 'shared_secret' },
-                          { label: 'JWKS', value: 'jwks' },
-                        ]} />
-                    </Form.FormItem>
-                    <Form.FormItem name={[name, 'value']} label="Secret值" rules={[{ required: true, type: 'error' }]}>
-                      <Input />
+                    <Form.FormItem name={[name, 'value']} label={getSecretLabelByAuthMethod(formData.tokenEndpointAuthMethod)} rules={[{ required: true, type: 'error' }]}> 
+                      {formData.tokenEndpointAuthMethod === 'private_key_jwt' ? (
+                        <Textarea
+                          autosize={{ minRows: 8, maxRows: 16 }}
+                          placeholder='请输入 JWKS JSON，例如：{"keys":[...]}'
+                        />
+                      ) : (
+                        <Input type="password" placeholder="请输入 Client Secret" />
+                      )}
                     </Form.FormItem>
                     <Form.FormItem name={[name, 'description']} label="描述">
-                      <Input />
+                      <Input placeholder={formData.tokenEndpointAuthMethod === 'private_key_jwt' ? '例如：生产环境签名公钥集' : '例如：2026 Q2 轮换密钥'} />
                     </Form.FormItem>
-                    <Form.FormItem>
-                      <MinusCircleIcon size="20px" style={{ cursor: 'pointer' }} onClick={() => remove(name)} />
-                    </Form.FormItem>
+                    {formData.tokenEndpointAuthMethod !== 'private_key_jwt' && (
+                      <Form.FormItem>
+                        <MinusCircleIcon size="20px" style={{ cursor: 'pointer' }} onClick={() => remove(name)} />
+                      </Form.FormItem>
+                    )}
                   </Form.FormItem>
                 ))}
-                <Form.FormItem style={{ marginLeft: 100 }}>
-                  <Button theme="default" variant="dashed" onClick={() => add({ type: 'shared_secret', value: '', description: '' })}>
-                    + 新增
-                  </Button>
-                </Form.FormItem>
+                {formData.tokenEndpointAuthMethod !== 'private_key_jwt' && (
+                  <Form.FormItem style={{ marginLeft: 100 }}>
+                    <Button theme="default" variant="dashed" onClick={() => add(createDefaultSecret())}>
+                      + 新增
+                    </Button>
+                  </Form.FormItem>
+                )}
               </>
             )}
           </Form.FormList>
@@ -546,17 +630,17 @@ const ClientManagementPage = () => {
           <Form.FormItem label="关联 API 资源">
             <Transfer
               data={transferData}
-              checked={formData.apiResourceIds}
+              value={formData.apiResourceIds}
               direction="both"
               onChange={(value) => setFormData((prev) => ({ ...prev, apiResourceIds: value as string[] }))}
             />
           </Form.FormItem>
         </Form>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
-          <Button variant="base" onClick={handleClose}>
+          <Button variant="base" onClick={handleClose} disabled={submitting || loadingDetail}>
             取消
           </Button>
-          <Button theme="primary" onClick={handleSubmit}>
+          <Button theme="primary" loading={submitting} disabled={loadingDetail} onClick={handleSubmit}>
             {editingClient ? '保存' : '创建'}
           </Button>
         </div>
@@ -602,7 +686,7 @@ const ClientManagementPage = () => {
           <Table
             rowKey="id"
             columns={columns}
-            data={pagedData}
+            data={sourceData}
             verticalAlign="middle"
             maxHeight={tableMaxHeight}
             tableLayout="fixed"
@@ -619,7 +703,10 @@ const ClientManagementPage = () => {
             showPageSize
             showJumper
             onCurrentChange={(next) => setCurrent(next)}
-            onPageSizeChange={(size) => setPageSize(Number(size))}
+            onPageSizeChange={(size) => {
+              setPageSize(Number(size));
+              setCurrent(1);
+            }}
           />
         </div>
       </Card>

@@ -31,9 +31,34 @@ public class OAuthClientRepository(IUnitOfWork unitOfWork) : EfCoreAggregateRoot
         await unitOfWork.CommitAsync(ct);
     }
 
-    public async Task<List<OAuthClient>> GetAllAsync(CancellationToken ct = default)
+    public async Task<(List<OAuthClient> Items, int Total)> GetPagedAsync(
+        string? keyword,
+        bool? isActive,
+        int page,
+        int pageSize,
+        CancellationToken ct = default)
     {
-        return await FindAll().ToListAsync(ct);
+        var query = FindAll();
+
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            var kw = keyword.Trim();
+            query = query.Where(c => c.ClientId.Contains(kw) || c.ClientName.Contains(kw));
+        }
+
+        if (isActive.HasValue)
+        {
+            query = query.Where(c => c.IsActive == isActive.Value);
+        }
+
+        var total = await query.CountAsync(ct);
+        var items = await query
+            .OrderByDescending(c => c.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return (items, total);
     }
 
     public async Task<OAuthClient?> GetByIdAsync(Guid id, CancellationToken ct = default)

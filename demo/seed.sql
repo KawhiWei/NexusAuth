@@ -14,9 +14,9 @@ SET search_path TO nexusauth;
 
 -- ============================================================
 -- API resources with audience mapping
--- scope -> audience
--- demo_api, profile_api -> demo-bff-api
--- mobile_api -> demo-mobile-api
+-- requested resource scopes now use audience directly
+-- demo-bff-api -> web BFF APIs
+-- demo-mobile-api -> mobile bearer APIs
 -- ============================================================
 INSERT INTO api_resources (id, name, display_name, audience, description, is_active, created_at)
 VALUES
@@ -56,7 +56,7 @@ VALUES (
     'A front-end/back-end separated demo client for authorization code + OIDC',
     '["http://localhost:5201/signin-oidc"]',
     '["http://localhost:5200/"]',
-    '["openid","profile","email","phone","offline_access","demo_api","profile_api"]',
+    '["openid","profile","email","phone","offline_access","demo-bff-api"]',
     '["authorization_code","refresh_token"]',
     true,
     true,
@@ -93,7 +93,7 @@ VALUES (
     'A front-end/back-end separated demo client for authorization code + OIDC using client_secret_basic',
     '["http://localhost:5301/signin-oidc"]',
     '["http://localhost:5300/"]',
-    '["openid","profile","email","phone","offline_access","demo_api","profile_api"]',
+    '["openid","profile","email","phone","offline_access","demo-bff-api"]',
     '["authorization_code","refresh_token"]',
     true,
     true,
@@ -130,7 +130,7 @@ VALUES (
     'Console demo client for OAuth2 client_credentials grant',
     '[]',
     '[]',
-    '["demo_api"]',
+    '["demo-bff-api"]',
     '["client_credentials"]',
     false,
     true,
@@ -167,7 +167,7 @@ VALUES (
     'Console demo client for OAuth2 device_code and refresh_token grants (public-client friendly)',
     '[]',
     '[]',
-    '["openid","profile","email","phone","offline_access","demo_api"]',
+    '["openid","profile","email","phone","offline_access","demo-bff-api"]',
     '["urn:ietf:params:oauth:grant-type:device_code","refresh_token"]',
     false,
     true,
@@ -203,7 +203,7 @@ VALUES (
     'Console demo client for OAuth2 private_key_jwt token endpoint auth',
     '[]',
     '[]',
-    '["demo_api"]',
+    '["demo-bff-api"]',
     '["client_credentials"]',
     false,
     true,

@@ -1,69 +1,65 @@
 using Microsoft.AspNetCore.Mvc;
+using NexusAuth.Application;
 using NexusAuth.Application.Services.ApiResources;
-using NexusAuth.Domain.AggregateRoots.ApiResources;
-using NexusAuth.Domain.Repositories;
 
 namespace NexusAuth.Workbench.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/api-resources")]
 public class ApiResourcesController : ControllerBase
 {
     private readonly IApiResourceService _apiResourceService;
-    private readonly IApiResourceRepository _apiResourceRepository;
 
-    public ApiResourcesController(
-        IApiResourceService apiResourceService,
-        IApiResourceRepository apiResourceRepository)
+    public ApiResourcesController(IApiResourceService apiResourceService)
     {
         _apiResourceService = apiResourceService;
-        _apiResourceRepository = apiResourceRepository;
     }
 
-    [HttpGet]
-    public async Task<List<ApiResource>> GetAll(
+    [HttpGet("all")]
+    public async Task<List<ApiResourceDto>> GetAll(
         [FromQuery] string? keyword,
         [FromQuery] bool? isActive,
         CancellationToken ct = default)
     {
-        var resources = await _apiResourceRepository.GetAllActiveAsync(ct);
+        return await _apiResourceService.GetAllAsync(keyword, isActive, ct);
+    }
 
-        if (!string.IsNullOrWhiteSpace(keyword))
-        {
-            var kw = keyword.Trim().ToLower();
-            resources = resources
-                .Where(r => r.Name.ToLower().Contains(kw) || r.DisplayName.ToLower().Contains(kw))
-                .ToList();
-        }
-
-        if (isActive.HasValue)
-        {
-            resources = resources.Where(r => r.IsActive == isActive.Value).ToList();
-        }
-
-        return resources.ToList();
+    [HttpGet]
+    public async Task<PagedResult<ApiResourceDto>> GetPaged(
+        [FromQuery] string? keyword,
+        [FromQuery] bool? isActive,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken ct = default)
+    {
+        return await _apiResourceService.GetPagedAsync(keyword, isActive, page, pageSize, ct);
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<ApiResource?> GetById(Guid id, CancellationToken ct = default)
+    public async Task<ActionResult<ApiResourceDto>> GetById(Guid id, CancellationToken ct = default)
     {
-        return await _apiResourceRepository.FindByIdAsync(id, ct);
+        var resource = await _apiResourceService.GetByIdAsync(id, ct);
+        if (resource is null)
+            return NotFound();
+
+        return resource;
     }
 
     [HttpPost]
-    public async Task<ApiResource> Create([FromBody] CreateApiResourceRequest request, CancellationToken ct = default)
+    public async Task<ApiResourceDto> Create([FromBody] CreateApiResourceRequest request, CancellationToken ct = default)
     {
-        return await _apiResourceService.RegisterAsync(
-            request.Name,
-            request.DisplayName,
-            request.Audience,
-            request.Description,
-            ct);
+        return await _apiResourceService.CreateAsync(request, ct);
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<ApiResourceDto> Update(Guid id, [FromBody] UpdateApiResourceRequest request, CancellationToken ct = default)
+    {
+        return await _apiResourceService.UpdateAsync(id, request, ct);
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task Delete(Guid id, CancellationToken ct = default)
+    {
+        await _apiResourceService.DeleteAsync(id, ct);
     }
 }
-
-public record CreateApiResourceRequest(
-    string Name,
-    string DisplayName,
-    string Audience,
-    string? Description);

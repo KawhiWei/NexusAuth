@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using NexusAuth.Application;
 using NexusAuth.Application.Clients;
 
 namespace NexusAuth.Workbench.Api.Controllers;
@@ -14,34 +15,34 @@ public class ClientsController : ControllerBase
         _clientService = clientService;
     }
 
-    [HttpGet]
-    public async Task<List<OAuthClient>> GetAll(
+    [HttpGet("all")]
+    public async Task<List<ClientDto>> GetAll(
         [FromQuery] string? keyword,
         [FromQuery] bool? isActive,
         CancellationToken ct = default)
     {
-        var clients = await _clientService.GetAllAsync(ct);
+        return await _clientService.GetAllAsync(keyword, isActive, ct);
+    }
 
-        if (!string.IsNullOrWhiteSpace(keyword))
-        {
-            var kw = keyword.Trim().ToLower();
-            clients = clients
-                .Where(c => c.ClientId.ToLower().Contains(kw) || c.ClientName.ToLower().Contains(kw))
-                .ToList();
-        }
-
-        if (isActive.HasValue)
-        {
-            clients = clients.Where(c => c.IsActive == isActive.Value).ToList();
-        }
-
-        return clients;
+    [HttpGet]
+    public async Task<PagedResult<ClientDto>> GetPaged(
+        [FromQuery] string? keyword,
+        [FromQuery] bool? isActive,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken ct = default)
+    {
+        return await _clientService.GetPagedAsync(keyword, isActive, page, pageSize, ct);
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<OAuthClient?> GetById(Guid id, CancellationToken ct = default)
+    public async Task<ActionResult<ClientDto>> GetById(Guid id, CancellationToken ct = default)
     {
-        return await _clientService.GetByIdAsync(id, ct);
+        var client = await _clientService.GetByIdAsync(id, ct);
+        if (client is null)
+            return NotFound();
+
+        return client;
     }
 
     [HttpPost]

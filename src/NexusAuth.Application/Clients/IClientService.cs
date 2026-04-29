@@ -1,3 +1,5 @@
+using NexusAuth.Application;
+
 namespace NexusAuth.Application.Clients;
 
 public interface IClientService : IScopedDependency
@@ -56,9 +58,16 @@ public interface IClientService : IScopedDependency
 
     #region 管理服务 (Workbench 使用)
 
-    Task<List<OAuthClient>> GetAllAsync(CancellationToken ct = default);
+    Task<List<ClientDto>> GetAllAsync(string? keyword = null, bool? isActive = null, CancellationToken ct = default);
 
-    Task<OAuthClient?> GetByIdAsync(Guid id, CancellationToken ct = default);
+    Task<PagedResult<ClientDto>> GetPagedAsync(
+        string? keyword = null,
+        bool? isActive = null,
+        int page = 1,
+        int pageSize = 10,
+        CancellationToken ct = default);
+
+    Task<ClientDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
 
     Task<OAuthClient> CreateAsync(CreateClientRequest request, CancellationToken ct = default);
 
@@ -140,6 +149,21 @@ public record UpdateClientRequest(
     List<Guid>? ApiResourceIds);
 
 public record ClientSecretInput(
-    string Type,
     string Value,
     string? Description);
+
+public record ClientDto(
+    Guid Id,
+    string ClientId,
+    List<OAuthClientSecret> ClientSecrets,
+    string TokenEndpointAuthMethod,
+    string ClientName,
+    string? Description,
+    List<string> RedirectUris,
+    List<string> PostLogoutRedirectUris,
+    List<string> AllowedScopes,
+    List<string> AllowedGrantTypes,
+    bool RequirePkce,
+    bool IsActive,
+    DateTimeOffset CreatedAt,
+    List<Guid> ApiResourceIds);

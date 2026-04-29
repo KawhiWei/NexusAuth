@@ -437,10 +437,10 @@ public class TokenService(
             .Where(scopeName => !IsIdentityScope(scopeName))
             .ToArray();
 
-        var resources = await apiResourceRepository.FindByNamesAsync(resourceScopeNames, ct);
+        var resources = await apiResourceRepository.FindByAudiencesAsync(resourceScopeNames, ct);
         var resourceMap = resources
             .Where(resource => resource.IsActive)
-            .ToDictionary(resource => resource.Name, resource => resource, StringComparer.Ordinal);
+            .ToDictionary(resource => resource.Audience, resource => resource, StringComparer.Ordinal);
 
         string? resolved = null;
         foreach (var scopeName in resourceScopeNames)

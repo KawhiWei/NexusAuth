@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AxiosError } from 'axios';
-import { Button, Card, DialogPlugin, Drawer, Dropdown, Form, Input, MessagePlugin, Pagination, Select, Space, Switch, Table, Tag, Textarea, Transfer, type TableProps } from 'tdesign-react';
+import { Button, Card, Dialog, Drawer, Dropdown, Form, Input, MessagePlugin, Pagination, Select, Space, Switch, Table, Tag, Textarea, Transfer, type TableProps } from 'tdesign-react';
 import {
   createClient,
   deleteClient,
@@ -67,6 +67,13 @@ type DialogFormData = {
   apiResourceIds: string[];
 };
 
+type CredentialActionDialogState = {
+  visible: boolean;
+  client: Client | null;
+  method: string;
+  mutation: 'generate' | 'reset';
+};
+
 const defaultFormData: DialogFormData = {
   clientId: '',
   clientName: '',
@@ -85,6 +92,13 @@ const defaultClientMetadata: ClientMetadata = {
   scopes: [],
   grantTypes: [],
   tokenEndpointAuthMethods: [],
+};
+
+const defaultCredentialActionDialogState: CredentialActionDialogState = {
+  visible: false,
+  client: null,
+  method: '',
+  mutation: 'generate',
 };
 
 const getRequestErrorMessage = (error: unknown, fallback: string) => {
@@ -126,8 +140,9 @@ const ClientManagementPage = () => {
   const [expandedRowKeys, setExpandedRowKeys] = useState<Array<string | number>>([]);
   const [credentialDetailLoadingMap, setCredentialDetailLoadingMap] = useState<Record<string, boolean>>({});
   const [credentialDetailCache, setCredentialDetailCache] = useState<Record<string, Client>>({});
-  const [credentialDrawerVisible, setCredentialDrawerVisible] = useState(false);
+  const [credentialResultDialogVisible, setCredentialResultDialogVisible] = useState(false);
   const [generatedCredential, setGeneratedCredential] = useState<GeneratedClientCredential | null>(null);
+  const [credentialActionDialog, setCredentialActionDialog] = useState<CredentialActionDialogState>(defaultCredentialActionDialogState);
 
   const authMethodSelectOptions = useMemo(
     () => (clientMetadata.tokenEndpointAuthMethods.length > 0 ? toSelectOptions(clientMetadata.tokenEndpointAuthMethods) : authMethodOptions),
@@ -267,7 +282,7 @@ const ClientManagementPage = () => {
     }
 
     setGeneratedCredential(credential);
-    setCredentialDrawerVisible(true);
+    setCredentialResultDialogVisible(true);
   };
 
   const copyCredentialValue = async (value?: string) => {
@@ -336,6 +351,7 @@ const ClientManagementPage = () => {
   };
 
   const generateCredentialForMethod = async (client: Client, tokenEndpointAuthMethod?: string) => {
+    debugger;
     const method = tokenEndpointAuthMethod?.trim() || getClientAuthMethods(client)[0];
     if (!method) {
       MessagePlugin.error('该客户端没有可用的认证方式');
@@ -343,12 +359,11 @@ const ClientManagementPage = () => {
     }
 
     if (method !== 'private_key_jwt') {
-      DialogPlugin.confirm({
-        header: getCredentialConfirmLabel(method),
-        body: `确定要为客户端 "${client.clientName}" 生成 ${method} 凭据吗？新明文只显示一次。`,
-        confirmBtn: '生成',
-        cancelBtn: '取消',
-        onConfirm: () => submitCredentialMutation(client, method, 'generate'),
+      setCredentialActionDialog({
+        visible: true,
+        client,
+        method,
+        mutation: 'generate',
       });
       return;
     }
@@ -363,13 +378,33 @@ const ClientManagementPage = () => {
       return;
     }
 
-    DialogPlugin.confirm({
-      header: '确认重置凭据',
-      body: `确定要为客户端 "${client.clientName}" 重置 ${method} 凭据吗？旧明文将失效，新明文只显示一次。`,
-      confirmBtn: '重置',
-      cancelBtn: '取消',
-      onConfirm: () => submitCredentialMutation(client, method, 'reset'),
+    setCredentialActionDialog({
+      visible: true,
+      client,
+      method,
+      mutation: 'reset',
     });
+  };
+
+  const handleCloseCredentialActionDialog = () => {
+    if (submitting) {
+      return;
+    }
+
+    setCredentialActionDialog(defaultCredentialActionDialogState);
+  };
+
+  const handleConfirmCredentialAction = async () => {
+    if (!credentialActionDialog.client || !credentialActionDialog.method) {
+      return;
+    }
+
+    await submitCredentialMutation(
+      credentialActionDialog.client,
+      credentialActionDialog.method,
+      credentialActionDialog.mutation
+    );
+    setCredentialActionDialog(defaultCredentialActionDialogState);
   };
 
   const handleQuery = () => {
@@ -498,6 +533,30 @@ const ClientManagementPage = () => {
     }
   };
 
+  const apiResourceNameMap = useMemo(
+    () => Object.fromEntries(apiResources.map((resource) => [resource.id, resource.displayName || resource.name])),
+    [apiResources]
+  );
+
+  const renderArrayTags = (
+    values?: string[],
+    theme: 'default' | 'primary' | 'success' | 'warning' | 'danger' = 'default'
+  ) => {
+    if (!values?.length) {
+      return '-';
+    }
+
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {values.map((value) => (
+          <Tag key={value} theme={theme} variant="light-outline">
+            {value}
+          </Tag>
+        ))}
+      </div>
+    );
+  };
+
   const columns: TableProps<Client>['columns'] = [
     { colKey: 'clientId', title: 'Client ID', width: 180 },
     { colKey: 'clientName', title: '名称', minWidth: 150, ellipsis: true },
@@ -517,18 +576,25 @@ const ClientManagementPage = () => {
       colKey: 'tokenEndpointAuthMethods',
       title: '认证方式',
       minWidth: 220,
-      ellipsis: true,
-      cell: ({ row }) => getClientAuthMethods(row).join(', ') || '-',
+      cell: ({ row }) => renderArrayTags(getClientAuthMethods(row), 'primary'),
     },
-    { colKey: 'redirectUris', title: '回调地址', minWidth: 200, ellipsis: true, cell: ({ row }) => row.redirectUris?.join(', ') || '-' },
+    {
+      colKey: 'redirectUris',
+      title: '回调地址',
+      minWidth: 260,
+      cell: ({ row }) => renderArrayTags(row.redirectUris),
+    },
     {
       colKey: 'apiResourceIds',
       title: 'API资源',
+      minWidth: 220,
+      cell: ({ row }) => renderArrayTags(row.apiResourceIds?.map((id) => apiResourceNameMap[id] ?? id), 'success'),
+    },
+    {
+      colKey: 'credentialCount',
+      title: 'Secret 数量',
       width: 120,
-      cell: ({ row }) => {
-        const count = row.apiResourceIds?.length ?? 0;
-        return count > 0 ? <Tag theme="primary">{count} 个</Tag> : '-';
-      },
+      cell: ({ row }) => <Tag theme="primary">{row.credentials?.length ?? 0}</Tag>,
     },
     {
       colKey: 'action',
@@ -713,31 +779,39 @@ const ClientManagementPage = () => {
         </div>
       </Drawer>
 
-      <Drawer
-        visible={credentialDrawerVisible}
-        header="一次性客户端凭据"
-        onClose={() => setCredentialDrawerVisible(false)}
-        footer={false}
-        size="640px"
-      >
-        <Card bordered>
-          <div style={{ marginBottom: 16, color: 'var(--td-text-color-secondary)' }}>
-            请立即复制并安全保存。关闭后无法再次查看明文，只能重新轮换生成。
-            {generatedCredential?.type === 'jwks' ? ' 这是 jwks 登记结果，私钥由 BFF 自行管理。' : ''}
-          </div>
-          <Form.FormItem label="类型">
-            <Input readonly value={generatedCredential?.type ?? '-'} />
-          </Form.FormItem>
-          {generatedCredential?.clientSecret && (
-            <Form.FormItem label="Client Secret">
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Input readonly value={generatedCredential.clientSecret} />
+      <Dialog
+        visible={credentialActionDialog.visible}
+        header={"Client Secret 生成提示"}
+        body={credentialActionDialog.client ? (` 此类型的 client secret 只会展示一次，后续如需再次查看，只能通过重置重新生成并显示。`
+        ) : ''}
+        confirmBtn={credentialActionDialog.mutation === 'generate' ? '生成' : '重置'}
+        cancelBtn="取消"
+        confirmLoading={submitting}
+        onClose={handleCloseCredentialActionDialog}
+        onCancel={handleCloseCredentialActionDialog}
+        onConfirm={handleConfirmCredentialAction}
+      />
+
+      <Dialog
+        visible={credentialResultDialogVisible}
+        header="Client Secret"
+        confirmBtn="关闭"
+        cancelBtn={null}
+        onClose={() => setCredentialResultDialogVisible(false)}
+        onConfirm={() => setCredentialResultDialogVisible(false)}
+        body={(
+          <div>
+            {generatedCredential?.clientSecret && (
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <Tag theme="primary" variant="light" size="large">
+                  {generatedCredential.clientSecret}
+                </Tag>
                 <Button variant="outline" onClick={() => copyCredentialValue(generatedCredential.clientSecret)}>复制 Client Secret</Button>
               </Space>
-            </Form.FormItem>
-          )}
-        </Card>
-      </Drawer>
+            )}
+          </div>
+        )}
+      />
 
       <Card bordered>
         <Form layout="inline">
@@ -827,8 +901,8 @@ const ClientManagementPage = () => {
                           colKey: 'action',
                           title: '操作',
                           width: 120,
-                          cell: () => (
-                            getResettableAuthMethod(row) ? (
+                          cell: ({ row: credential }) => (
+                            credential.type !== 'jwks' && getResettableAuthMethod(row) ? (
                               <Button size="small" variant="text" theme="warning" onClick={() => handleResetCredential(row)}>
                                 reset
                               </Button>

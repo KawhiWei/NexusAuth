@@ -1,9 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AxiosError } from 'axios';
-import { Button, Card, Drawer, Form, Input, MessagePlugin, Pagination, Select, Space, Switch, Table, Tag, Textarea, Transfer, type TableProps } from 'tdesign-react';
-import { getClients, getClient, deleteClient, createClient, updateClient, type Client, type CreateClientRequest, type UpdateClientRequest } from '../../api/client';
+import { Button, Card, DialogPlugin, Drawer, Dropdown, Form, Input, MessagePlugin, Pagination, Select, Space, Switch, Table, Tag, Textarea, Transfer, type TableProps } from 'tdesign-react';
+import {
+  createClient,
+  deleteClient,
+  generateClientCredential,
+  getClient,
+  getClients,
+  resetClientCredential,
+  updateClient,
+  type Client,
+  type CreateClientRequest,
+  type GeneratedClientCredential,
+  type UpdateClientRequest,
+} from '../../api/client';
 import { getAllApiResources, type ApiResource } from '../../api/api-resource';
-import { MinusCircleIcon } from 'tdesign-icons-react';
+import { getClientMetadata, type ClientMetadata, type ClientOption } from '../../api/client-metadata';
 
 type FilterState = {
   keyword: string;
@@ -24,6 +36,7 @@ const statusOptions = [
 const authMethodOptions = [
   { label: 'client_secret_basic', value: 'client_secret_basic' },
   { label: 'client_secret_post', value: 'client_secret_post' },
+  { label: 'client_secret_jwt', value: 'client_secret_jwt' },
   { label: 'private_key_jwt', value: 'private_key_jwt' },
 ];
 
@@ -40,30 +53,6 @@ const scopeOptions = [
   { label: 'offline_access', value: 'offline_access' },
 ];
 
-type ClientSecretItem = {
-  value: string;
-  description: string;
-};
-
-const getSecretTypeByAuthMethod = (tokenEndpointAuthMethod: string) => {
-  return tokenEndpointAuthMethod === 'private_key_jwt' ? 'jwks' : 'shared_secret';
-};
-
-const getSecretLabelByAuthMethod = (tokenEndpointAuthMethod: string) => {
-  return tokenEndpointAuthMethod === 'private_key_jwt' ? 'JWKS' : 'Client Secret';
-};
-
-const getSecretDescriptionByAuthMethod = (tokenEndpointAuthMethod: string) => {
-  return tokenEndpointAuthMethod === 'private_key_jwt'
-    ? 'private_key_jwt 只支持一条 JWKS 配置，JWKS 内可包含多个 key。'
-    : 'client_secret_basic / client_secret_post 支持多条 Client Secret，用于密钥轮换。';
-};
-
-const createDefaultSecret = (): ClientSecretItem => ({
-  value: '',
-  description: '',
-});
-
 type DialogFormData = {
   clientId: string;
   clientName: string;
@@ -73,8 +62,7 @@ type DialogFormData = {
   allowedScopes: string[];
   allowedGrantTypes: string[];
   requirePkce: boolean;
-  tokenEndpointAuthMethod: string;
-  clientSecrets: ClientSecretItem[];
+  tokenEndpointAuthMethods: string[];
   isActive: boolean;
   apiResourceIds: string[];
 };
@@ -88,10 +76,15 @@ const defaultFormData: DialogFormData = {
   allowedScopes: [],
   allowedGrantTypes: [],
   requirePkce: false,
-  tokenEndpointAuthMethod: 'client_secret_basic',
-  clientSecrets: [createDefaultSecret()],
+  tokenEndpointAuthMethods: ['client_secret_basic'],
   isActive: false,
   apiResourceIds: [],
+};
+
+const defaultClientMetadata: ClientMetadata = {
+  scopes: [],
+  grantTypes: [],
+  tokenEndpointAuthMethods: [],
 };
 
 const getRequestErrorMessage = (error: unknown, fallback: string) => {
@@ -102,6 +95,14 @@ const getRequestErrorMessage = (error: unknown, fallback: string) => {
     || fallback;
 };
 
+const getCredentialConfirmLabel = (method: string) => method;
+const getCredentialTypeLabel = (type: string) => type;
+
+const toSelectOptions = (options: ClientOption[]) => options.map((option) => ({
+  label: option.label,
+  value: option.value,
+}));
+
 const ClientManagementPage = () => {
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(defaultFilters);
@@ -111,6 +112,7 @@ const ClientManagementPage = () => {
   const [sourceData, setSourceData] = useState<Client[]>([]);
   const [total, setTotal] = useState(0);
   const [apiResources, setApiResources] = useState<ApiResource[]>([]);
+  const [clientMetadata, setClientMetadata] = useState<ClientMetadata>(defaultClientMetadata);
   const [tableMaxHeight, setTableMaxHeight] = useState(() => Math.max(window.innerHeight - 200, 260));
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
 
@@ -120,6 +122,27 @@ const ClientManagementPage = () => {
   const formRef = useRef<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
+
+  const [expandedRowKeys, setExpandedRowKeys] = useState<Array<string | number>>([]);
+  const [credentialDetailLoadingMap, setCredentialDetailLoadingMap] = useState<Record<string, boolean>>({});
+  const [credentialDetailCache, setCredentialDetailCache] = useState<Record<string, Client>>({});
+  const [credentialDrawerVisible, setCredentialDrawerVisible] = useState(false);
+  const [generatedCredential, setGeneratedCredential] = useState<GeneratedClientCredential | null>(null);
+
+  const authMethodSelectOptions = useMemo(
+    () => (clientMetadata.tokenEndpointAuthMethods.length > 0 ? toSelectOptions(clientMetadata.tokenEndpointAuthMethods) : authMethodOptions),
+    [clientMetadata.tokenEndpointAuthMethods]
+  );
+
+  const grantTypeSelectOptions = useMemo(
+    () => (clientMetadata.grantTypes.length > 0 ? toSelectOptions(clientMetadata.grantTypes) : grantTypeOptions),
+    [clientMetadata.grantTypes]
+  );
+
+  const scopeSelectOptions = useMemo(
+    () => (clientMetadata.scopes.length > 0 ? toSelectOptions(clientMetadata.scopes) : scopeOptions),
+    [clientMetadata.scopes]
+  );
 
   const addRedirectUri = (type: 'redirectUris' | 'postLogoutRedirectUris') => {
     const newId = String(Date.now());
@@ -141,18 +164,6 @@ const ClientManagementPage = () => {
       ...prev,
       [type]: prev[type].map((r) => (r.id === id ? { ...r, value } : r)),
     }));
-  };
-
-  const handleTokenEndpointAuthMethodChange = (value: string) => {
-    setFormData((prev) => {
-      return {
-        ...prev,
-        tokenEndpointAuthMethod: value,
-        clientSecrets: value === 'private_key_jwt'
-          ? [prev.clientSecrets[0] ?? createDefaultSecret()]
-          : (prev.clientSecrets.length > 0 ? prev.clientSecrets : [createDefaultSecret()]),
-      };
-    });
   };
 
   const fetchData = async () => {
@@ -180,12 +191,22 @@ const ClientManagementPage = () => {
     }
   };
 
+  const fetchClientMetadata = async () => {
+    try {
+      const metadata = await getClientMetadata();
+      setClientMetadata(metadata);
+    } catch (error) {
+      console.error('Failed to fetch client metadata:', error);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, [appliedFilters, current, pageSize]);
 
   useEffect(() => {
     fetchApiResources();
+    fetchClientMetadata();
   }, []);
 
   useEffect(() => {
@@ -201,15 +222,11 @@ const ClientManagementPage = () => {
     form.setFieldsValue({
       clientId: formData.clientId,
       clientName: formData.clientName,
-      tokenEndpointAuthMethod: formData.tokenEndpointAuthMethod,
+      tokenEndpointAuthMethods: formData.tokenEndpointAuthMethods,
       allowedScopes: formData.allowedScopes,
       allowedGrantTypes: formData.allowedGrantTypes,
       requirePkce: formData.requirePkce,
       isActive: formData.isActive,
-      clientSecrets: formData.clientSecrets.map((s) => ({
-        value: s.value,
-        description: s.description,
-      })),
     });
   }, [dialogVisible, loadingDetail, formData]);
 
@@ -235,51 +252,125 @@ const ClientManagementPage = () => {
     };
   }, []);
 
-  const columns: TableProps<Client>['columns'] = useMemo(
-    () => [
-      { colKey: 'clientId', title: 'Client ID', width: 180 },
-      { colKey: 'clientName', title: '名称', minWidth: 150, ellipsis: true },
-      {
-        colKey: 'isActive',
-        title: '状态',
-        width: 100,
-        cell: ({ row }) => <Tag theme={row.isActive ? 'success' : 'default'}>{row.isActive ? '启用' : '禁用'}</Tag>,
-      },
-      {
-        colKey: 'requirePkce',
-        title: 'PKCE',
-        width: 80,
-        cell: ({ row }) => (row.requirePkce ? '是' : '否'),
-      },
-      { colKey: 'tokenEndpointAuthMethod', title: '认证方式', width: 180 },
-      { colKey: 'redirectUris', title: '回调地址', minWidth: 200, ellipsis: true, cell: ({ row }) => row.redirectUris?.join(', ') || '-' },
-      {
-        colKey: 'apiResourceIds',
-        title: 'API资源',
-        width: 120,
-        cell: ({ row }) => {
-          const count = row.apiResourceIds?.length ?? 0;
-          return count > 0 ? <Tag theme="primary">{count} 个</Tag> : '-';
-        },
-      },
-      {
-        colKey: 'action',
-        title: '操作',
-        width: 160,
-        cell: ({ row }) => (
-          <Space>
-            <Button size="small" variant="text" theme="warning" onClick={() => handleEdit(row)}>
-              编辑
-            </Button>
-            <Button size="small" variant="text" theme="danger" onClick={() => handleDelete(row)}>
-              删除
-            </Button>
-          </Space>
-        ),
-      },
-    ],
-    []
-  );
+  useEffect(() => {
+    expandedRowKeys.forEach((key) => {
+      const clientId = String(key);
+      if (!credentialDetailCache[clientId] && !credentialDetailLoadingMap[clientId]) {
+        void loadClientCredentials(clientId);
+      }
+    });
+  }, [expandedRowKeys, credentialDetailCache, credentialDetailLoadingMap]);
+
+  const showGeneratedCredential = (credential?: GeneratedClientCredential) => {
+    if (!credential) {
+      return;
+    }
+
+    setGeneratedCredential(credential);
+    setCredentialDrawerVisible(true);
+  };
+
+  const copyCredentialValue = async (value?: string) => {
+    if (!value) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(value);
+    MessagePlugin.success('已复制');
+  };
+
+  const getClientAuthMethods = (client: Client) => {
+    const methods = client.tokenEndpointAuthMethods?.length ? client.tokenEndpointAuthMethods : [client.tokenEndpointAuthMethod];
+    return methods.filter(Boolean);
+  };
+
+  const getResettableAuthMethod = (client: Client) => {
+    return getClientAuthMethods(client).find((method) => method !== 'private_key_jwt');
+  };
+
+  const loadClientCredentials = async (clientId: string) => {
+    if (credentialDetailLoadingMap[clientId]) {
+      return;
+    }
+
+    setCredentialDetailLoadingMap((prev) => ({ ...prev, [clientId]: true }));
+    try {
+      const detail = await getClient(clientId);
+      setCredentialDetailCache((prev) => ({ ...prev, [clientId]: detail }));
+    } catch (error) {
+      console.error('Failed to fetch client credentials:', error);
+      MessagePlugin.error(getRequestErrorMessage(error, '加载凭据明细失败'));
+    } finally {
+      setCredentialDetailLoadingMap((prev) => ({ ...prev, [clientId]: false }));
+    }
+  };
+
+  const submitCredentialMutation = async (
+    client: Client,
+    tokenEndpointAuthMethod: string,
+    mutation: 'generate' | 'reset'
+  ) => {
+    try {
+      setSubmitting(true);
+      const result = mutation === 'generate'
+        ? await generateClientCredential(client.id, { tokenEndpointAuthMethod })
+        : await resetClientCredential(client.id, { tokenEndpointAuthMethod });
+
+      if (editingClient?.id === client.id) {
+        setEditingClient(result.client);
+      }
+
+      setCredentialDetailCache((prev) => ({ ...prev, [client.id]: result.client }));
+      showGeneratedCredential(result.generatedCredential);
+      await fetchData();
+
+      if (expandedRowKeys.includes(client.id)) {
+        await loadClientCredentials(client.id);
+      }
+    } catch (error) {
+      console.error(`Failed to ${mutation} client credential:`, error);
+      MessagePlugin.error(getRequestErrorMessage(error, mutation === 'generate' ? '生成客户端凭据失败' : '重置客户端凭据失败'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const generateCredentialForMethod = async (client: Client, tokenEndpointAuthMethod?: string) => {
+    const method = tokenEndpointAuthMethod?.trim() || getClientAuthMethods(client)[0];
+    if (!method) {
+      MessagePlugin.error('该客户端没有可用的认证方式');
+      return;
+    }
+
+    if (method !== 'private_key_jwt') {
+      DialogPlugin.confirm({
+        header: getCredentialConfirmLabel(method),
+        body: `确定要为客户端 "${client.clientName}" 生成 ${method} 凭据吗？新明文只显示一次。`,
+        confirmBtn: '生成',
+        cancelBtn: '取消',
+        onConfirm: () => submitCredentialMutation(client, method, 'generate'),
+      });
+      return;
+    }
+
+    await submitCredentialMutation(client, method, 'generate');
+  };
+
+  const handleResetCredential = async (client: Client) => {
+    const method = getResettableAuthMethod(client);
+    if (!method) {
+      MessagePlugin.error('当前客户端没有可重置的共享凭据');
+      return;
+    }
+
+    DialogPlugin.confirm({
+      header: '确认重置凭据',
+      body: `确定要为客户端 "${client.clientName}" 重置 ${method} 凭据吗？旧明文将失效，新明文只显示一次。`,
+      confirmBtn: '重置',
+      cancelBtn: '取消',
+      onConfirm: () => submitCredentialMutation(client, method, 'reset'),
+    });
+  };
 
   const handleQuery = () => {
     setAppliedFilters(filters);
@@ -312,9 +403,7 @@ const ClientManagementPage = () => {
         allowedScopes: detail.allowedScopes ?? ['openid'],
         allowedGrantTypes: detail.allowedGrantTypes ?? ['authorization_code'],
         requirePkce: detail.requirePkce,
-        tokenEndpointAuthMethod: detail.tokenEndpointAuthMethod,
-        clientSecrets: detail.clientSecrets?.map((s) => ({ value: s.value, description: s.description ?? '' }))
-          ?? [createDefaultSecret()],
+        tokenEndpointAuthMethods: getClientAuthMethods(detail),
         isActive: detail.isActive,
         apiResourceIds: detail.apiResourceIds ?? [],
       };
@@ -362,13 +451,8 @@ const ClientManagementPage = () => {
 
     const redirectUris = formData.redirectUris.map((r) => r.value).filter((v) => v.trim());
     const postLogoutRedirectUris = formData.postLogoutRedirectUris.map((r) => r.value).filter((v) => v.trim());
-    const clientSecretsFromForm = form.getFieldValue('clientSecrets') || [];
     const requirePkce = Boolean(form.getFieldValue('requirePkce'));
     const isActive = Boolean(form.getFieldValue('isActive'));
-    const secretType = getSecretTypeByAuthMethod(formData.tokenEndpointAuthMethod);
-    const clientSecrets = clientSecretsFromForm
-      .filter((s: any) => s.value?.trim())
-      .map((s: any) => ({ type: secretType, value: s.value, description: s.description || undefined }));
 
     try {
       setSubmitting(true);
@@ -382,7 +466,8 @@ const ClientManagementPage = () => {
           allowedGrantTypes: formData.allowedGrantTypes,
           requirePkce,
           isActive,
-          clientSecrets: clientSecrets.length > 0 ? clientSecrets : undefined,
+          tokenEndpointAuthMethod: formData.tokenEndpointAuthMethods[0],
+          tokenEndpointAuthMethods: formData.tokenEndpointAuthMethods,
           apiResourceIds: formData.apiResourceIds,
         };
         await updateClient(editingClient.id, request);
@@ -396,8 +481,8 @@ const ClientManagementPage = () => {
           allowedScopes: formData.allowedScopes,
           allowedGrantTypes: formData.allowedGrantTypes,
           requirePkce,
-          tokenEndpointAuthMethod: formData.tokenEndpointAuthMethod,
-          clientSecrets: clientSecrets.length > 0 ? clientSecrets : undefined,
+          tokenEndpointAuthMethod: formData.tokenEndpointAuthMethods[0],
+          tokenEndpointAuthMethods: formData.tokenEndpointAuthMethods,
           apiResourceIds: formData.apiResourceIds,
         };
         await createClient(request);
@@ -412,6 +497,70 @@ const ClientManagementPage = () => {
       setSubmitting(false);
     }
   };
+
+  const columns: TableProps<Client>['columns'] = [
+    { colKey: 'clientId', title: 'Client ID', width: 180 },
+    { colKey: 'clientName', title: '名称', minWidth: 150, ellipsis: true },
+    {
+      colKey: 'isActive',
+      title: '状态',
+      width: 100,
+      cell: ({ row }) => <Tag theme={row.isActive ? 'success' : 'default'}>{row.isActive ? '启用' : '禁用'}</Tag>,
+    },
+    {
+      colKey: 'requirePkce',
+      title: 'PKCE',
+      width: 80,
+      cell: ({ row }) => (row.requirePkce ? '是' : '否'),
+    },
+    {
+      colKey: 'tokenEndpointAuthMethods',
+      title: '认证方式',
+      minWidth: 220,
+      ellipsis: true,
+      cell: ({ row }) => getClientAuthMethods(row).join(', ') || '-',
+    },
+    { colKey: 'redirectUris', title: '回调地址', minWidth: 200, ellipsis: true, cell: ({ row }) => row.redirectUris?.join(', ') || '-' },
+    {
+      colKey: 'apiResourceIds',
+      title: 'API资源',
+      width: 120,
+      cell: ({ row }) => {
+        const count = row.apiResourceIds?.length ?? 0;
+        return count > 0 ? <Tag theme="primary">{count} 个</Tag> : '-';
+      },
+    },
+    {
+      colKey: 'action',
+      title: '操作',
+      width: 140,
+      cell: ({ row }) => (
+        <Space direction="vertical" size={4} style={{ alignItems: 'flex-start' }}>
+          <Button size="small" variant="text" theme="warning" onClick={() => handleEdit(row)}>
+            编辑
+          </Button>
+          <Dropdown
+            trigger="click"
+            hideAfterItemClick
+            placement="bottom-right"
+            minColumnWidth="170px"
+            options={getClientAuthMethods(row).map((method) => ({
+              content: method,
+              value: method,
+            }))}
+            onClick={(dropdownItem) => generateCredentialForMethod(row, String(dropdownItem.value))}
+          >
+            <Button size="small" variant="text" theme="primary">
+              生成凭证
+            </Button>
+          </Dropdown>
+          <Button size="small" variant="text" theme="danger" onClick={() => handleDelete(row)}>
+            删除
+          </Button>
+        </Space>
+      ),
+    },
+  ];
 
   const transferData = useMemo(
     () => apiResources.map((r) => ({ value: r.id, label: r.displayName || r.name })),
@@ -451,12 +600,13 @@ const ClientManagementPage = () => {
               onChange={(value) => setFormData((prev) => ({ ...prev, clientName: value }))}
             />
           </Form.FormItem>
-          <Form.FormItem label="认证方式" name="tokenEndpointAuthMethod" rules={[{ required: true, message: '请选择认证方式', type: 'error' }]}>
+          <Form.FormItem label="认证方式" name="tokenEndpointAuthMethods" rules={[{ required: true, message: '请选择认证方式', type: 'error' }]}>
             <Select
-              value={formData.tokenEndpointAuthMethod}
+              value={formData.tokenEndpointAuthMethods}
+              multiple
               placeholder="请选择"
-              options={authMethodOptions}
-              onChange={(value) => handleTokenEndpointAuthMethodChange(value as string)}
+              options={authMethodSelectOptions}
+              onChange={(value) => setFormData((prev) => ({ ...prev, tokenEndpointAuthMethods: value as string[] }))}
             />
           </Form.FormItem>
           <Form.FormItem label="允许的 Scope" name="allowedScopes" rules={[{ required: true, message: '请选择 Scope', type: 'error' }]}>
@@ -464,7 +614,7 @@ const ClientManagementPage = () => {
               value={formData.allowedScopes}
               multiple
               placeholder="请选择"
-              options={scopeOptions}
+              options={scopeSelectOptions}
               onChange={(value) => setFormData((prev) => ({ ...prev, allowedScopes: value as string[] }))}
             />
           </Form.FormItem>
@@ -473,7 +623,7 @@ const ClientManagementPage = () => {
               value={formData.allowedGrantTypes}
               multiple
               placeholder="请选择"
-              options={grantTypeOptions}
+              options={grantTypeSelectOptions}
               onChange={(value) => setFormData((prev) => ({ ...prev, allowedGrantTypes: value as string[] }))}
             />
           </Form.FormItem>
@@ -491,90 +641,7 @@ const ClientManagementPage = () => {
               onChange={(value) => setFormData((prev) => ({ ...prev, isActive: value }))}
             />
           </Form.FormItem>
-
-          <Form.FormList name="clientSecrets" initialData={[{ type: '', value: '', description: '' }]}> 
-            {(fields, { add, remove }) => (
-              <>
-                <Form.FormItem label="凭据说明">
-                  <div style={{ color: 'var(--td-text-color-secondary)' }}>
-                    {getSecretDescriptionByAuthMethod(formData.tokenEndpointAuthMethod)}
-                  </div>
-                </Form.FormItem>
-                {fields.map(({ key, name }) => (
-                  <Form.FormItem key={key}>
-                    <Form.FormItem name={[name, 'value']} label={getSecretLabelByAuthMethod(formData.tokenEndpointAuthMethod)} rules={[{ required: true, type: 'error' }]}> 
-                      {formData.tokenEndpointAuthMethod === 'private_key_jwt' ? (
-                        <Textarea
-                          autosize={{ minRows: 8, maxRows: 16 }}
-                          placeholder='请输入 JWKS JSON，例如：{"keys":[...]}'
-                        />
-                      ) : (
-                        <Input type="password" placeholder="请输入 Client Secret" />
-                      )}
-                    </Form.FormItem>
-                    <Form.FormItem name={[name, 'description']} label="描述">
-                      <Input placeholder={formData.tokenEndpointAuthMethod === 'private_key_jwt' ? '例如：生产环境签名公钥集' : '例如：2026 Q2 轮换密钥'} />
-                    </Form.FormItem>
-                    {formData.tokenEndpointAuthMethod !== 'private_key_jwt' && (
-                      <Form.FormItem>
-                        <MinusCircleIcon size="20px" style={{ cursor: 'pointer' }} onClick={() => remove(name)} />
-                      </Form.FormItem>
-                    )}
-                  </Form.FormItem>
-                ))}
-                {formData.tokenEndpointAuthMethod !== 'private_key_jwt' && (
-                  <Form.FormItem style={{ marginLeft: 100 }}>
-                    <Button theme="default" variant="dashed" onClick={() => add(createDefaultSecret())}>
-                      + 新增
-                    </Button>
-                  </Form.FormItem>
-                )}
-              </>
-            )}
-          </Form.FormList>
-
-          {/* 
-          <Form.FormItem label="Client Secrets" name="clientSecrets" >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {formData.clientSecrets.map((secret, index) => (
-                <div key={secret.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <Select
-                    value={secret.type}
-                    style={{ flex: 1, minWidth: 200 }}
-                    options={[
-                      { label: 'SharedSecret', value: 'shared_secret' },
-                      { label: 'JWKS', value: 'jwks' },
-                    ]}
-                    onChange={(value) => updateClientSecret(secret.id, 'type', value as string)}
-                  />
-                  <Input
-                    value={secret.value}
-                    placeholder="请输入 Secret"
-                    style={{ flex: 1, minWidth: 350 }}
-                    onChange={(value) => updateClientSecret(secret.id, 'value', value)}
-                  />
-                  <Input
-                    value={secret.description}
-                    placeholder="描述"
-                    style={{ flex: 1, minWidth: 350 }}
-                    onChange={(value) => updateClientSecret(secret.id, 'description', value)}
-                  />
-                  {index === 0 ? (
-                    <Button variant="outline" onClick={addClientSecret}>
-                      +
-                    </Button>
-                  ) : (
-                    <Button variant="outline" onClick={() => removeClientSecret(secret.id)}>
-                      -
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </Form.FormItem> */}
-
-
-          <Form.FormItem label="回调地址" >
+          <Form.FormItem label="回调地址">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {formData.redirectUris.map((uri, index) => (
                 <div key={uri.id} style={{ display: 'flex', gap: 8 }}>
@@ -646,6 +713,32 @@ const ClientManagementPage = () => {
         </div>
       </Drawer>
 
+      <Drawer
+        visible={credentialDrawerVisible}
+        header="一次性客户端凭据"
+        onClose={() => setCredentialDrawerVisible(false)}
+        footer={false}
+        size="640px"
+      >
+        <Card bordered>
+          <div style={{ marginBottom: 16, color: 'var(--td-text-color-secondary)' }}>
+            请立即复制并安全保存。关闭后无法再次查看明文，只能重新轮换生成。
+            {generatedCredential?.type === 'jwks' ? ' 这是 jwks 登记结果，私钥由 BFF 自行管理。' : ''}
+          </div>
+          <Form.FormItem label="类型">
+            <Input readonly value={generatedCredential?.type ?? '-'} />
+          </Form.FormItem>
+          {generatedCredential?.clientSecret && (
+            <Form.FormItem label="Client Secret">
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Input readonly value={generatedCredential.clientSecret} />
+                <Button variant="outline" onClick={() => copyCredentialValue(generatedCredential.clientSecret)}>复制 Client Secret</Button>
+              </Space>
+            </Form.FormItem>
+          )}
+        </Card>
+      </Drawer>
+
       <Card bordered>
         <Form layout="inline">
           <Form.FormItem label="关键词">
@@ -691,6 +784,65 @@ const ClientManagementPage = () => {
             maxHeight={tableMaxHeight}
             tableLayout="fixed"
             loading={loading}
+            expandedRowKeys={expandedRowKeys}
+            onExpandChange={(keys) => setExpandedRowKeys(keys)}
+            expandedRow={({ row }) => {
+              const clientId = String(row.id);
+              const detail = credentialDetailCache[clientId] ?? row;
+              const credentials = detail.credentials ?? [];
+              const credentialLoading = credentialDetailLoadingMap[clientId];
+
+              return (
+                <div style={{ padding: '8px 0 8px 24px' }}>
+                  {credentialLoading ? (
+                    <div style={{ color: 'var(--td-text-color-secondary)' }}>正在加载凭据...</div>
+                  ) : credentials.length > 0 ? (
+                    <Table
+                      rowKey="id"
+                      data={credentials}
+                      columns={[
+                        {
+                          colKey: 'type',
+                          title: 'type',
+                          width: 180,
+                          cell: ({ row: credential }) => getCredentialTypeLabel(credential.type),
+                        },
+                        {
+                          colKey: 'isActive',
+                          title: '状态',
+                          width: 100,
+                          cell: ({ row: credential }) => (
+                            <Tag theme={credential.isActive ? 'success' : 'default'}>
+                              {credential.isActive ? '启用' : '禁用'}
+                            </Tag>
+                          ),
+                        },
+                        {
+                          colKey: 'createdAt',
+                          title: '创建时间',
+                          minWidth: 180,
+                          cell: ({ row: credential }) => new Date(credential.createdAt).toLocaleString(),
+                        },
+                        {
+                          colKey: 'action',
+                          title: '操作',
+                          width: 120,
+                          cell: () => (
+                            getResettableAuthMethod(row) ? (
+                              <Button size="small" variant="text" theme="warning" onClick={() => handleResetCredential(row)}>
+                                reset
+                              </Button>
+                            ) : '-'
+                          ),
+                        },
+                      ]}
+                    />
+                  ) : (
+                    <div style={{ color: 'var(--td-text-color-secondary)' }}>暂无凭据</div>
+                  )}
+                </div>
+              );
+            }}
           />
         </div>
 

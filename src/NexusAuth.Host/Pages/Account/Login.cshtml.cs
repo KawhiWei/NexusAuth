@@ -6,20 +6,14 @@ using NexusAuth.Application.Services;
 
 namespace NexusAuth.Host.Pages.Account;
 
-public class LoginModel : PageModel
+public class LoginModel(IUserService userService, IClientService clientService) : PageModel
 {
     private const string AuthTimeClaimType = "auth_time";
     private const string AmrClaimType = "amr";
     private const string AcrClaimType = "acr";
 
-    private readonly IUserService _userService;
-    private readonly IClientService _clientService;
-
-    public LoginModel(IUserService userService, IClientService clientService)
-    {
-        _userService = userService;
-        _clientService = clientService;
-    }
+    private readonly IUserService _userService = userService;
+    private readonly IClientService _clientService = clientService;
 
     [BindProperty(SupportsGet = true)]
     public string? ReturnUrl { get; set; }

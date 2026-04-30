@@ -15,6 +15,12 @@ public static class OAuthClientAuthenticationParser
         string? formClientAssertion = null,
         string? assertionAudience = null)
     {
+        var formAuthMethod = !string.IsNullOrWhiteSpace(formClientAssertion) || !string.IsNullOrWhiteSpace(formClientAssertionType)
+            ? OAuthClient.TokenEndpointAuthMethodPrivateKeyJwt
+            : !string.IsNullOrWhiteSpace(formClientSecret)
+                ? OAuthClient.TokenEndpointAuthMethodClientSecretPost
+                : null;
+
         if (string.IsNullOrWhiteSpace(authorizationHeader)
             || !authorizationHeader.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
         {
@@ -23,7 +29,8 @@ public static class OAuthClientAuthenticationParser
                 formClientSecret,
                 formClientAssertionType,
                 formClientAssertion,
-                assertionAudience);
+                assertionAudience,
+                formAuthMethod);
         }
 
         try
@@ -37,7 +44,8 @@ public static class OAuthClientAuthenticationParser
                     formClientSecret,
                     formClientAssertionType,
                     formClientAssertion,
-                    assertionAudience);
+                    assertionAudience,
+                    formAuthMethod);
             }
 
             var headerClientId = decoded[..separatorIndex];
@@ -47,7 +55,8 @@ public static class OAuthClientAuthenticationParser
                 string.IsNullOrWhiteSpace(headerClientSecret) ? formClientSecret : headerClientSecret,
                 formClientAssertionType,
                 formClientAssertion,
-                assertionAudience);
+                assertionAudience,
+                OAuthClient.TokenEndpointAuthMethodClientSecretBasic);
         }
         catch (FormatException)
         {
@@ -56,7 +65,8 @@ public static class OAuthClientAuthenticationParser
                 formClientSecret,
                 formClientAssertionType,
                 formClientAssertion,
-                assertionAudience);
+                assertionAudience,
+                formAuthMethod);
         }
     }
 }

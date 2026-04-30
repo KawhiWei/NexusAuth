@@ -19,7 +19,7 @@ public class AuthorizationCodeRepository(IUnitOfWork unitOfWork) : EfCoreEntityR
 
     public async Task AddAsync(AuthorizationCode code, CancellationToken ct = default)
     {
-        await _dbContext.Set<AuthorizationCode>().AddAsync(code, ct);
+        _dbContext.Add(code);
         await unitOfWork.CommitAsync(ct);
     }
 

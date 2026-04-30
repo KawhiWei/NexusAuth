@@ -314,7 +314,6 @@ public class TokenService(
         var handler = new JwtSecurityTokenHandler();
         if (!handler.CanReadToken(token))
             return TokenIntrospectionResult.Inactive();
-
         try
         {
             var principal = handler.ValidateToken(
@@ -343,7 +342,7 @@ public class TokenService(
                 jwt.Issuer,
                 principal.FindFirst("token_use")?.Value);
         }
-        catch(Exception e)
+        catch (Exception)
         {
             return TokenIntrospectionResult.Inactive();
         }

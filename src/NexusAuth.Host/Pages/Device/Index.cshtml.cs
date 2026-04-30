@@ -5,14 +5,9 @@ using NexusAuth.Application.Services;
 
 namespace NexusAuth.Host.Pages.Device;
 
-public class IndexModel : PageModel
+public class IndexModel(IDeviceAuthorizationService deviceAuthorizationService) : PageModel
 {
-    private readonly IDeviceAuthorizationService _deviceAuthorizationService;
-
-    public IndexModel(IDeviceAuthorizationService deviceAuthorizationService)
-    {
-        _deviceAuthorizationService = deviceAuthorizationService;
-    }
+    private readonly IDeviceAuthorizationService _deviceAuthorizationService = deviceAuthorizationService;
 
     [BindProperty(SupportsGet = true, Name = "user_code")]
     public string UserCode { get; set; } = string.Empty;

@@ -24,7 +24,7 @@ public class TokenBlacklistRepository(IUnitOfWork unitOfWork) : EfCoreEntityRepo
 
     public async Task AddAsync(TokenBlacklistEntry entry, CancellationToken ct = default)
     {
-        await _dbContext.Set<TokenBlacklistEntry>().AddAsync(entry, ct);
+        _dbContext.Add(entry);
         await unitOfWork.CommitAsync(ct);
     }
 }

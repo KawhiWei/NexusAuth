@@ -121,8 +121,9 @@ dotnet run --project demo/src/Demo.RefreshToken
 ### 完整初始化
 
 ```bash
-psql -U nexusauth -d nexusauth -f demo/schema.sql
+psql -U nexusauth -f production-init.sql
 psql -U nexusauth -d nexusauth -f demo/seed.sql
+psql -U nexusauth -d nexusauth -f NexusAuth.Workbench/NexusAuth.Workbench.Api/seed.sql
 ```
 
 ### 测试账号

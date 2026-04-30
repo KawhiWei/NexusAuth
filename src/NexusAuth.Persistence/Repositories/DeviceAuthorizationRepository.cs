@@ -24,7 +24,7 @@ public class DeviceAuthorizationRepository(IUnitOfWork unitOfWork) : EfCoreEntit
 
     public async Task AddAsync(DeviceAuthorization authorization, CancellationToken ct = default)
     {
-        await _dbContext.Set<DeviceAuthorization>().AddAsync(authorization, ct);
+        _dbContext.Add(authorization);
         await unitOfWork.CommitAsync(ct);
     }
 

@@ -10,7 +10,9 @@ public class OAuthClientRepository(IUnitOfWork unitOfWork) : EfCoreAggregateRoot
 {
     public async Task<OAuthClient?> FindByClientIdAsync(string clientId, CancellationToken ct = default)
     {
-        return await FindAll(c => c.ClientId == clientId).FirstOrDefaultAsync(ct);
+        return await FindAll(c => c.ClientId == clientId)
+            .Include(c => c.ClientSecrets)
+            .FirstOrDefaultAsync(ct);
     }
 
     public async Task AddAsync(OAuthClient client, CancellationToken ct = default)
@@ -53,6 +55,7 @@ public class OAuthClientRepository(IUnitOfWork unitOfWork) : EfCoreAggregateRoot
 
         var total = await query.CountAsync(ct);
         var items = await query
+            .Include(c => c.ClientSecrets)
             .OrderByDescending(c => c.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -63,6 +66,8 @@ public class OAuthClientRepository(IUnitOfWork unitOfWork) : EfCoreAggregateRoot
 
     public async Task<OAuthClient?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        return await FindAsync(id);
+        return await FindAll(c => c.Id == id)
+            .Include(c => c.ClientSecrets)
+            .FirstOrDefaultAsync(ct);
     }
 }

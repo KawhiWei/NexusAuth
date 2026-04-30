@@ -1,5 +1,6 @@
 using Luck.DDD.Domain.Domain.AggregateRoots;
 using System.Linq;
+using NexusAuth.Domain.Entities;
 
 namespace NexusAuth.Domain.AggregateRoots.OAuthClients;
 
@@ -15,21 +16,23 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
 
     public string ClientId { get; private set; } = default!;
 
-    public List<OAuthClientSecret> ClientSecrets { get; private set; } = new();
+    public List<OAuthClientSecret> ClientSecrets { get; private set; } = [];
 
-    public string TokenEndpointAuthMethod { get; private set; } = TokenEndpointAuthMethodClientSecretBasic;
+    public List<string> TokenEndpointAuthMethods { get; private set; } = [TokenEndpointAuthMethodClientSecretBasic];
+
+    public string TokenEndpointAuthMethod => TokenEndpointAuthMethods.FirstOrDefault() ?? TokenEndpointAuthMethodClientSecretBasic;
 
     public string ClientName { get; private set; } = default!;
 
     public string? Description { get; private set; }
 
-    public List<string> RedirectUris { get; private set; } = new();
+    public List<string> RedirectUris { get; private set; } = [];
 
-    public List<string> PostLogoutRedirectUris { get; private set; } = new();
+    public List<string> PostLogoutRedirectUris { get; private set; } = [];
 
-    public List<string> AllowedScopes { get; private set; } = new();
+    public List<string> AllowedScopes { get; private set; } = [];
 
-    public List<string> AllowedGrantTypes { get; private set; } = new();
+    public List<string> AllowedGrantTypes { get; private set; } = [];
 
     public bool RequirePkce { get; private set; }
 
@@ -45,6 +48,45 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
     }
 
     public static OAuthClient Create(
+        Guid id,
+        string clientId,
+        string clientName,
+        string? description = null,
+        IEnumerable<string>? redirectUris = null,
+        IEnumerable<string>? postLogoutRedirectUris = null,
+        IEnumerable<string>? allowedScopes = null,
+        IEnumerable<string>? allowedGrantTypes = null,
+        bool requirePkce = true,
+        IEnumerable<string>? tokenEndpointAuthMethods = null,
+        IEnumerable<OAuthClientSecret>? clientSecrets = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientName);
+
+        var normalizedSecrets = clientSecrets?.ToList() ?? [];
+        var normalizedAuthMethods = NormalizeTokenEndpointAuthMethods(tokenEndpointAuthMethods);
+        ValidateTokenEndpointAuthentication(normalizedAuthMethods, normalizedSecrets);
+
+        var client = new OAuthClient(id)
+        {
+            ClientId = clientId,
+            ClientSecrets = normalizedSecrets,
+            TokenEndpointAuthMethods = normalizedAuthMethods,
+            ClientName = clientName,
+            Description = description,
+            RedirectUris = redirectUris?.ToList() ?? [],
+            PostLogoutRedirectUris = postLogoutRedirectUris?.ToList() ?? [],
+            AllowedScopes = allowedScopes?.ToList() ?? [],
+            AllowedGrantTypes = allowedGrantTypes?.ToList() ?? [],
+            RequirePkce = requirePkce,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+        return client;
+    }
+
+    public static OAuthClient Create(
         string clientId,
         string clientName,
         string? description = null,
@@ -56,29 +98,44 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
         string tokenEndpointAuthMethod = TokenEndpointAuthMethodClientSecretBasic,
         IEnumerable<OAuthClientSecret>? clientSecrets = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(clientName);
+        return Create(
+            Guid.NewGuid(),
+            clientId,
+            clientName,
+            description,
+            redirectUris,
+            postLogoutRedirectUris,
+            allowedScopes,
+            allowedGrantTypes,
+            requirePkce,
+            [tokenEndpointAuthMethod],
+            clientSecrets);
+    }
 
-        var normalizedSecrets = clientSecrets?.ToList() ?? new List<OAuthClientSecret>();
-        ValidateTokenEndpointAuthentication(tokenEndpointAuthMethod, normalizedSecrets);
-
-        var client = new OAuthClient(Guid.NewGuid())
-        {
-            ClientId = clientId,
-            ClientSecrets = normalizedSecrets,
-            TokenEndpointAuthMethod = tokenEndpointAuthMethod,
-            ClientName = clientName,
-            Description = description,
-            RedirectUris = redirectUris?.ToList() ?? new List<string>(),
-            PostLogoutRedirectUris = postLogoutRedirectUris?.ToList() ?? new List<string>(),
-            AllowedScopes = allowedScopes?.ToList() ?? new List<string>(),
-            AllowedGrantTypes = allowedGrantTypes?.ToList() ?? new List<string>(),
-            RequirePkce = requirePkce,
-            IsActive = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-        };
-
-        return client;
+    public static OAuthClient Create(
+        string clientId,
+        string clientName,
+        string? description = null,
+        IEnumerable<string>? redirectUris = null,
+        IEnumerable<string>? postLogoutRedirectUris = null,
+        IEnumerable<string>? allowedScopes = null,
+        IEnumerable<string>? allowedGrantTypes = null,
+        bool requirePkce = true,
+        IEnumerable<string>? tokenEndpointAuthMethods = null,
+        IEnumerable<OAuthClientSecret>? clientSecrets = null)
+    {
+        return Create(
+            Guid.NewGuid(),
+            clientId,
+            clientName,
+            description,
+            redirectUris,
+            postLogoutRedirectUris,
+            allowedScopes,
+            allowedGrantTypes,
+            requirePkce,
+            tokenEndpointAuthMethods,
+            clientSecrets);
     }
 
     public bool VerifyClientSecret(string rawSecret)
@@ -93,19 +150,26 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
     public string? GetJwks()
     {
         return ClientSecrets
-            .FirstOrDefault(secret => string.Equals(secret.Type, OAuthClientSecret.TypeJwks, StringComparison.Ordinal))
+            .FirstOrDefault(secret => secret.IsActive && string.Equals(secret.Type, OAuthClientSecret.TypeJwks, StringComparison.Ordinal))
             ?.Value;
+    }
+
+    public IReadOnlyList<string> GetJwksValues()
+    {
+        return [.. ClientSecrets
+            .Where(secret => secret.IsActive && string.Equals(secret.Type, OAuthClientSecret.TypeJwks, StringComparison.Ordinal))
+            .Select(secret => secret.Value)];
     }
 
     public bool RequiresPrivateKeyJwtAuthentication()
     {
-        return string.Equals(TokenEndpointAuthMethod, TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal);
+        return TokenEndpointAuthMethods.Contains(TokenEndpointAuthMethodPrivateKeyJwt, StringComparer.Ordinal);
     }
 
     public bool AllowsClientSecretAuthentication()
     {
-        return string.Equals(TokenEndpointAuthMethod, TokenEndpointAuthMethodClientSecretBasic, StringComparison.Ordinal)
-            || string.Equals(TokenEndpointAuthMethod, TokenEndpointAuthMethodClientSecretPost, StringComparison.Ordinal);
+        return TokenEndpointAuthMethods.Contains(TokenEndpointAuthMethodClientSecretBasic, StringComparer.Ordinal)
+            || TokenEndpointAuthMethods.Contains(TokenEndpointAuthMethodClientSecretPost, StringComparer.Ordinal);
     }
 
     public bool IsValidRedirectUri(string uri)
@@ -136,6 +200,7 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
         IEnumerable<string>? allowedGrantTypes = null,
         bool? requirePkce = null,
         bool? isActive = null,
+        IEnumerable<string>? tokenEndpointAuthMethods = null,
         IEnumerable<OAuthClientSecret>? clientSecrets = null)
     {
         if (!string.IsNullOrWhiteSpace(clientName))
@@ -145,47 +210,60 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
             Description = description;
         
         if (redirectUris is { })
-            RedirectUris = redirectUris.ToList();
+            RedirectUris = [.. redirectUris];
         
         if (postLogoutRedirectUris is { })
-            PostLogoutRedirectUris = postLogoutRedirectUris.ToList();
+            PostLogoutRedirectUris = [.. postLogoutRedirectUris];
         
         if (allowedScopes is { })
-            AllowedScopes = allowedScopes.ToList();
+            AllowedScopes = [.. allowedScopes];
         
         if (allowedGrantTypes is { })
-            AllowedGrantTypes = allowedGrantTypes.ToList();
+            AllowedGrantTypes = [.. allowedGrantTypes];
         
         if (requirePkce is { } requirePkceValue)
             RequirePkce = requirePkceValue;
         
         if (isActive is { } isActiveValue)
             IsActive = isActiveValue;
+
+        if (tokenEndpointAuthMethods is { })
+            TokenEndpointAuthMethods = NormalizeTokenEndpointAuthMethods(tokenEndpointAuthMethods);
         
         if (clientSecrets is { } secrets)
-            ClientSecrets = secrets.ToList();
+            ClientSecrets.AddRange(secrets);
+
+        ValidateTokenEndpointAuthentication(TokenEndpointAuthMethods, ClientSecrets);
+    }
+
+    public bool AllowsTokenEndpointAuthMethod(string tokenEndpointAuthMethod)
+    {
+        return TokenEndpointAuthMethods.Contains(tokenEndpointAuthMethod, StringComparer.Ordinal);
+    }
+
+    private static List<string> NormalizeTokenEndpointAuthMethods(IEnumerable<string>? tokenEndpointAuthMethods)
+    {
+        var methods = tokenEndpointAuthMethods?
+            .Where(method => !string.IsNullOrWhiteSpace(method))
+            .Select(method => method.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToList() ?? [];
+
+        return methods.Count == 0 ? [TokenEndpointAuthMethodClientSecretBasic] : methods;
     }
 
     private static void ValidateTokenEndpointAuthentication(
-        string tokenEndpointAuthMethod,
+        IReadOnlyCollection<string> tokenEndpointAuthMethods,
         IReadOnlyCollection<OAuthClientSecret> clientSecrets)
     {
-        if (!string.Equals(tokenEndpointAuthMethod, TokenEndpointAuthMethodClientSecretBasic, StringComparison.Ordinal)
-            && !string.Equals(tokenEndpointAuthMethod, TokenEndpointAuthMethodClientSecretPost, StringComparison.Ordinal)
-            && !string.Equals(tokenEndpointAuthMethod, TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal))
+        foreach (var tokenEndpointAuthMethod in tokenEndpointAuthMethods)
         {
-            throw new InvalidOperationException($"Unsupported token_endpoint_auth_method '{tokenEndpointAuthMethod}'.");
+            if (!string.Equals(tokenEndpointAuthMethod, TokenEndpointAuthMethodClientSecretBasic, StringComparison.Ordinal)
+                && !string.Equals(tokenEndpointAuthMethod, TokenEndpointAuthMethodClientSecretPost, StringComparison.Ordinal)
+                && !string.Equals(tokenEndpointAuthMethod, TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException($"Unsupported token_endpoint_auth_method '{tokenEndpointAuthMethod}'.");
+            }
         }
-
-        if (string.Equals(tokenEndpointAuthMethod, TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal))
-        {
-            if (!clientSecrets.Any(secret => string.Equals(secret.Type, OAuthClientSecret.TypeJwks, StringComparison.Ordinal)))
-                throw new InvalidOperationException("jwks is required for private_key_jwt clients.");
-
-            return;
-        }
-
-        if (!clientSecrets.Any(secret => string.Equals(secret.Type, OAuthClientSecret.TypeSharedSecret, StringComparison.Ordinal)))
-            throw new InvalidOperationException($"shared_secret is required for {tokenEndpointAuthMethod} clients.");
     }
 }

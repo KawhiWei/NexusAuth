@@ -21,18 +21,11 @@ ON CONFLICT (name) DO UPDATE SET
 -- ============================================================
 -- OAuth Client: NexusAuth.Workbench (参考 demo-bff-secret 格式)
 -- ============================================================
-INSERT INTO oauth_clients (id, client_id, client_secrets, token_endpoint_auth_method, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
+INSERT INTO oauth_clients (id, client_id, token_endpoint_auth_methods, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
 VALUES (
     'a9846c33-0147-44a8-b0be-fc2ddfccd732',
     'NexusAuth.Workbench',
-    jsonb_build_array(
-        jsonb_build_object(
-            'Type', 'shared_secret',
-            'Value', '$2a$12$vOC8fSO5ti5eIJ1Hl5in.OjL3ZxP99yUf5nVHWBwN26aaa9/P7nm2',
-            'Description', 'Client secret (c57cf0e110c54ad2ac5591b99801b852)'
-        )
-    ),
-    'client_secret_basic',
+    '["client_secret_basic"]',
     'NexusAuth Workbench',
     'NexusAuth Workbench Dashboard and API (client_secret_basic)',
     '["http://localhost:5051/signin-oidc"]',
@@ -44,13 +37,28 @@ VALUES (
     NOW()
 )
 ON CONFLICT (client_id) DO UPDATE SET
-    client_secrets = EXCLUDED.client_secrets,
-    token_endpoint_auth_method = EXCLUDED.token_endpoint_auth_method,
+    token_endpoint_auth_methods = EXCLUDED.token_endpoint_auth_methods,
     redirect_uris = EXCLUDED.redirect_uris,
     post_logout_redirect_uris = EXCLUDED.post_logout_redirect_uris,
     allowed_scopes = EXCLUDED.allowed_scopes,
     allowed_grant_types = EXCLUDED.allowed_grant_types,
     require_pkce = EXCLUDED.require_pkce,
+    is_active = EXCLUDED.is_active;
+
+INSERT INTO oauth_client_secrets (id, client_id, type, value, description, is_active, created_at, key_id)
+VALUES (
+    'a8dc73d9-253c-4945-b096-8933e8d557ec',
+    'a9846c33-0147-44a8-b0be-fc2ddfccd732',
+    'shared_secret',
+    '$2a$12$vOC8fSO5ti5eIJ1Hl5in.OjL3ZxP99yUf5nVHWBwN26aaa9/P7nm2',
+    'Client secret (c57cf0e110c54ad2ac5591b99801b852)',
+    true,
+    NOW(),
+    NULL
+)
+ON CONFLICT (id) DO UPDATE SET
+    value = EXCLUDED.value,
+    description = EXCLUDED.description,
     is_active = EXCLUDED.is_active;
 
 -- ============================================================

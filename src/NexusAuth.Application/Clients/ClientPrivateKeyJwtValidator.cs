@@ -30,27 +30,27 @@ public static class ClientPrivateKeyJwtValidator
         if (!string.Equals(unvalidatedToken.Header.Alg, SupportedAssertionAlgorithm, StringComparison.Ordinal))
             return ClientAssertionValidationResult.Failure($"client_assertion alg must be {SupportedAssertionAlgorithm}.");
 
-        var clientJwksJson = client.GetJwks();
-        if (string.IsNullOrWhiteSpace(clientJwksJson))
+        var clientJwksValues = client.GetJwksValues();
+        if (clientJwksValues.Count == 0)
             return ClientAssertionValidationResult.Failure("Client JWK set is missing.");
 
-        JsonWebKeySet jwkSet;
+        List<JsonWebKey> keys;
         try
         {
-            jwkSet = new JsonWebKeySet(clientJwksJson);
+            keys = [.. clientJwksValues.SelectMany(value => new JsonWebKeySet(value).Keys)];
         }
         catch (JsonException)
         {
             return ClientAssertionValidationResult.Failure("Client JWK set format is invalid.");
         }
 
-        if (jwkSet.Keys.Count == 0)
+        if (keys.Count == 0)
             return ClientAssertionValidationResult.Failure("Client JWK set does not contain any key.");
 
         var validationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            IssuerSigningKeys = ResolveSigningKeys(jwkSet),
+            IssuerSigningKeys = ResolveSigningKeys(keys),
             ValidateIssuer = true,
             ValidIssuer = client.ClientId,
             ValidateAudience = true,
@@ -89,11 +89,11 @@ public static class ClientPrivateKeyJwtValidator
         }
     }
 
-    private static IReadOnlyList<SecurityKey> ResolveSigningKeys(JsonWebKeySet jwkSet)
+    private static IReadOnlyList<SecurityKey> ResolveSigningKeys(IEnumerable<JsonWebKey> jwks)
     {
         var keys = new List<SecurityKey>();
 
-        foreach (var key in jwkSet.Keys)
+        foreach (var key in jwks)
         {
             if (!string.Equals(key.Kty, "RSA", StringComparison.OrdinalIgnoreCase))
                 continue;

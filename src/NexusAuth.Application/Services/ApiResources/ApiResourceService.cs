@@ -9,7 +9,7 @@ public class ApiResourceService(
     public async Task<List<ApiResourceDto>> GetAllAsync(string? keyword = null, bool? isActive = null, CancellationToken ct = default)
     {
         var (resources, _) = await apiResourceRepository.GetPagedAsync(keyword, isActive, 1, int.MaxValue, ct);
-        return resources.Select(MapDto).ToList();
+        return [.. resources.Select(MapDto)];
     }
 
     public async Task<PagedResult<ApiResourceDto>> GetPagedAsync(
@@ -22,7 +22,7 @@ public class ApiResourceService(
         var normalizedPage = Math.Max(1, page);
         var normalizedPageSize = NormalizePageSize(pageSize);
         var (resources, total) = await apiResourceRepository.GetPagedAsync(keyword, isActive, normalizedPage, normalizedPageSize, ct);
-        return new PagedResult<ApiResourceDto>(resources.Select(MapDto).ToList(), total, normalizedPage, normalizedPageSize);
+        return new PagedResult<ApiResourceDto>([.. resources.Select(MapDto)], total, normalizedPage, normalizedPageSize);
     }
 
     public async Task<ApiResourceDto?> GetByIdAsync(Guid id, CancellationToken ct = default)

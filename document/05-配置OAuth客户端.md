@@ -37,18 +37,11 @@ ON CONFLICT (name) DO UPDATE SET
 -- ============================================================
 -- OAuth Client 配置
 -- ============================================================
-INSERT INTO oauth_clients (id, client_id, client_secrets, token_endpoint_auth_method, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
+INSERT INTO oauth_clients (id, client_id, token_endpoint_auth_methods, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
 VALUES (
     '20000000-0000-0000-0000-000000000201',
     'NexusAuth.Workbench',  -- ClientId
-    jsonb_build_array(
-        jsonb_build_object(
-            'Type', 'shared_secret',
-            'Value', '$2a$12$...',  -- BCrypt 加密的密钥
-            'Description', 'Workbench client secret'
-        )
-    ),
-    'client_secret_basic',  -- 认证方式: client_secret_basic 或 none
+    '["client_secret_basic"]',  -- 认证方式，可多选
     'NexusAuth Workbench',
     'NexusAuth Workbench Dashboard and API',
     '["http://localhost:5051/signin-oidc"]',  -- 回调地址
@@ -60,7 +53,19 @@ VALUES (
     NOW()
 )
 ON CONFLICT (client_id) DO UPDATE SET
-    client_secrets = EXCLUDED.client_secrets;
+    token_endpoint_auth_methods = EXCLUDED.token_endpoint_auth_methods;
+
+INSERT INTO oauth_client_secrets (id, client_id, type, value, description, is_active, created_at, key_id)
+VALUES (
+    '21000000-0000-0000-0000-000000000201',
+    '20000000-0000-0000-0000-000000000201',
+    'shared_secret',
+    '$2a$12$...',  -- BCrypt 加密的密钥
+    'Workbench client secret',
+    true,
+    NOW(),
+    NULL
+);
 
 -- ============================================================
 -- Client API Resource Mapping
@@ -84,8 +89,7 @@ psql -U nexusauth -d nexusauth -f NexusAuth.Workbench/NexusAuth.Workbench.Api/se
 | 字段 | 必填 | 说明 |
 |------|------|------|
 | client_id | 是 | 客户端唯一标识 |
-| client_secrets | 否 | 客户端密钥（JSON 数组） |
-| token_endpoint_auth_method | 是 | 认证方式：none, client_secret_basic, client_secret_post, private_key_jwt |
+| token_endpoint_auth_methods | 是 | 认证方式（JSON 数组）：client_secret_basic, client_secret_post, private_key_jwt |
 | client_name | 是 | 客户端显示名称 |
 | redirect_uris | 是 | 授权回调地址（JSON 数组） |
 | post_logout_redirect_uris | 否 | 登出回调地址（JSON 数组） |

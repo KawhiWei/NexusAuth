@@ -1,4 +1,5 @@
 using NexusAuth.Application;
+using NexusAuth.Domain.Entities;
 
 namespace NexusAuth.Application.Clients;
 
@@ -69,9 +70,13 @@ public interface IClientService : IScopedDependency
 
     Task<ClientDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
 
-    Task<OAuthClient> CreateAsync(CreateClientRequest request, CancellationToken ct = default);
+    Task<ClientDto> CreateAsync(CreateClientRequest request, CancellationToken ct = default);
 
-    Task<OAuthClient> UpdateAsync(Guid id, UpdateClientRequest request, CancellationToken ct = default);
+    Task<ClientDto> UpdateAsync(Guid id, UpdateClientRequest request, CancellationToken ct = default);
+
+    Task<ClientMutationResultDto> GenerateCredentialAsync(Guid id, GenerateClientCredentialRequest request, CancellationToken ct = default);
+
+    Task<ClientMutationResultDto> ResetCredentialAsync(Guid id, GenerateClientCredentialRequest request, CancellationToken ct = default);
 
     Task DeleteAsync(Guid id, CancellationToken ct = default);
 
@@ -83,7 +88,8 @@ public record ClientAuthenticationInput(
     string? ClientSecret,
     string? ClientAssertionType,
     string? ClientAssertion,
-    string? AssertionAudience = null);
+    string? AssertionAudience = null,
+    string? TokenEndpointAuthMethod = null);
 
 public record ClientValidationResult(
     bool IsSuccess,
@@ -132,8 +138,8 @@ public record CreateClientRequest(
     List<string>? AllowedScopes,
     List<string>? AllowedGrantTypes,
     bool RequirePkce,
-    string TokenEndpointAuthMethod,
-    List<ClientSecretInput>? ClientSecrets,
+    string? TokenEndpointAuthMethod,
+    List<string>? TokenEndpointAuthMethods,
     List<Guid>? ApiResourceIds);
 
 public record UpdateClientRequest(
@@ -144,19 +150,21 @@ public record UpdateClientRequest(
     List<string>? AllowedScopes,
     List<string>? AllowedGrantTypes,
     bool? RequirePkce,
+    string? TokenEndpointAuthMethod,
+    List<string>? TokenEndpointAuthMethods,
     bool? IsActive,
-    List<ClientSecretInput>? ClientSecrets,
     List<Guid>? ApiResourceIds);
 
-public record ClientSecretInput(
-    string Value,
-    string? Description);
+public record GenerateClientCredentialRequest(
+    string? TokenEndpointAuthMethod = null,
+    string? Description = null);
 
 public record ClientDto(
     Guid Id,
     string ClientId,
-    List<OAuthClientSecret> ClientSecrets,
+    List<ClientCredentialDto> Credentials,
     string TokenEndpointAuthMethod,
+    List<string> TokenEndpointAuthMethods,
     string ClientName,
     string? Description,
     List<string> RedirectUris,
@@ -167,3 +175,18 @@ public record ClientDto(
     bool IsActive,
     DateTimeOffset CreatedAt,
     List<Guid> ApiResourceIds);
+
+public record ClientCredentialDto(
+    Guid Id,
+    string Type,
+    bool IsActive,
+    DateTimeOffset CreatedAt);
+
+public record GeneratedClientCredentialDto(
+    string Type,
+    string? ClientSecret,
+    string? Description);
+
+public record ClientMutationResultDto(
+    ClientDto Client,
+    GeneratedClientCredentialDto? GeneratedCredential);

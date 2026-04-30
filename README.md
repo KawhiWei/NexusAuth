@@ -117,8 +117,9 @@ Demo 详细文档移至 [document/10-Demo示例详解.md](./document/10-Demo示�
 ### Demo 环境
 
 ```bash
-psql -U nexusauth -d nexusauth -f demo/schema.sql
+psql -U nexusauth -f production-init.sql
 psql -U nexusauth -d nexusauth -f demo/seed.sql
+psql -U nexusauth -d nexusauth -f NexusAuth.Workbench/NexusAuth.Workbench.Api/seed.sql
 ```
 
 测试账号：`alice / Pass@123`、`bob / Pass@123`、`admin / Pass@123`
@@ -126,7 +127,7 @@ psql -U nexusauth -d nexusauth -f demo/seed.sql
 ### 生产环境
 
 ```bash
-psql -U nexusauth -d nexusauth -f production-init.sql
+psql -U nexusauth -f production-init.sql
 ```
 
 ## 启动服务

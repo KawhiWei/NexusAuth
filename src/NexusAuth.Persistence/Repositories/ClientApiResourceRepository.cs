@@ -46,7 +46,7 @@ public class ClientApiResourceRepository(IUnitOfWork unitOfWork) : IClientApiRes
 
     public async Task AddAsync(ClientApiResource association, CancellationToken ct = default)
     {
-        await _dbContext.Set<ClientApiResource>().AddAsync(association, ct);
+        _dbContext.Add(association);
         await _dbContext.SaveChangesAsync(ct);
     }
 

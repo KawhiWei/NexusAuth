@@ -6,14 +6,20 @@ using NexusAuth.Application.Services;
 namespace NexusAuth.Host.Controllers;
 
 [ApiController]
-public class OpenIdController : ControllerBase
+public class OpenIdController(
+    ITokenSigningCredentialsProvider signingCredentialsProvider,
+    ITokenService tokenService,
+    IUserService userService,
+    IClientService clientService,
+    IDeviceAuthorizationService deviceAuthorizationService,
+    IOptions<JwtOptions> jwtOptions) : ControllerBase
 {
-    private readonly ITokenSigningCredentialsProvider _signingCredentialsProvider;
-    private readonly ITokenService _tokenService;
-    private readonly IUserService _userService;
-    private readonly IClientService _clientService;
-    private readonly IDeviceAuthorizationService _deviceAuthorizationService;
-    private readonly JwtOptions _jwtOptions;
+    private readonly ITokenSigningCredentialsProvider _signingCredentialsProvider = signingCredentialsProvider;
+    private readonly ITokenService _tokenService = tokenService;
+    private readonly IUserService _userService = userService;
+    private readonly IClientService _clientService = clientService;
+    private readonly IDeviceAuthorizationService _deviceAuthorizationService = deviceAuthorizationService;
+    private readonly JwtOptions _jwtOptions = jwtOptions.Value;
     private static readonly HashSet<string> BaseUserInfoClaims =
     [
         "sub",
@@ -24,22 +30,6 @@ public class OpenIdController : ControllerBase
         "email_verified",
         "phone_number_verified",
     ];
-
-    public OpenIdController(
-        ITokenSigningCredentialsProvider signingCredentialsProvider,
-        ITokenService tokenService,
-        IUserService userService,
-        IClientService clientService,
-        IDeviceAuthorizationService deviceAuthorizationService,
-        IOptions<JwtOptions> jwtOptions)
-    {
-        _signingCredentialsProvider = signingCredentialsProvider;
-        _tokenService = tokenService;
-        _userService = userService;
-        _clientService = clientService;
-        _deviceAuthorizationService = deviceAuthorizationService;
-        _jwtOptions = jwtOptions.Value;
-    }
 
     /// <summary>
     /// OIDC Discovery 元数据端点。

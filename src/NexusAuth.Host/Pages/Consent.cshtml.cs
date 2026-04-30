@@ -4,14 +4,9 @@ using NexusAuth.Application.Services;
 
 namespace NexusAuth.Host.Pages;
 
-public class ConsentModel : PageModel
+public class ConsentModel(IAuthorizationService authorizationService) : PageModel
 {
-    private readonly IAuthorizationService _authorizationService;
-
-    public ConsentModel(IAuthorizationService authorizationService)
-    {
-        _authorizationService = authorizationService;
-    }
+    private readonly IAuthorizationService _authorizationService = authorizationService;
 
     [BindProperty(SupportsGet = true, Name = "client_id")]
     public string ClientId { get; set; } = string.Empty;
@@ -91,9 +86,7 @@ public class ConsentModel : PageModel
 
     private void BindDisplayItems()
     {
-        ScopeItems = Scope
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .ToArray();
+        ScopeItems = [.. Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
 
         ClaimItems = ExtractClaimItems(Claims);
     }
@@ -104,12 +97,11 @@ public class ConsentModel : PageModel
             return [];
 
         var requestedClaims = _authorizationService.ParseRequestedClaims(claimsJson);
-        return requestedClaims.IdTokenClaimRequests
+        return [.. requestedClaims.IdTokenClaimRequests
             .Concat(requestedClaims.UserInfoClaimRequests)
             .Select(kvp => BuildClaimDisplayText(kvp.Key, kvp.Value))
             .Distinct(StringComparer.Ordinal)
-            .OrderBy(value => value, StringComparer.Ordinal)
-            .ToArray();
+            .OrderBy(value => value, StringComparer.Ordinal)];
     }
 
     private static string BuildClaimDisplayText(string claimName, OidcClaimRequest request)

@@ -19,7 +19,7 @@ public class RefreshTokenRepository(IUnitOfWork unitOfWork) : EfCoreEntityReposi
 
     public async Task AddAsync(RefreshToken token, CancellationToken ct = default)
     {
-        await _dbContext.Set<RefreshToken>().AddAsync(token, ct);
+        _dbContext.Add(token);
         await unitOfWork.CommitAsync(ct);
     }
 
@@ -36,13 +36,13 @@ public class RefreshTokenRepository(IUnitOfWork unitOfWork) : EfCoreEntityReposi
     public async Task RevokeAllForUserAsync(Guid userId, CancellationToken ct = default)
     {
         var tokens = await FindAll(r => r.UserId == userId && !r.IsRevoked)
-            .ToListAsync();
+            .ToListAsync(cancellationToken: ct);
 
         foreach (var token in tokens)
         {
             token.Revoke();
         }
 
-        await unitOfWork.CommitAsync();
+        await unitOfWork.CommitAsync(ct);
     }
 }

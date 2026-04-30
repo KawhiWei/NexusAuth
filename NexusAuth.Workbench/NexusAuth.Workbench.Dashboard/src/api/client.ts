@@ -1,10 +1,5 @@
 import request from './request';
 
-export type ClientSecretInput = {
-  value: string;
-  description?: string;
-};
-
 export type CreateClientRequest = {
   clientId: string;
   clientName: string;
@@ -14,8 +9,8 @@ export type CreateClientRequest = {
   allowedScopes?: string[];
   allowedGrantTypes?: string[];
   requirePkce: boolean;
-  tokenEndpointAuthMethod: string;
-  clientSecrets?: ClientSecretInput[];
+  tokenEndpointAuthMethod?: string;
+  tokenEndpointAuthMethods?: string[];
   apiResourceIds?: string[];
 };
 
@@ -27,9 +22,33 @@ export type UpdateClientRequest = {
   allowedScopes?: string[];
   allowedGrantTypes?: string[];
   requirePkce?: boolean;
+  tokenEndpointAuthMethod?: string;
+  tokenEndpointAuthMethods?: string[];
   isActive?: boolean;
-  clientSecrets?: ClientSecretInput[];
   apiResourceIds?: string[];
+};
+
+export type GenerateClientCredentialRequest = {
+  tokenEndpointAuthMethod?: string;
+  description?: string;
+};
+
+export type ClientCredential = {
+  id: string;
+  type: string;
+  isActive: boolean;
+  createdAt: string;
+};
+
+export type GeneratedClientCredential = {
+  type: string;
+  clientSecret?: string;
+  description?: string;
+};
+
+export type ClientMutationResult = {
+  client: Client;
+  generatedCredential?: GeneratedClientCredential;
 };
 
 export type Client = {
@@ -44,7 +63,8 @@ export type Client = {
   requirePkce: boolean;
   isActive: boolean;
   tokenEndpointAuthMethod: string;
-  clientSecrets: ClientSecretInput[];
+  tokenEndpointAuthMethods: string[];
+  credentials: ClientCredential[];
   createdAt: string;
   apiResourceIds?: string[];
 };
@@ -91,6 +111,14 @@ export const createClient = (data: CreateClientRequest): Promise<Client> => {
 
 export const updateClient = (id: string, data: UpdateClientRequest): Promise<Client> => {
   return request.put<Client>(`/clients/${id}`, data);
+};
+
+export const generateClientCredential = (id: string, data: GenerateClientCredentialRequest = {}): Promise<ClientMutationResult> => {
+  return request.post<ClientMutationResult>(`/clients/${id}/credentials`, data);
+};
+
+export const resetClientCredential = (id: string, data: GenerateClientCredentialRequest = {}): Promise<ClientMutationResult> => {
+  return request.post<ClientMutationResult>(`/clients/${id}/credentials/reset`, data);
 };
 
 export const deleteClient = (id: string): Promise<void> => {

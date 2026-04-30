@@ -5,27 +5,18 @@ using NexusAuth.Application.Services;
 namespace NexusAuth.Host.Controllers;
 
 [ApiController]
-public class TokenController : ControllerBase
+public class TokenController(
+    IAuthorizationService authorizationService,
+    ITokenService tokenService,
+    IDeviceAuthorizationService deviceAuthorizationService,
+    IClientService clientService,
+    IOptions<JwtOptions> jwtOptions) : ControllerBase
 {
-    private readonly IAuthorizationService _authorizationService;
-    private readonly ITokenService _tokenService;
-    private readonly IDeviceAuthorizationService _deviceAuthorizationService;
-    private readonly IClientService _clientService;
-    private readonly JwtOptions _jwtOptions;
-
-    public TokenController(
-        IAuthorizationService authorizationService,
-        ITokenService tokenService,
-        IDeviceAuthorizationService deviceAuthorizationService,
-        IClientService clientService,
-        IOptions<JwtOptions> jwtOptions)
-    {
-        _authorizationService = authorizationService;
-        _tokenService = tokenService;
-        _deviceAuthorizationService = deviceAuthorizationService;
-        _clientService = clientService;
-        _jwtOptions = jwtOptions.Value;
-    }
+    private readonly IAuthorizationService _authorizationService = authorizationService;
+    private readonly ITokenService _tokenService = tokenService;
+    private readonly IDeviceAuthorizationService _deviceAuthorizationService = deviceAuthorizationService;
+    private readonly IClientService _clientService = clientService;
+    private readonly JwtOptions _jwtOptions = jwtOptions.Value;
 
     /// <summary>
     /// OAuth2.0 Token Endpoint.

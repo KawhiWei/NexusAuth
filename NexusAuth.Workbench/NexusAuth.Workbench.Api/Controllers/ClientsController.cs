@@ -46,15 +46,33 @@ public class ClientsController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<OAuthClient> Create([FromBody] CreateClientRequest request, CancellationToken ct = default)
+    public async Task<ClientDto> Create([FromBody] CreateClientRequest request, CancellationToken ct = default)
     {
         return await _clientService.CreateAsync(request, ct);
     }
 
     [HttpPut("{id:guid}")]
-    public async Task<OAuthClient> Update(Guid id, [FromBody] UpdateClientRequest request, CancellationToken ct = default)
+    public async Task<ClientDto> Update(Guid id, [FromBody] UpdateClientRequest request, CancellationToken ct = default)
     {
         return await _clientService.UpdateAsync(id, request, ct);
+    }
+
+    [HttpPost("{id:guid}/credentials")]
+    public async Task<ClientMutationResultDto> GenerateCredential(
+        Guid id,
+        [FromBody] GenerateClientCredentialRequest request,
+        CancellationToken ct = default)
+    {
+        return await _clientService.GenerateCredentialAsync(id, request, ct);
+    }
+
+    [HttpPost("{id:guid}/credentials/reset")]
+    public async Task<ClientMutationResultDto> ResetCredential(
+        Guid id,
+        [FromBody] GenerateClientCredentialRequest request,
+        CancellationToken ct = default)
+    {
+        return await _clientService.ResetCredentialAsync(id, request, ct);
     }
 
     [HttpDelete("{id:guid}")]

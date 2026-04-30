@@ -13,6 +13,8 @@ public class DbContext(DbContextOptions options) : LuckDbContextBase(options)
 
     public DbSet<OAuthClient> OAuthClients => Set<OAuthClient>();
 
+    public DbSet<OAuthClientSecret> OAuthClientSecrets => Set<OAuthClientSecret>();
+
     public DbSet<ApiResource> ApiResources => Set<ApiResource>();
 
     public DbSet<ClientApiResource> ClientApiResources => Set<ClientApiResource>();

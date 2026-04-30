@@ -147,11 +147,10 @@ public sealed record OidcClaimRequest(bool? Essential, string? Value, IReadOnlyL
             if (valuesElement.ValueKind != JsonValueKind.Array)
                 throw new InvalidOperationException("OIDC claim request 'values' must be an array.");
 
-            values = valuesElement.EnumerateArray()
+            values = [.. valuesElement.EnumerateArray()
                 .Select(item => item.ValueKind == JsonValueKind.String ? item.GetString() : null)
                 .Where(item => !string.IsNullOrWhiteSpace(item))
-                .Cast<string>()
-                .ToList();
+                .Cast<string>()];
         }
 
         return new OidcClaimRequest(essential, value, values);

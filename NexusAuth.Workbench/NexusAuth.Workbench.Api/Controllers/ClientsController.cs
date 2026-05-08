@@ -46,7 +46,7 @@ public class ClientsController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ClientDto> Create([FromBody] CreateClientRequest request, CancellationToken ct = default)
+    public async Task<ClientMutationResultDto> Create([FromBody] CreateClientRequest request, CancellationToken ct = default)
     {
         return await _clientService.CreateAsync(request, ct);
     }

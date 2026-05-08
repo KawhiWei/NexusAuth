@@ -70,7 +70,7 @@ public interface IClientService : IScopedDependency
 
     Task<ClientDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
 
-    Task<ClientDto> CreateAsync(CreateClientRequest request, CancellationToken ct = default);
+    Task<ClientMutationResultDto> CreateAsync(CreateClientRequest request, CancellationToken ct = default);
 
     Task<ClientDto> UpdateAsync(Guid id, UpdateClientRequest request, CancellationToken ct = default);
 
@@ -139,8 +139,10 @@ public record CreateClientRequest(
     List<string>? AllowedGrantTypes,
     bool RequirePkce,
     string? TokenEndpointAuthMethod,
-    List<string>? TokenEndpointAuthMethods,
-    List<Guid>? ApiResourceIds);
+    bool? AutoGenerateJwks,
+    string? Jwks,
+    string? JwksUri,
+    List<Guid>? ApiResourceIds = null);
 
 public record UpdateClientRequest(
     string? ClientName,
@@ -151,12 +153,14 @@ public record UpdateClientRequest(
     List<string>? AllowedGrantTypes,
     bool? RequirePkce,
     string? TokenEndpointAuthMethod,
-    List<string>? TokenEndpointAuthMethods,
+    string? Jwks,
+    string? JwksUri,
     bool? IsActive,
-    List<Guid>? ApiResourceIds);
+    List<Guid>? ApiResourceIds = null);
 
 public record GenerateClientCredentialRequest(
     string? TokenEndpointAuthMethod = null,
+    bool? AutoGenerateJwks = null,
     string? Description = null);
 
 public record ClientDto(
@@ -164,7 +168,8 @@ public record ClientDto(
     string ClientId,
     List<ClientCredentialDto> Credentials,
     string TokenEndpointAuthMethod,
-    List<string> TokenEndpointAuthMethods,
+    string? Jwks,
+    string? JwksUri,
     string ClientName,
     string? Description,
     List<string> RedirectUris,
@@ -173,8 +178,7 @@ public record ClientDto(
     List<string> AllowedGrantTypes,
     bool RequirePkce,
     bool IsActive,
-    DateTimeOffset CreatedAt,
-    List<Guid> ApiResourceIds);
+    DateTimeOffset CreatedAt);
 
 public record ClientCredentialDto(
     Guid Id,
@@ -185,6 +189,8 @@ public record ClientCredentialDto(
 public record GeneratedClientCredentialDto(
     string Type,
     string? ClientSecret,
+    string? PrivateKeyPem,
+    string? Jwks,
     string? Description);
 
 public record ClientMutationResultDto(

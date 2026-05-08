@@ -1,26 +1,13 @@
 namespace NexusAuth.Application.Clients;
 
-public class ClientMetadataService(IApiResourceRepository apiResourceRepository) : IClientMetadataService
+public class ClientMetadataService : IClientMetadataService
 {
-    public async Task<ClientMetadataDto> GetAsync(CancellationToken ct = default)
+    public Task<ClientMetadataDto> GetAsync(CancellationToken ct = default)
     {
-        var apiResources = await apiResourceRepository.GetAllActiveAsync(ct);
-
-        var scopes = GetIdentityScopes()
-            .Concat(apiResources
-                .OrderBy(resource => resource.DisplayName)
-                .Select(resource => new ClientOptionDto(
-                    resource.Audience,
-                    $"{resource.DisplayName}（{resource.Audience}）",
-                    resource.Description ?? $"API 资源：{resource.Name}")))
-            .GroupBy(scope => scope.Value, StringComparer.Ordinal)
-            .Select(group => group.First())
-            .ToList();
-
-        return new ClientMetadataDto(
-            scopes,
+        return Task.FromResult(new ClientMetadataDto(
+            GetIdentityScopes(),
             GetGrantTypes(),
-            GetTokenEndpointAuthMethods());
+            GetTokenEndpointAuthMethods()));
     }
 
     private static List<ClientOptionDto> GetIdentityScopes()
@@ -53,6 +40,7 @@ public class ClientMetadataService(IApiResourceRepository apiResourceRepository)
         [
             new(OAuthClient.TokenEndpointAuthMethodClientSecretBasic, "Basic 密钥认证（client_secret_basic）", "通过 Authorization Basic 发送 client_id/client_secret。"),
             new(OAuthClient.TokenEndpointAuthMethodClientSecretPost, "表单密钥认证（client_secret_post）", "通过请求表单发送 client_id/client_secret。"),
+            new(OAuthClient.TokenEndpointAuthMethodClientSecretJwt, "共享密钥 JWT 认证（client_secret_jwt）", "客户端使用共享密钥签名 JWT，服务端使用已登记共享密钥验签。"),
             new(OAuthClient.TokenEndpointAuthMethodPrivateKeyJwt, "私钥 JWT 认证（private_key_jwt）", "客户端使用私钥签名 JWT，服务端使用已登记 JWKS 验签。"),
         ];
     }

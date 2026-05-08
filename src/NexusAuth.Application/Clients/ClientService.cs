@@ -72,17 +72,10 @@ public class ClientService(
         if (!requireClientAuthentication)
             return ClientAuthenticationResult.Success(client);
 
-        var requestedAuthMethod = ResolveRequestAuthMethod(input);
-
-        if (string.Equals(requestedAuthMethod, OAuthClient.TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal))
+        if (string.Equals(client.TokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal))
         {
-            if (!client.AllowsTokenEndpointAuthMethod(OAuthClient.TokenEndpointAuthMethodPrivateKeyJwt))
-                return ClientAuthenticationResult.Failure("invalid_client", "Client does not allow private_key_jwt authentication.");
-
             if (!string.Equals(input.ClientAssertionType, OAuthClient.ClientAssertionTypeJwtBearer, StringComparison.Ordinal))
-            {
                 return ClientAuthenticationResult.Failure("invalid_client", "client_assertion_type is invalid for this client.");
-            }
 
             if (string.IsNullOrWhiteSpace(input.ClientAssertion))
                 return ClientAuthenticationResult.Failure("invalid_client", "client_assertion is required.");
@@ -108,11 +101,49 @@ public class ClientService(
             return ClientAuthenticationResult.Success(client);
         }
 
+        if (string.Equals(client.TokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretJwt, StringComparison.Ordinal))
+        {
+            if (!string.Equals(input.ClientAssertionType, OAuthClient.ClientAssertionTypeJwtBearer, StringComparison.Ordinal))
+                return ClientAuthenticationResult.Failure("invalid_client", "client_assertion_type is invalid for this client.");
+
+            if (string.IsNullOrWhiteSpace(input.ClientAssertion))
+                return ClientAuthenticationResult.Failure("invalid_client", "client_assertion is required.");
+
+            if (string.IsNullOrWhiteSpace(input.AssertionAudience))
+                return ClientAuthenticationResult.Failure("invalid_client", "assertion audience is required for client_secret_jwt validation.");
+
+            var assertionValidation = ClientSecretJwtValidator.Validate(input.ClientAssertion, client, input.AssertionAudience);
+            if (!assertionValidation.IsSuccess)
+                return ClientAuthenticationResult.Failure("invalid_client", assertionValidation.Error ?? "Invalid client assertion.");
+
+            if (string.IsNullOrWhiteSpace(assertionValidation.Jti) || assertionValidation.ExpiresAt is null)
+                return ClientAuthenticationResult.Failure("invalid_client", "client_assertion metadata is incomplete.");
+
+            var replayKey = BuildClientAssertionReplayKey(client.ClientId, assertionValidation.Jti);
+            if (await tokenBlacklistRepository.ExistsActiveAsync(replayKey, DateTimeOffset.UtcNow, ct))
+                return ClientAuthenticationResult.Failure("invalid_client", "client_assertion has already been used.");
+
+            await tokenBlacklistRepository.AddAsync(
+                TokenBlacklistEntry.Create(replayKey, "client_assertion", client.ClientId, assertionValidation.ExpiresAt.Value),
+                ct);
+
+            return ClientAuthenticationResult.Success(client);
+        }
+
+        if (string.Equals(client.TokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretBasic, StringComparison.Ordinal)
+            && !string.Equals(input.TokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretBasic, StringComparison.Ordinal))
+        {
+            return ClientAuthenticationResult.Failure("invalid_client", "Client must authenticate with client_secret_basic.");
+        }
+
+        if (string.Equals(client.TokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretPost, StringComparison.Ordinal)
+            && !string.Equals(input.TokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretPost, StringComparison.Ordinal))
+        {
+            return ClientAuthenticationResult.Failure("invalid_client", "Client must authenticate with client_secret_post.");
+        }
+
         if (string.IsNullOrWhiteSpace(input.ClientSecret))
             return ClientAuthenticationResult.Failure("invalid_client", "client_secret is required.");
-
-        if (!client.AllowsTokenEndpointAuthMethod(requestedAuthMethod))
-            return ClientAuthenticationResult.Failure("invalid_client", $"Client does not allow {requestedAuthMethod} authentication.");
 
         if (!client.VerifyClientSecret(input.ClientSecret))
             return ClientAuthenticationResult.Failure("invalid_client", "Invalid client secret.");
@@ -250,9 +281,15 @@ public class ClientService(
         return client is null ? null : await MapClientAsync(client, ct);
     }
 
-    public async Task<ClientDto> CreateAsync(CreateClientRequest request, CancellationToken ct = default)
+    public async Task<ClientMutationResultDto> CreateAsync(CreateClientRequest request, CancellationToken ct = default)
     {
         var clientId = Guid.NewGuid();
+        var tokenEndpointAuthMethod = ResolveTokenEndpointAuthMethod(request.TokenEndpointAuthMethod);
+        GeneratedCredential? generatedCredential = null;
+        var requiresGeneratedJwks = string.Equals(tokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal)
+            && request.AutoGenerateJwks == true;
+
+        var initialJwks = requiresGeneratedJwks ? null : request.Jwks;
 
         var client = OAuthClient.Create(
             clientId,
@@ -264,9 +301,25 @@ public class ClientService(
             request.AllowedScopes,
             request.AllowedGrantTypes,
             request.RequirePkce,
-            ResolveTokenEndpointAuthMethods(request.TokenEndpointAuthMethods, request.TokenEndpointAuthMethod));
+            tokenEndpointAuthMethod,
+            jwks: initialJwks,
+            jwksUri: request.JwksUri);
+
+        if (requiresGeneratedJwks
+            || string.Equals(tokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretBasic, StringComparison.Ordinal)
+            || string.Equals(tokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretPost, StringComparison.Ordinal)
+            || string.Equals(tokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretJwt, StringComparison.Ordinal))
+        {
+            generatedCredential = GenerateCredential(client.Id, tokenEndpointAuthMethod, request.AutoGenerateJwks, request.Description);
+
+            if (!string.IsNullOrWhiteSpace(generatedCredential.Jwks))
+                client.SetJwks(generatedCredential.Jwks);
+        }
 
         await clientRepository.AddAsync(client, ct);
+
+        if (generatedCredential?.Secret is not null)
+            await clientSecretRepository.AddAsync(generatedCredential.Secret, ct);
 
         if (request.ApiResourceIds?.Count > 0)
         {
@@ -277,15 +330,17 @@ public class ClientService(
             }
         }
 
-        return await MapClientAsync(client, ct);
+        return new ClientMutationResultDto(
+            await MapClientAsync(client, ct),
+            generatedCredential?.Dto);
     }
 
     public async Task<ClientDto> UpdateAsync(Guid id, UpdateClientRequest request, CancellationToken ct = default)
     {
         var client = await clientRepository.GetByIdAsync(id, ct) ?? throw new InvalidOperationException($"Client with id {id} not found.");
-        var tokenEndpointAuthMethods = request.TokenEndpointAuthMethods is null && request.TokenEndpointAuthMethod is null
-            ? client.TokenEndpointAuthMethods
-            : ResolveTokenEndpointAuthMethods(request.TokenEndpointAuthMethods, request.TokenEndpointAuthMethod);
+        var tokenEndpointAuthMethod = request.TokenEndpointAuthMethod is null
+            ? client.TokenEndpointAuthMethod
+            : ResolveTokenEndpointAuthMethod(request.TokenEndpointAuthMethod);
 
         client.Update(
             request.ClientName,
@@ -296,7 +351,9 @@ public class ClientService(
             request.AllowedGrantTypes,
             request.RequirePkce,
             request.IsActive,
-            tokenEndpointAuthMethods);
+            tokenEndpointAuthMethod,
+            jwks: request.Jwks,
+            jwksUri: request.JwksUri);
 
         await clientRepository.UpdateAsync(client, ct);
 
@@ -326,8 +383,16 @@ public class ClientService(
     {
         var client = await clientRepository.GetByIdAsync(id, ct) ?? throw new InvalidOperationException($"Client with id {id} not found.");
         var tokenEndpointAuthMethod = ResolveCredentialAuthMethod(client, request.TokenEndpointAuthMethod);
-        var generatedCredential = GenerateCredential(client.Id, tokenEndpointAuthMethod, request.Description);
-        await clientSecretRepository.AddAsync(generatedCredential.Secret, ct);
+        var generatedCredential = GenerateCredential(client.Id, tokenEndpointAuthMethod, request.AutoGenerateJwks, request.Description);
+        if (generatedCredential.Secret is not null)
+        {
+            await clientSecretRepository.AddAsync(generatedCredential.Secret, ct);
+        }
+        else if (!string.IsNullOrWhiteSpace(generatedCredential.Jwks))
+        {
+            client.SetJwks(generatedCredential.Jwks);
+            await clientRepository.UpdateAsync(client, ct);
+        }
 
         client = await clientRepository.GetByIdAsync(id, ct)
             ?? throw new InvalidOperationException($"Client with id {id} not found.");
@@ -342,14 +407,17 @@ public class ClientService(
         var client = await clientRepository.GetByIdAsync(id, ct) ?? throw new InvalidOperationException($"Client with id {id} not found.");
         var tokenEndpointAuthMethod = ResolveCredentialAuthMethod(client, request.TokenEndpointAuthMethod);
         if (string.Equals(tokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal))
-            throw new InvalidOperationException("private_key_jwt does not use shared secret reset.");
+            throw new InvalidOperationException("private_key_jwt does not use shared secret reset. Update the registered JWKS instead.");
 
         foreach (var secret in client.ClientSecrets.Where(secret => secret.IsActive && string.Equals(secret.Type, OAuthClientSecret.TypeSharedSecret, StringComparison.Ordinal)))
         {
             secret.Disable();
         }
 
-        var generatedCredential = GenerateCredential(client.Id, tokenEndpointAuthMethod, request.Description);
+        var generatedCredential = GenerateCredential(client.Id, tokenEndpointAuthMethod, request.AutoGenerateJwks, request.Description);
+        if (generatedCredential.Secret is null)
+            throw new InvalidOperationException("Shared secret generation failed.");
+
         await clientSecretRepository.AddAsync(generatedCredential.Secret, ct);
 
         client = await clientRepository.GetByIdAsync(id, ct)
@@ -384,24 +452,17 @@ public class ClientService(
         return $"client_assertion:{clientId}:{assertionJti}";
     }
 
-    private static string ResolveRequestAuthMethod(ClientAuthenticationInput input)
-    {
-        if (!string.IsNullOrWhiteSpace(input.TokenEndpointAuthMethod))
-            return input.TokenEndpointAuthMethod;
-
-        if (!string.IsNullOrWhiteSpace(input.ClientAssertion) || !string.IsNullOrWhiteSpace(input.ClientAssertionType))
-            return OAuthClient.TokenEndpointAuthMethodPrivateKeyJwt;
-
-        return OAuthClient.TokenEndpointAuthMethodClientSecretPost;
-    }
-
-    private static GeneratedCredential GenerateCredential(Guid clientId, string tokenEndpointAuthMethod, string? description)
+    private static GeneratedCredential GenerateCredential(Guid clientId, string tokenEndpointAuthMethod, bool? autoGenerateJwks, string? description)
     {
         if (string.Equals(tokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal))
         {
+            if (autoGenerateJwks is false)
+                throw new InvalidOperationException("private_key_jwt credential generation only supports automatic JWKS generation.");
+
             var keyId = Guid.NewGuid().ToString("N");
             using var rsa = RSA.Create(2048);
             var parameters = rsa.ExportParameters(false);
+            var privateKeyPem = ExportPrivateKeyPem(rsa);
             var jwks = JsonSerializer.Serialize(new
             {
                 keys = new[]
@@ -418,23 +479,31 @@ public class ClientService(
                 }
             });
 
-            var secret = OAuthClientSecret.CreateJwks(clientId, jwks, description, keyId);
             var dto = new GeneratedClientCredentialDto(
-                OAuthClientSecret.TypeJwks,
+                "jwks",
                 null,
+                privateKeyPem,
+                jwks,
                 description);
 
-            return new GeneratedCredential(secret, dto);
+            return new GeneratedCredential(null, dto, jwks);
         }
 
         if (string.Equals(tokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretBasic, StringComparison.Ordinal)
-            || string.Equals(tokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretPost, StringComparison.Ordinal))
+            || string.Equals(tokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretPost, StringComparison.Ordinal)
+            || string.Equals(tokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretJwt, StringComparison.Ordinal))
         {
             var secretValue = GenerateSecretValue();
-            var secret = OAuthClientSecret.CreateSharedSecret(clientId, secretValue, description);
+            var secret = OAuthClientSecret.CreateSharedSecret(
+                clientId,
+                secretValue,
+                description,
+                persistPlainValue: string.Equals(tokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretJwt, StringComparison.Ordinal));
             var dto = new GeneratedClientCredentialDto(
                 OAuthClientSecret.TypeSharedSecret,
                 secretValue,
+                null,
+                null,
                 description);
 
             return new GeneratedCredential(secret, dto);
@@ -448,18 +517,27 @@ public class ClientService(
         return Base64UrlEncoder.Encode(RandomNumberGenerator.GetBytes(32));
     }
 
-    private static List<string> ResolveTokenEndpointAuthMethods(List<string>? tokenEndpointAuthMethods, string? tokenEndpointAuthMethod)
+    private static string ExportPrivateKeyPem(RSA rsa)
     {
-        var methods = tokenEndpointAuthMethods?
-            .Where(method => !string.IsNullOrWhiteSpace(method))
-            .Select(method => method.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .ToList() ?? [];
+        var privateKeyBytes = rsa.ExportPkcs8PrivateKey();
+        var base64 = Convert.ToBase64String(privateKeyBytes);
+        var builder = new StringBuilder();
+        builder.AppendLine("-----BEGIN PRIVATE KEY-----");
 
-        if (methods.Count == 0 && !string.IsNullOrWhiteSpace(tokenEndpointAuthMethod))
-            methods.Add(tokenEndpointAuthMethod.Trim());
+        for (var i = 0; i < base64.Length; i += 64)
+        {
+            builder.AppendLine(base64.Substring(i, Math.Min(64, base64.Length - i)));
+        }
 
-        return methods.Count == 0 ? [OAuthClient.TokenEndpointAuthMethodClientSecretBasic] : methods;
+        builder.Append("-----END PRIVATE KEY-----");
+        return builder.ToString();
+    }
+
+    private static string ResolveTokenEndpointAuthMethod(string? tokenEndpointAuthMethod)
+    {
+        return string.IsNullOrWhiteSpace(tokenEndpointAuthMethod)
+            ? OAuthClient.TokenEndpointAuthMethodClientSecretBasic
+            : tokenEndpointAuthMethod.Trim();
     }
 
     private static string ResolveCredentialAuthMethod(OAuthClient client, string? requestedMethod)
@@ -487,28 +565,23 @@ public class ClientService(
             return [];
         }
 
-        var apiResourceLookup = await clientApiResourceRepository.GetApiResourceIdsByClientIdsAsync(clientList.Select(client => client.Id), ct);
-
-        return [.. clientList.Select(client => MapClient(client, apiResourceLookup.TryGetValue(client.Id, out var apiResourceIds) ? apiResourceIds : []))];
+        return [.. clientList.Select(MapClient)];
     }
 
-    private async Task<ClientDto> MapClientAsync(OAuthClient client, CancellationToken ct)
+    private Task<ClientDto> MapClientAsync(OAuthClient client, CancellationToken ct)
     {
-        var apiResourceIds = (await clientApiResourceRepository.GetResourcesByClientIdAsync(client.Id, ct))
-            .Select(resource => resource.Id)
-            .ToList();
-
-        return MapClient(client, apiResourceIds);
+        return Task.FromResult(MapClient(client));
     }
 
-    private static ClientDto MapClient(OAuthClient client, List<Guid> apiResourceIds)
+    private static ClientDto MapClient(OAuthClient client)
     {
         return new ClientDto(
             client.Id,
             client.ClientId,
             [.. client.ClientSecrets.Select(MapCredential)],
             client.TokenEndpointAuthMethod,
-            client.TokenEndpointAuthMethods,
+            client.Jwks,
+            client.JwksUri,
             client.ClientName,
             client.Description,
             client.RedirectUris,
@@ -517,8 +590,7 @@ public class ClientService(
             client.AllowedGrantTypes,
             client.RequirePkce,
             client.IsActive,
-            client.CreatedAt,
-            apiResourceIds);
+            client.CreatedAt);
     }
 
     private static ClientCredentialDto MapCredential(OAuthClientSecret secret)
@@ -531,6 +603,7 @@ public class ClientService(
     }
 
     private sealed record GeneratedCredential(
-        OAuthClientSecret Secret,
-        GeneratedClientCredentialDto Dto);
+        OAuthClientSecret? Secret,
+        GeneratedClientCredentialDto Dto,
+        string? Jwks = null);
 }

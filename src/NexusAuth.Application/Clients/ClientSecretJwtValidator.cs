@@ -1,20 +1,14 @@
-
 namespace NexusAuth.Application.Clients;
 
-public static class ClientPrivateKeyJwtValidator
+public static class ClientSecretJwtValidator
 {
-    private const string SupportedAssertionAlgorithm = SecurityAlgorithms.RsaSha256;
+    private const string SupportedAssertionAlgorithm = SecurityAlgorithms.HmacSha256;
 
     private static readonly JwtSecurityTokenHandler Handler = new()
     {
-        // 保留 JWT 原始 claim 名称，避�?sub 被映射成 NameIdentifier 后取不到值�?
         MapInboundClaims = false,
     };
 
-    /// <summary>
-    /// 校验 private_key_jwt 客户端断言�?
-    /// 主要调用方：ClientService，在 /connect/token�?connect/revocation�?connect/introspect 等端点统一复用�?
-    /// </summary>
     public static ClientAssertionValidationResult Validate(string assertionJwt, OAuthClient client, string expectedAudience)
     {
         JwtSecurityToken unvalidatedToken;
@@ -30,26 +24,14 @@ public static class ClientPrivateKeyJwtValidator
         if (!string.Equals(unvalidatedToken.Header.Alg, SupportedAssertionAlgorithm, StringComparison.Ordinal))
             return ClientAssertionValidationResult.Failure($"client_assertion alg must be {SupportedAssertionAlgorithm}.");
 
-        if (string.IsNullOrWhiteSpace(client.Jwks))
-            return ClientAssertionValidationResult.Failure("Client JWK set is missing.");
-
-        List<JsonWebKey> keys;
-        try
-        {
-            keys = [.. new JsonWebKeySet(client.Jwks).Keys];
-        }
-        catch (JsonException)
-        {
-            return ClientAssertionValidationResult.Failure("Client JWK set format is invalid.");
-        }
-
-        if (keys.Count == 0)
-            return ClientAssertionValidationResult.Failure("Client JWK set does not contain any key.");
+        var secretValues = client.GetSharedSecretValues();
+        if (secretValues.Count == 0)
+            return ClientAssertionValidationResult.Failure("Client shared secret is missing.");
 
         var validationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            IssuerSigningKeys = ResolveSigningKeys(keys),
+            IssuerSigningKeys = [.. secretValues.Select(secret => new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)))],
             ValidateIssuer = true,
             ValidIssuer = client.ClientId,
             ValidateAudience = true,
@@ -87,52 +69,4 @@ public static class ClientPrivateKeyJwtValidator
             return ClientAssertionValidationResult.Failure($"Invalid client assertion: {ex.Message}");
         }
     }
-
-    private static IReadOnlyList<SecurityKey> ResolveSigningKeys(IEnumerable<JsonWebKey> jwks)
-    {
-        var keys = new List<SecurityKey>();
-
-        foreach (var key in jwks)
-        {
-            if (!string.Equals(key.Kty, "RSA", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            if (string.IsNullOrWhiteSpace(key.N) || string.IsNullOrWhiteSpace(key.E))
-                continue;
-
-            RSAParameters parameters;
-            try
-            {
-                parameters = new RSAParameters
-                {
-                    Modulus = Base64UrlEncoder.DecodeBytes(key.N),
-                    Exponent = Base64UrlEncoder.DecodeBytes(key.E),
-                };
-            }
-            catch (CryptographicException)
-            {
-                continue;
-            }
-
-            keys.Add(new RsaSecurityKey(parameters)
-            {
-                KeyId = string.IsNullOrWhiteSpace(key.Kid) ? null : key.Kid,
-            });
-        }
-
-        return keys;
-    }
-}
-
-public record ClientAssertionValidationResult(
-    bool IsSuccess,
-    string? Error,
-    string? Jti = null,
-    DateTimeOffset? ExpiresAt = null,
-    string? Algorithm = null)
-{
-    public static ClientAssertionValidationResult Success(string jti, DateTimeOffset expiresAt, string algorithm)
-        => new(true, null, jti, expiresAt, algorithm);
-
-    public static ClientAssertionValidationResult Failure(string error) => new(false, error);
 }

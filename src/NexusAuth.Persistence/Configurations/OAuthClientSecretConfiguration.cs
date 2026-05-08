@@ -29,6 +29,10 @@ public class OAuthClientSecretConfiguration : IEntityTypeConfiguration<OAuthClie
             .HasColumnType("text")
             .IsRequired();
 
+        builder.Property(x => x.PlainValue)
+            .HasColumnName("plain_value")
+            .HasColumnType("text");
+
         builder.Property(x => x.Description)
             .HasColumnName("description")
             .HasColumnType("text");
@@ -41,10 +45,6 @@ public class OAuthClientSecretConfiguration : IEntityTypeConfiguration<OAuthClie
         builder.Property(x => x.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
-
-        builder.Property(x => x.KeyId)
-            .HasColumnName("key_id")
-            .HasMaxLength(128);
 
         builder.HasIndex(x => x.ClientId);
         builder.HasIndex(x => new { x.ClientId, x.Type });

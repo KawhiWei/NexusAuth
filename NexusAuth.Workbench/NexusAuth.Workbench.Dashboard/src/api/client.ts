@@ -10,8 +10,9 @@ export type CreateClientRequest = {
   allowedGrantTypes?: string[];
   requirePkce: boolean;
   tokenEndpointAuthMethod?: string;
-  tokenEndpointAuthMethods?: string[];
-  apiResourceIds?: string[];
+  autoGenerateJwks?: boolean;
+  jwks?: string;
+  jwksUri?: string;
 };
 
 export type UpdateClientRequest = {
@@ -23,13 +24,14 @@ export type UpdateClientRequest = {
   allowedGrantTypes?: string[];
   requirePkce?: boolean;
   tokenEndpointAuthMethod?: string;
-  tokenEndpointAuthMethods?: string[];
+  jwks?: string;
+  jwksUri?: string;
   isActive?: boolean;
-  apiResourceIds?: string[];
 };
 
 export type GenerateClientCredentialRequest = {
   tokenEndpointAuthMethod?: string;
+  autoGenerateJwks?: boolean;
   description?: string;
 };
 
@@ -43,6 +45,8 @@ export type ClientCredential = {
 export type GeneratedClientCredential = {
   type: string;
   clientSecret?: string;
+  privateKeyPem?: string;
+  jwks?: string;
   description?: string;
 };
 
@@ -63,10 +67,10 @@ export type Client = {
   requirePkce: boolean;
   isActive: boolean;
   tokenEndpointAuthMethod: string;
-  tokenEndpointAuthMethods: string[];
+  jwks?: string;
+  jwksUri?: string;
   credentials: ClientCredential[];
   createdAt: string;
-  apiResourceIds?: string[];
 };
 
 export type PagedResult<T> = {
@@ -105,8 +109,8 @@ export const getClient = (id: string): Promise<Client> => {
   return request.get<Client>(`/clients/${id}`);
 };
 
-export const createClient = (data: CreateClientRequest): Promise<Client> => {
-  return request.post<Client>('/clients', data);
+export const createClient = (data: CreateClientRequest): Promise<ClientMutationResult> => {
+  return request.post<ClientMutationResult>('/clients', data);
 };
 
 export const updateClient = (id: string, data: UpdateClientRequest): Promise<Client> => {

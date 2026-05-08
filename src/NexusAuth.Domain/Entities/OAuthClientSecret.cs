@@ -6,13 +6,13 @@ public class OAuthClientSecret : EntityWithIdentity<Guid>
 {
     public const string TypeSharedSecret = "shared_secret";
 
-    public const string TypeJwks = "jwks";
-
     public Guid ClientId { get; private set; }
 
     public string Type { get; private set; } = default!;
 
     public string Value { get; private set; } = default!;
+
+    public string? PlainValue { get; private set; }
 
     public string? Description { get; private set; }
 
@@ -20,13 +20,11 @@ public class OAuthClientSecret : EntityWithIdentity<Guid>
 
     public DateTimeOffset CreatedAt { get; private set; }
 
-    public string? KeyId { get; private set; }
-
     private OAuthClientSecret(Guid id) : base(id)
     {
     }
 
-    public static OAuthClientSecret CreateSharedSecret(Guid clientId, string rawSecret, string? description = null)
+    public static OAuthClientSecret CreateSharedSecret(Guid clientId, string rawSecret, string? description = null, bool persistPlainValue = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rawSecret);
 
@@ -35,25 +33,10 @@ public class OAuthClientSecret : EntityWithIdentity<Guid>
             ClientId = clientId,
             Type = TypeSharedSecret,
             Value = BCrypt.Net.BCrypt.HashPassword(rawSecret, workFactor: 12),
+            PlainValue = persistPlainValue ? rawSecret : null,
             Description = description,
             IsActive = true,
             CreatedAt = DateTimeOffset.UtcNow,
-        };
-    }
-
-    public static OAuthClientSecret CreateJwks(Guid clientId, string jwksJson, string? description = null, string? keyId = null)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(jwksJson);
-
-        return new OAuthClientSecret(Guid.NewGuid())
-        {
-            ClientId = clientId,
-            Type = TypeJwks,
-            Value = jwksJson,
-            Description = description,
-            IsActive = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            KeyId = keyId,
         };
     }
 

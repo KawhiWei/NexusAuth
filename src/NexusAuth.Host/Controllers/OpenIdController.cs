@@ -66,8 +66,8 @@ public class OpenIdController(
             },
             subject_types_supported = new[] { "public" },
             id_token_signing_alg_values_supported = new[] { "RS256" },
-            token_endpoint_auth_methods_supported = new[] { "client_secret_post", "client_secret_basic", "private_key_jwt" },
-            token_endpoint_auth_signing_alg_values_supported = new[] { "RS256" },
+            token_endpoint_auth_methods_supported = new[] { "client_secret_post", "client_secret_basic", "client_secret_jwt", "private_key_jwt" },
+            token_endpoint_auth_signing_alg_values_supported = new[] { "HS256", "RS256" },
             claims_supported = new[]
             {
                 "sub", "preferred_username", "name", "nickname", "email", "phone_number", "email_verified",

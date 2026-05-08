@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AxiosError } from 'axios';
-import { Button, Card, Dialog, Drawer, Dropdown, Form, Input, MessagePlugin, Pagination, Select, Space, Switch, Table, Tag, Textarea, Transfer, type TableProps } from 'tdesign-react';
+import { Button, Card, Dialog, Drawer, Form, Input, MessagePlugin, Pagination, Select, Space, Switch, Table, Tag, Textarea, type TableProps } from 'tdesign-react';
 import {
   createClient,
   deleteClient,
@@ -14,7 +14,6 @@ import {
   type GeneratedClientCredential,
   type UpdateClientRequest,
 } from '../../api/client';
-import { getAllApiResources, type ApiResource } from '../../api/api-resource';
 import { getClientMetadata, type ClientMetadata, type ClientOption } from '../../api/client-metadata';
 
 type FilterState = {
@@ -40,6 +39,16 @@ const authMethodOptions = [
   { label: 'private_key_jwt', value: 'private_key_jwt' },
 ];
 
+const keyMaterialSourceOptions = [
+  { label: 'JWKS', value: 'jwks' },
+  { label: 'JWKS URI', value: 'jwks_uri' },
+];
+
+const jwksInputModeOptions = [
+  { label: '自动生成', value: 'auto_generate' },
+  { label: '手动录入', value: 'manual' },
+];
+
 const grantTypeOptions = [
   { label: 'authorization_code', value: 'authorization_code' },
   { label: 'client_credentials', value: 'client_credentials' },
@@ -62,9 +71,12 @@ type DialogFormData = {
   allowedScopes: string[];
   allowedGrantTypes: string[];
   requirePkce: boolean;
-  tokenEndpointAuthMethods: string[];
+  tokenEndpointAuthMethod: string;
+  keyMaterialSource: 'jwks' | 'jwks_uri';
+  jwksInputMode: 'auto_generate' | 'manual';
+  jwks: string;
+  jwksUri: string;
   isActive: boolean;
-  apiResourceIds: string[];
 };
 
 type CredentialActionDialogState = {
@@ -83,9 +95,12 @@ const defaultFormData: DialogFormData = {
   allowedScopes: [],
   allowedGrantTypes: [],
   requirePkce: false,
-  tokenEndpointAuthMethods: ['client_secret_basic'],
+  tokenEndpointAuthMethod: 'client_secret_basic',
+  keyMaterialSource: 'jwks',
+  jwksInputMode: 'manual',
+  jwks: '',
+  jwksUri: '',
   isActive: false,
-  apiResourceIds: [],
 };
 
 const defaultClientMetadata: ClientMetadata = {
@@ -109,7 +124,6 @@ const getRequestErrorMessage = (error: unknown, fallback: string) => {
     || fallback;
 };
 
-const getCredentialConfirmLabel = (method: string) => method;
 const getCredentialTypeLabel = (type: string) => type;
 
 const toSelectOptions = (options: ClientOption[]) => options.map((option) => ({
@@ -125,7 +139,6 @@ const ClientManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [sourceData, setSourceData] = useState<Client[]>([]);
   const [total, setTotal] = useState(0);
-  const [apiResources, setApiResources] = useState<ApiResource[]>([]);
   const [clientMetadata, setClientMetadata] = useState<ClientMetadata>(defaultClientMetadata);
   const [tableMaxHeight, setTableMaxHeight] = useState(() => Math.max(window.innerHeight - 200, 260));
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
@@ -136,10 +149,6 @@ const ClientManagementPage = () => {
   const formRef = useRef<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
-
-  const [expandedRowKeys, setExpandedRowKeys] = useState<Array<string | number>>([]);
-  const [credentialDetailLoadingMap, setCredentialDetailLoadingMap] = useState<Record<string, boolean>>({});
-  const [credentialDetailCache, setCredentialDetailCache] = useState<Record<string, Client>>({});
   const [credentialResultDialogVisible, setCredentialResultDialogVisible] = useState(false);
   const [generatedCredential, setGeneratedCredential] = useState<GeneratedClientCredential | null>(null);
   const [credentialActionDialog, setCredentialActionDialog] = useState<CredentialActionDialogState>(defaultCredentialActionDialogState);
@@ -197,15 +206,6 @@ const ClientManagementPage = () => {
     }
   };
 
-  const fetchApiResources = async () => {
-    try {
-      const resources = await getAllApiResources();
-      setApiResources(resources);
-    } catch (error) {
-      console.error('Failed to fetch api resources:', error);
-    }
-  };
-
   const fetchClientMetadata = async () => {
     try {
       const metadata = await getClientMetadata();
@@ -220,7 +220,6 @@ const ClientManagementPage = () => {
   }, [appliedFilters, current, pageSize]);
 
   useEffect(() => {
-    fetchApiResources();
     fetchClientMetadata();
   }, []);
 
@@ -237,13 +236,43 @@ const ClientManagementPage = () => {
     form.setFieldsValue({
       clientId: formData.clientId,
       clientName: formData.clientName,
-      tokenEndpointAuthMethods: formData.tokenEndpointAuthMethods,
+      tokenEndpointAuthMethod: formData.tokenEndpointAuthMethod,
+      keyMaterialSource: formData.keyMaterialSource,
+      jwksInputMode: formData.jwksInputMode,
       allowedScopes: formData.allowedScopes,
       allowedGrantTypes: formData.allowedGrantTypes,
       requirePkce: formData.requirePkce,
       isActive: formData.isActive,
     });
   }, [dialogVisible, loadingDetail, formData]);
+
+  const handleAuthMethodChange = (value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      tokenEndpointAuthMethod: value,
+      keyMaterialSource: value === 'private_key_jwt' ? prev.keyMaterialSource : 'jwks',
+      jwksInputMode: value === 'private_key_jwt' ? prev.jwksInputMode : 'manual',
+      jwks: value === 'private_key_jwt' ? prev.jwks : '',
+      jwksUri: value === 'private_key_jwt' ? prev.jwksUri : '',
+    }));
+  };
+
+  const handleKeyMaterialSourceChange = (value: 'jwks' | 'jwks_uri') => {
+    setFormData((prev) => ({
+      ...prev,
+      keyMaterialSource: value,
+      jwks: value === 'jwks' ? prev.jwks : '',
+      jwksUri: value === 'jwks_uri' ? prev.jwksUri : '',
+    }));
+  };
+
+  const handleJwksInputModeChange = (value: 'auto_generate' | 'manual') => {
+    setFormData((prev) => ({
+      ...prev,
+      jwksInputMode: value,
+      jwks: value === 'manual' ? prev.jwks : '',
+    }));
+  };
 
   useEffect(() => {
     const updateTableMaxHeight = () => {
@@ -267,15 +296,6 @@ const ClientManagementPage = () => {
     };
   }, []);
 
-  useEffect(() => {
-    expandedRowKeys.forEach((key) => {
-      const clientId = String(key);
-      if (!credentialDetailCache[clientId] && !credentialDetailLoadingMap[clientId]) {
-        void loadClientCredentials(clientId);
-      }
-    });
-  }, [expandedRowKeys, credentialDetailCache, credentialDetailLoadingMap]);
-
   const showGeneratedCredential = (credential?: GeneratedClientCredential) => {
     if (!credential) {
       return;
@@ -294,30 +314,8 @@ const ClientManagementPage = () => {
     MessagePlugin.success('已复制');
   };
 
-  const getClientAuthMethods = (client: Client) => {
-    const methods = client.tokenEndpointAuthMethods?.length ? client.tokenEndpointAuthMethods : [client.tokenEndpointAuthMethod];
-    return methods.filter(Boolean);
-  };
-
   const getResettableAuthMethod = (client: Client) => {
-    return getClientAuthMethods(client).find((method) => method !== 'private_key_jwt');
-  };
-
-  const loadClientCredentials = async (clientId: string) => {
-    if (credentialDetailLoadingMap[clientId]) {
-      return;
-    }
-
-    setCredentialDetailLoadingMap((prev) => ({ ...prev, [clientId]: true }));
-    try {
-      const detail = await getClient(clientId);
-      setCredentialDetailCache((prev) => ({ ...prev, [clientId]: detail }));
-    } catch (error) {
-      console.error('Failed to fetch client credentials:', error);
-      MessagePlugin.error(getRequestErrorMessage(error, '加载凭据明细失败'));
-    } finally {
-      setCredentialDetailLoadingMap((prev) => ({ ...prev, [clientId]: false }));
-    }
+    return client.tokenEndpointAuthMethod === 'private_key_jwt' ? undefined : client.tokenEndpointAuthMethod;
   };
 
   const submitCredentialMutation = async (
@@ -328,47 +326,24 @@ const ClientManagementPage = () => {
     try {
       setSubmitting(true);
       const result = mutation === 'generate'
-        ? await generateClientCredential(client.id, { tokenEndpointAuthMethod })
+        ? await generateClientCredential(client.id, {
+          tokenEndpointAuthMethod,
+          autoGenerateJwks: tokenEndpointAuthMethod === 'private_key_jwt',
+        })
         : await resetClientCredential(client.id, { tokenEndpointAuthMethod });
 
       if (editingClient?.id === client.id) {
         setEditingClient(result.client);
       }
 
-      setCredentialDetailCache((prev) => ({ ...prev, [client.id]: result.client }));
       showGeneratedCredential(result.generatedCredential);
       await fetchData();
-
-      if (expandedRowKeys.includes(client.id)) {
-        await loadClientCredentials(client.id);
-      }
     } catch (error) {
       console.error(`Failed to ${mutation} client credential:`, error);
       MessagePlugin.error(getRequestErrorMessage(error, mutation === 'generate' ? '生成客户端凭据失败' : '重置客户端凭据失败'));
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const generateCredentialForMethod = async (client: Client, tokenEndpointAuthMethod?: string) => {
-    debugger;
-    const method = tokenEndpointAuthMethod?.trim() || getClientAuthMethods(client)[0];
-    if (!method) {
-      MessagePlugin.error('该客户端没有可用的认证方式');
-      return;
-    }
-
-    if (method !== 'private_key_jwt') {
-      setCredentialActionDialog({
-        visible: true,
-        client,
-        method,
-        mutation: 'generate',
-      });
-      return;
-    }
-
-    await submitCredentialMutation(client, method, 'generate');
   };
 
   const handleResetCredential = async (client: Client) => {
@@ -429,19 +404,22 @@ const ClientManagementPage = () => {
     try {
       setLoadingDetail(true);
       const detail = await getClient(row.id);
-      const nextFormData = {
-        clientId: detail.clientId,
-        clientName: detail.clientName,
-        description: detail.description ?? '',
+        const nextFormData: DialogFormData = {
+          clientId: detail.clientId,
+          clientName: detail.clientName,
+          description: detail.description ?? '',
         redirectUris: detail.redirectUris?.map((uri, i) => ({ id: String(i + 1), value: uri })) ?? [{ id: '1', value: '' }],
         postLogoutRedirectUris: detail.postLogoutRedirectUris?.map((uri, i) => ({ id: String(i + 1), value: uri })) ?? [{ id: '1', value: '' }],
-        allowedScopes: detail.allowedScopes ?? ['openid'],
-        allowedGrantTypes: detail.allowedGrantTypes ?? ['authorization_code'],
-        requirePkce: detail.requirePkce,
-        tokenEndpointAuthMethods: getClientAuthMethods(detail),
-        isActive: detail.isActive,
-        apiResourceIds: detail.apiResourceIds ?? [],
-      };
+          allowedScopes: detail.allowedScopes ?? ['openid'],
+          allowedGrantTypes: detail.allowedGrantTypes ?? ['authorization_code'],
+          requirePkce: detail.requirePkce,
+          tokenEndpointAuthMethod: detail.tokenEndpointAuthMethod,
+          keyMaterialSource: detail.jwksUri ? 'jwks_uri' : 'jwks',
+          jwksInputMode: 'manual',
+          jwks: detail.jwks ?? '',
+          jwksUri: detail.jwksUri ?? '',
+          isActive: detail.isActive,
+        };
 
       setEditingClient(detail);
       setFormData(nextFormData);
@@ -491,6 +469,14 @@ const ClientManagementPage = () => {
 
     try {
       setSubmitting(true);
+      const isPrivateKeyJwt = formData.tokenEndpointAuthMethod === 'private_key_jwt';
+      const jwks = isPrivateKeyJwt && formData.keyMaterialSource === 'jwks' && formData.jwksInputMode === 'manual'
+        ? formData.jwks || undefined
+        : undefined;
+      const jwksUri = isPrivateKeyJwt && formData.keyMaterialSource === 'jwks_uri'
+        ? formData.jwksUri || undefined
+        : undefined;
+
       if (editingClient) {
         const request: UpdateClientRequest = {
           clientName: formData.clientName,
@@ -501,9 +487,9 @@ const ClientManagementPage = () => {
           allowedGrantTypes: formData.allowedGrantTypes,
           requirePkce,
           isActive,
-          tokenEndpointAuthMethod: formData.tokenEndpointAuthMethods[0],
-          tokenEndpointAuthMethods: formData.tokenEndpointAuthMethods,
-          apiResourceIds: formData.apiResourceIds,
+          tokenEndpointAuthMethod: formData.tokenEndpointAuthMethod,
+          jwks,
+          jwksUri,
         };
         await updateClient(editingClient.id, request);
       } else {
@@ -516,11 +502,13 @@ const ClientManagementPage = () => {
           allowedScopes: formData.allowedScopes,
           allowedGrantTypes: formData.allowedGrantTypes,
           requirePkce,
-          tokenEndpointAuthMethod: formData.tokenEndpointAuthMethods[0],
-          tokenEndpointAuthMethods: formData.tokenEndpointAuthMethods,
-          apiResourceIds: formData.apiResourceIds,
+          tokenEndpointAuthMethod: formData.tokenEndpointAuthMethod,
+          autoGenerateJwks: isPrivateKeyJwt && formData.keyMaterialSource === 'jwks' && formData.jwksInputMode === 'auto_generate',
+          jwks,
+          jwksUri,
         };
-        await createClient(request);
+        const result = await createClient(request);
+        showGeneratedCredential(result.generatedCredential);
       }
 
       setDialogVisible(false);
@@ -532,11 +520,6 @@ const ClientManagementPage = () => {
       setSubmitting(false);
     }
   };
-
-  const apiResourceNameMap = useMemo(
-    () => Object.fromEntries(apiResources.map((resource) => [resource.id, resource.displayName || resource.name])),
-    [apiResources]
-  );
 
   const renderArrayTags = (
     values?: string[],
@@ -573,28 +556,16 @@ const ClientManagementPage = () => {
       cell: ({ row }) => (row.requirePkce ? '是' : '否'),
     },
     {
-      colKey: 'tokenEndpointAuthMethods',
+      colKey: 'tokenEndpointAuthMethod',
       title: '认证方式',
-      minWidth: 220,
-      cell: ({ row }) => renderArrayTags(getClientAuthMethods(row), 'primary'),
+      minWidth: 180,
+      cell: ({ row }) => <Tag theme="primary" variant="light-outline">{row.tokenEndpointAuthMethod}</Tag>,
     },
     {
       colKey: 'redirectUris',
       title: '回调地址',
       minWidth: 260,
       cell: ({ row }) => renderArrayTags(row.redirectUris),
-    },
-    {
-      colKey: 'apiResourceIds',
-      title: 'API资源',
-      minWidth: 220,
-      cell: ({ row }) => renderArrayTags(row.apiResourceIds?.map((id) => apiResourceNameMap[id] ?? id), 'success'),
-    },
-    {
-      colKey: 'credentialCount',
-      title: 'Secret 数量',
-      width: 120,
-      cell: ({ row }) => <Tag theme="primary">{row.credentials?.length ?? 0}</Tag>,
     },
     {
       colKey: 'action',
@@ -605,21 +576,11 @@ const ClientManagementPage = () => {
           <Button size="small" variant="text" theme="warning" onClick={() => handleEdit(row)}>
             编辑
           </Button>
-          <Dropdown
-            trigger="click"
-            hideAfterItemClick
-            placement="bottom-right"
-            minColumnWidth="170px"
-            options={getClientAuthMethods(row).map((method) => ({
-              content: method,
-              value: method,
-            }))}
-            onClick={(dropdownItem) => generateCredentialForMethod(row, String(dropdownItem.value))}
-          >
-            <Button size="small" variant="text" theme="primary">
-              生成凭证
+          {getResettableAuthMethod(row) && (
+            <Button size="small" variant="text" theme="primary" onClick={() => handleResetCredential(row)}>
+              重置 Secret
             </Button>
-          </Dropdown>
+          )}
           <Button size="small" variant="text" theme="danger" onClick={() => handleDelete(row)}>
             删除
           </Button>
@@ -627,11 +588,6 @@ const ClientManagementPage = () => {
       ),
     },
   ];
-
-  const transferData = useMemo(
-    () => apiResources.map((r) => ({ value: r.id, label: r.displayName || r.name })),
-    [apiResources]
-  );
 
   return (
     <div>
@@ -666,15 +622,62 @@ const ClientManagementPage = () => {
               onChange={(value) => setFormData((prev) => ({ ...prev, clientName: value }))}
             />
           </Form.FormItem>
-          <Form.FormItem label="认证方式" name="tokenEndpointAuthMethods" rules={[{ required: true, message: '请选择认证方式', type: 'error' }]}>
+          <Form.FormItem label="认证方式" name="tokenEndpointAuthMethod" rules={[{ required: true, message: '请选择认证方式', type: 'error' }]}>
             <Select
-              value={formData.tokenEndpointAuthMethods}
-              multiple
+              value={formData.tokenEndpointAuthMethod}
               placeholder="请选择"
               options={authMethodSelectOptions}
-              onChange={(value) => setFormData((prev) => ({ ...prev, tokenEndpointAuthMethods: value as string[] }))}
+              onChange={(value) => handleAuthMethodChange(String(value))}
             />
           </Form.FormItem>
+          {formData.tokenEndpointAuthMethod === 'private_key_jwt' && (
+            <>
+              <Form.FormItem label="公钥来源" name="keyMaterialSource">
+                <Select
+                  value={formData.keyMaterialSource}
+                  options={keyMaterialSourceOptions}
+                  onChange={(value) => handleKeyMaterialSourceChange(value as 'jwks' | 'jwks_uri')}
+                />
+              </Form.FormItem>
+
+              {formData.keyMaterialSource === 'jwks' ? (
+                <>
+                  <Form.FormItem label="JWKS 配置方式" name="jwksInputMode">
+                    <Select
+                      value={formData.jwksInputMode}
+                      options={jwksInputModeOptions}
+                      onChange={(value) => handleJwksInputModeChange(value as 'auto_generate' | 'manual')}
+                    />
+                  </Form.FormItem>
+
+                  {formData.jwksInputMode === 'manual' ? (
+                    <Form.FormItem label="JWKS">
+                      <Textarea
+                        value={formData.jwks}
+                        placeholder="请输入客户端公钥 JWKS JSON"
+                        autosize={{ minRows: 4, maxRows: 10 }}
+                        onChange={(value) => setFormData((prev) => ({ ...prev, jwks: value }))}
+                      />
+                    </Form.FormItem>
+                  ) : (
+                    <Form.FormItem label="自动生成说明">
+                      <div style={{ color: 'var(--td-text-color-secondary)', lineHeight: 1.7 }}>
+                        自动生成模式下，创建客户端时会由后端直接生成 RSA 密钥对并登记 JWKS，创建成功后会一次性展示私钥明文。
+                      </div>
+                    </Form.FormItem>
+                  )}
+                </>
+              ) : (
+                <Form.FormItem label="JWKS URI">
+                  <Input
+                    value={formData.jwksUri}
+                    placeholder="请输入客户端 jwks_uri，例如 https://client.example.com/.well-known/jwks.json"
+                    onChange={(value) => setFormData((prev) => ({ ...prev, jwksUri: value }))}
+                  />
+                </Form.FormItem>
+              )}
+            </>
+          )}
           <Form.FormItem label="允许的 Scope" name="allowedScopes" rules={[{ required: true, message: '请选择 Scope', type: 'error' }]}>
             <Select
               value={formData.allowedScopes}
@@ -760,14 +763,6 @@ const ClientManagementPage = () => {
               onChange={(value) => setFormData((prev) => ({ ...prev, description: value }))}
             />
           </Form.FormItem>
-          <Form.FormItem label="关联 API 资源">
-            <Transfer
-              data={transferData}
-              value={formData.apiResourceIds}
-              direction="both"
-              onChange={(value) => setFormData((prev) => ({ ...prev, apiResourceIds: value as string[] }))}
-            />
-          </Form.FormItem>
         </Form>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
           <Button variant="base" onClick={handleClose} disabled={submitting || loadingDetail}>
@@ -794,7 +789,7 @@ const ClientManagementPage = () => {
 
       <Dialog
         visible={credentialResultDialogVisible}
-        header="Client Secret"
+        header={generatedCredential?.privateKeyPem ? 'Private Key' : 'Client Secret'}
         confirmBtn="关闭"
         cancelBtn={null}
         onClose={() => setCredentialResultDialogVisible(false)}
@@ -807,6 +802,15 @@ const ClientManagementPage = () => {
                   {generatedCredential.clientSecret}
                 </Tag>
                 <Button variant="outline" onClick={() => copyCredentialValue(generatedCredential.clientSecret)}>复制 Client Secret</Button>
+              </Space>
+            )}
+            {generatedCredential?.privateKeyPem && (
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <div style={{ color: 'var(--td-text-color-secondary)', lineHeight: 1.7 }}>
+                  请立即复制并安全保存私钥。关闭后无法再次查看，后续如需重新获取，请重新生成新的密钥对。
+                </div>
+                <Textarea readonly autosize={{ minRows: 10, maxRows: 16 }} value={generatedCredential.privateKeyPem} />
+                <Button variant="outline" onClick={() => copyCredentialValue(generatedCredential.privateKeyPem)}>复制 Private Key</Button>
               </Space>
             )}
           </div>
@@ -858,65 +862,6 @@ const ClientManagementPage = () => {
             maxHeight={tableMaxHeight}
             tableLayout="fixed"
             loading={loading}
-            expandedRowKeys={expandedRowKeys}
-            onExpandChange={(keys) => setExpandedRowKeys(keys)}
-            expandedRow={({ row }) => {
-              const clientId = String(row.id);
-              const detail = credentialDetailCache[clientId] ?? row;
-              const credentials = detail.credentials ?? [];
-              const credentialLoading = credentialDetailLoadingMap[clientId];
-
-              return (
-                <div style={{ padding: '8px 0 8px 24px' }}>
-                  {credentialLoading ? (
-                    <div style={{ color: 'var(--td-text-color-secondary)' }}>正在加载凭据...</div>
-                  ) : credentials.length > 0 ? (
-                    <Table
-                      rowKey="id"
-                      data={credentials}
-                      columns={[
-                        {
-                          colKey: 'type',
-                          title: 'type',
-                          width: 180,
-                          cell: ({ row: credential }) => getCredentialTypeLabel(credential.type),
-                        },
-                        {
-                          colKey: 'isActive',
-                          title: '状态',
-                          width: 100,
-                          cell: ({ row: credential }) => (
-                            <Tag theme={credential.isActive ? 'success' : 'default'}>
-                              {credential.isActive ? '启用' : '禁用'}
-                            </Tag>
-                          ),
-                        },
-                        {
-                          colKey: 'createdAt',
-                          title: '创建时间',
-                          minWidth: 180,
-                          cell: ({ row: credential }) => new Date(credential.createdAt).toLocaleString(),
-                        },
-                        {
-                          colKey: 'action',
-                          title: '操作',
-                          width: 120,
-                          cell: ({ row: credential }) => (
-                            credential.type !== 'jwks' && getResettableAuthMethod(row) ? (
-                              <Button size="small" variant="text" theme="warning" onClick={() => handleResetCredential(row)}>
-                                reset
-                              </Button>
-                            ) : '-'
-                          ),
-                        },
-                      ]}
-                    />
-                  ) : (
-                    <div style={{ color: 'var(--td-text-color-secondary)' }}>暂无凭据</div>
-                  )}
-                </div>
-              );
-            }}
           />
         </div>
 

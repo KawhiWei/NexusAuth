@@ -29,13 +29,19 @@ public class OAuthClientConfiguration : IEntityTypeConfiguration<OAuthClient>
             .HasMaxLength(128)
             .IsRequired();
 
-        builder.Ignore(c => c.TokenEndpointAuthMethod);
+        builder.Property(c => c.TokenEndpointAuthMethod)
+            .HasColumnName("token_endpoint_auth_method")
+            .HasMaxLength(64)
+            .IsRequired()
+            .HasDefaultValue(OAuthClient.TokenEndpointAuthMethodClientSecretBasic);
 
-        builder.Property(c => c.TokenEndpointAuthMethods)
-            .HasColumnName("token_endpoint_auth_methods")
-            .HasColumnType("jsonb")
-            .HasConversion(stringListConverter)
-            .Metadata.SetValueComparer(stringListComparer);
+        builder.Property(c => c.Jwks)
+            .HasColumnName("jwks")
+            .HasColumnType("text");
+
+        builder.Property(c => c.JwksUri)
+            .HasColumnName("jwks_uri")
+            .HasMaxLength(2048);
 
         builder.Property(c => c.ClientName)
             .HasColumnName("client_name")

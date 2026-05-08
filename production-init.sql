@@ -49,7 +49,9 @@ CREATE UNIQUE INDEX ix_users_phone_number ON nexusauth.users (phone_number) WHER
 CREATE TABLE nexusauth.oauth_clients (
     id                          uuid            NOT NULL,
     client_id                   varchar(128)    NOT NULL,
-    token_endpoint_auth_methods jsonb           NOT NULL DEFAULT '["client_secret_basic"]'::jsonb,
+    token_endpoint_auth_method  varchar(64)     NOT NULL DEFAULT 'client_secret_basic',
+    jwks                        text,
+    jwks_uri                    varchar(2048),
     client_name                 varchar(256)    NOT NULL,
     description                 text,
     redirect_uris               jsonb           NOT NULL,
@@ -68,17 +70,17 @@ CREATE UNIQUE INDEX ix_oauth_clients_client_id ON nexusauth.oauth_clients (clien
 -- oauth_client_secrets
 -- 说明：
 -- 1) shared_secret 的 value 为 BCrypt 哈希。
--- 2) jwks 的 value 为公钥 JWKS；私钥不入库。
+-- 2) plain_value 仅用于需要原始密钥材料的 client_secret_jwt 场景。
 -- ============================================================
 CREATE TABLE nexusauth.oauth_client_secrets (
     id              uuid            NOT NULL,
     client_id       uuid            NOT NULL,
     type            varchar(32)     NOT NULL,
     value           text            NOT NULL,
+    plain_value     text,
     description     text,
     is_active       boolean         NOT NULL DEFAULT true,
     created_at      timestamptz     NOT NULL,
-    key_id          varchar(128),
     CONSTRAINT pk_oauth_client_secrets PRIMARY KEY (id)
 );
 

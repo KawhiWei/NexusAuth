@@ -4,7 +4,7 @@
 -- 1) 该脚本是所有 demo 客户端的唯一种子数据来源。
 -- 2) Demo.Bff / Demo.Web 保持为 private_key_jwt。
 -- 3) 另外提供一套 Demo.Bff.ClientSecret / Demo.Web.ClientSecret 用于 client_secret_basic 演示。
--- 3) 客户端凭据保存在 oauth_client_secrets，private_key_jwt 只保存公钥 JWKS。
+-- 3) client_secret_* 使用 oauth_client_secrets；private_key_jwt 的公钥保存在 oauth_clients.jwks。
 -- 4) 测试账号密码：alice / Pass@123, bob / Pass@123, admin / Pass@123
 -- ============================================================
 
@@ -32,12 +32,14 @@ ON CONFLICT (name) DO UPDATE SET
 -- ============================================================
 -- OAuth demo clients
 -- ============================================================
-INSERT INTO oauth_clients (id, client_id, token_endpoint_auth_methods, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
+INSERT INTO oauth_clients (id, client_id, token_endpoint_auth_method, jwks, jwks_uri, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
 VALUES
 (
     '20000000-0000-0000-0000-000000000001',
     'demo-bff',
-    '["private_key_jwt"]',
+    'private_key_jwt',
+    '{"keys":[{"kty":"RSA","kid":"demo-bff-key-1","use":"sig","alg":"RS256","n":"7Bghnu8yZRRAnvax9eqUO0MziC3hSa4XKBP-mEE8WpFs8smd9PLgulFHCJEgZdTpT7eM6i-1HrQl66F2yP9iZiZ8cKbpYzL-QKH8ii8VLaXJ9bMR7mEKPAOU85H3tQS0W5RMGemXdN78o7oQwn8p3_mAoKby77YI3EcwNBaoZo51ud7x7jAxBGA0IiHhTqCrJEo4t3eXREIepEN5xBXAcnTTqTdrUQXWrEL0bD06Hud_xm2SapuxbogLkPKK3keRhTPSbEcZrAbVsNr08WnCMoGa6QsSSpj6Bk4kFF-nJDZyENU0IzZO28n_Uz0bSgEHGlIl0Qe2iv9hz6wdlHw6-Q","e":"AQAB"}]}',
+    NULL,
     'Demo Frontend BFF Client',
     'A front-end/back-end separated demo client for authorization code + OIDC',
     '["http://localhost:5201/signin-oidc"]',
@@ -51,7 +53,9 @@ VALUES
 (
     '20000000-0000-0000-0000-000000000002',
     'demo-bff-secret',
-    '["client_secret_basic"]',
+    'client_secret_basic',
+    NULL,
+    NULL,
     'Demo Frontend BFF Client Secret',
     'A front-end/back-end separated demo client for authorization code + OIDC using client_secret_basic',
     '["http://localhost:5301/signin-oidc"]',
@@ -65,7 +69,9 @@ VALUES
 (
     '20000000-0000-0000-0000-000000000101',
     'demo-cc',
-    '["private_key_jwt"]',
+    'private_key_jwt',
+    '{"keys":[{"kty":"RSA","kid":"demo-cc-key-1","use":"sig","alg":"RS256","n":"qcGBVp2tCI3PlfndpcWi5MPT-6sNej-_El3p5ivGDzUy_26Do6R2Bak3o4uJ7a4im5WuHtBRmfzgSJlPl7GPuc5KEjnhIupBtvbpKnEhSFKpcYt-0-E6lIA-asudW2AUgXGWjGO53e9_kml-qZ63E976op-tkecILxDpha846YbHIvpE4_hZLxmw4jCpGSzjvJdnM80po5qguwktBHCQuvUVSk2j_5RwiiN9bKHYNiWoIzpwXNXGyvbaANuk_FYIcHLG-kPHUMuWZSpt7lAq1Z045aiG_Nat9aBAA76klOcyuOF6-FI3qQenkoAEHC-VgG3NsNPRn25CJes0varcdQ","e":"AQAB"}]}',
+    NULL,
     'Demo Client Credentials Client',
     'Console demo client for OAuth2 client_credentials grant',
     '[]',
@@ -79,7 +85,9 @@ VALUES
 (
     '20000000-0000-0000-0000-000000000102',
     'demo-device',
-    '["private_key_jwt"]',
+    'private_key_jwt',
+    '{"keys":[{"kty":"RSA","kid":"demo-device-key-1","use":"sig","alg":"RS256","n":"yxfXmgXAnVynvxs0fGwdlmjA71O6tS8O3UuGDZ_7Z0BQ4t_T3fCjIRJeqQ3_-sHG-cocuKm6eCmbinEoneoQVbKZ7HjL_HmWQ2vm2CfpwvtY719R43oHLn1vXxx87kKqDVpCJwETlC-iyA9OkNlbSASY5aFTc5wFd1uxjEUUUwJm9yMn6lclZn23Mt32ayh7j6cfuCWSSI2jeV6v0wikeDm3MYE9G42PZJ9SX-fSsCgY7u3u9OopLgwEUBhnpQT1MEWsxy_hVqNpD-6nVOhhJdw5lka1qEzZJ1Keoq5xib4SmGDGOrEzebd-qq9XMWKNfvZ-BEzCcp1vyHUJ0B7HiQ","e":"AQAB"}]}',
+    NULL,
     'Demo Device Flow Client',
     'Console demo client for OAuth2 device_code and refresh_token grants (public-client friendly)',
     '[]',
@@ -93,7 +101,9 @@ VALUES
 (
     '20000000-0000-0000-0000-000000000103',
     'demo-cert',
-    '["private_key_jwt"]',
+    'private_key_jwt',
+    '{"keys":[{"kty":"RSA","kid":"demo-cert-key-1","use":"sig","alg":"RS256","n":"pPbIZWa9Kor7p4jaPrNrv29XigyKHTuBU3QG7xDRgy5GqbX16QBl715QtgCqe6mQAYhrazLH7LIecQ1ymeD7OCy6Bm0llgvGSTr8X_JU8dsrVN6MF7ab31bcOy1GggTdXpU-5QTfVcyd0MxQw1zxRubEj4jEhw2abUEn7PAdWgVLyB4r-sz0uMq7DQkUhOI8horrKowP_3rqumuba54Pj4hRwmKoSzEpW3MGvwhaanDzqTSWng00ooOysTNZou198Xpwq-BXxeX868KS-ud4DbebbzOQ85eyToRKC80jJscvlD8QcJJ6Uh_rcJPGJfaZPKgtwLy4q1szxFhXqUepXw","e":"AQAB"}]}',
+    NULL,
     'Demo Certificate Client',
     'Console demo client for OAuth2 private_key_jwt token endpoint auth',
     '[]',
@@ -105,7 +115,9 @@ VALUES
     NOW()
 )
 ON CONFLICT (client_id) DO UPDATE SET
-    token_endpoint_auth_methods = EXCLUDED.token_endpoint_auth_methods,
+    token_endpoint_auth_method = EXCLUDED.token_endpoint_auth_method,
+    jwks = EXCLUDED.jwks,
+    jwks_uri = EXCLUDED.jwks_uri,
     client_name = EXCLUDED.client_name,
     description = EXCLUDED.description,
     redirect_uris = EXCLUDED.redirect_uris,
@@ -115,64 +127,24 @@ ON CONFLICT (client_id) DO UPDATE SET
     require_pkce = EXCLUDED.require_pkce,
     is_active = EXCLUDED.is_active;
 
-INSERT INTO oauth_client_secrets (id, client_id, type, value, description, is_active, created_at, key_id)
+INSERT INTO oauth_client_secrets (id, client_id, type, value, plain_value, description, is_active, created_at)
 VALUES
-(
-    '21000000-0000-0000-0000-000000000001',
-    '20000000-0000-0000-0000-000000000001',
-    'jwks',
-    '{"keys":[{"kty":"RSA","kid":"demo-bff-key-1","use":"sig","alg":"RS256","n":"7Bghnu8yZRRAnvax9eqUO0MziC3hSa4XKBP-mEE8WpFs8smd9PLgulFHCJEgZdTpT7eM6i-1HrQl66F2yP9iZiZ8cKbpYzL-QKH8ii8VLaXJ9bMR7mEKPAOU85H3tQS0W5RMGemXdN78o7oQwn8p3_mAoKby77YI3EcwNBaoZo51ud7x7jAxBGA0IiHhTqCrJEo4t3eXREIepEN5xBXAcnTTqTdrUQXWrEL0bD06Hud_xm2SapuxbogLkPKK3keRhTPSbEcZrAbVsNr08WnCMoGa6QsSSpj6Bk4kFF-nJDZyENU0IzZO28n_Uz0bSgEHGlIl0Qe2iv9hz6wdlHw6-Q","e":"AQAB"}]}',
-    'demo-bff-jwks',
-    true,
-    NOW(),
-    'demo-bff-key-1'
-),
 (
     '21000000-0000-0000-0000-000000000002',
     '20000000-0000-0000-0000-000000000002',
     'shared_secret',
     '$2a$12$pw856E1CHH3FfcshE0NwCeETGR5hyYaeudBqZfQYCpXdbBuvOpuuy',
+    NULL,
     'demo-bff-secret',
     true,
-    NOW(),
-    NULL
-),
-(
-    '21000000-0000-0000-0000-000000000101',
-    '20000000-0000-0000-0000-000000000101',
-    'jwks',
-    '{"keys":[{"kty":"RSA","kid":"demo-cc-key-1","use":"sig","alg":"RS256","n":"qcGBVp2tCI3PlfndpcWi5MPT-6sNej-_El3p5ivGDzUy_26Do6R2Bak3o4uJ7a4im5WuHtBRmfzgSJlPl7GPuc5KEjnhIupBtvbpKnEhSFKpcYt-0-E6lIA-asudW2AUgXGWjGO53e9_kml-qZ63E976op-tkecILxDpha846YbHIvpE4_hZLxmw4jCpGSzjvJdnM80po5qguwktBHCQuvUVSk2j_5RwiiN9bKHYNiWoIzpwXNXGyvbaANuk_FYIcHLG-kPHUMuWZSpt7lAq1Z045aiG_Nat9aBAA76klOcyuOF6-FI3qQenkoAEHC-VgG3NsNPRn25CJes0varcdQ","e":"AQAB"}]}',
-    'demo-cc-jwks',
-    true,
-    NOW(),
-    'demo-cc-key-1'
-),
-(
-    '21000000-0000-0000-0000-000000000102',
-    '20000000-0000-0000-0000-000000000102',
-    'jwks',
-    '{"keys":[{"kty":"RSA","kid":"demo-device-key-1","use":"sig","alg":"RS256","n":"yxfXmgXAnVynvxs0fGwdlmjA71O6tS8O3UuGDZ_7Z0BQ4t_T3fCjIRJeqQ3_-sHG-cocuKm6eCmbinEoneoQVbKZ7HjL_HmWQ2vm2CfpwvtY719R43oHLn1vXxx87kKqDVpCJwETlC-iyA9OkNlbSASY5aFTc5wFd1uxjEUUUwJm9yMn6lclZn23Mt32ayh7j6cfuCWSSI2jeV6v0wikeDm3MYE9G42PZJ9SX-fSsCgY7u3u9OopLgwEUBhnpQT1MEWsxy_hVqNpD-6nVOhhJdw5lka1qEzZJ1Keoq5xib4SmGDGOrEzebd-qq9XMWKNfvZ-BEzCcp1vyHUJ0B7HiQ","e":"AQAB"}]}',
-    'demo-device-jwks',
-    true,
-    NOW(),
-    'demo-device-key-1'
-),
-(
-    '21000000-0000-0000-0000-000000000103',
-    '20000000-0000-0000-0000-000000000103',
-    'jwks',
-    '{"keys":[{"kty":"RSA","kid":"demo-cert-key-1","use":"sig","alg":"RS256","n":"pPbIZWa9Kor7p4jaPrNrv29XigyKHTuBU3QG7xDRgy5GqbX16QBl715QtgCqe6mQAYhrazLH7LIecQ1ymeD7OCy6Bm0llgvGSTr8X_JU8dsrVN6MF7ab31bcOy1GggTdXpU-5QTfVcyd0MxQw1zxRubEj4jEhw2abUEn7PAdWgVLyB4r-sz0uMq7DQkUhOI8horrKowP_3rqumuba54Pj4hRwmKoSzEpW3MGvwhaanDzqTSWng00ooOysTNZou198Xpwq-BXxeX868KS-ud4DbebbzOQ85eyToRKC80jJscvlD8QcJJ6Uh_rcJPGJfaZPKgtwLy4q1szxFhXqUepXw","e":"AQAB"}]}',
-    'demo-cert-jwks',
-    true,
-    NOW(),
-    'demo-cert-key-1'
+    NOW()
 )
 ON CONFLICT (id) DO UPDATE SET
     type = EXCLUDED.type,
     value = EXCLUDED.value,
+    plain_value = EXCLUDED.plain_value,
     description = EXCLUDED.description,
-    is_active = EXCLUDED.is_active,
-    key_id = EXCLUDED.key_id;
+    is_active = EXCLUDED.is_active;
 
 -- ============================================================
 -- Demo users

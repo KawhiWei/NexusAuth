@@ -10,6 +10,8 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
 
     public const string TokenEndpointAuthMethodClientSecretPost = "client_secret_post";
 
+    public const string TokenEndpointAuthMethodClientSecretJwt = "client_secret_jwt";
+
     public const string TokenEndpointAuthMethodPrivateKeyJwt = "private_key_jwt";
 
     public const string ClientAssertionTypeJwtBearer = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
@@ -18,9 +20,11 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
 
     public List<OAuthClientSecret> ClientSecrets { get; private set; } = [];
 
-    public List<string> TokenEndpointAuthMethods { get; private set; } = [TokenEndpointAuthMethodClientSecretBasic];
+    public string TokenEndpointAuthMethod { get; private set; } = TokenEndpointAuthMethodClientSecretBasic;
 
-    public string TokenEndpointAuthMethod => TokenEndpointAuthMethods.FirstOrDefault() ?? TokenEndpointAuthMethodClientSecretBasic;
+    public string? Jwks { get; private set; }
+
+    public string? JwksUri { get; private set; }
 
     public string ClientName { get; private set; } = default!;
 
@@ -57,21 +61,25 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
         IEnumerable<string>? allowedScopes = null,
         IEnumerable<string>? allowedGrantTypes = null,
         bool requirePkce = true,
-        IEnumerable<string>? tokenEndpointAuthMethods = null,
-        IEnumerable<OAuthClientSecret>? clientSecrets = null)
+        string? tokenEndpointAuthMethod = null,
+        IEnumerable<OAuthClientSecret>? clientSecrets = null,
+        string? jwks = null,
+        string? jwksUri = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
         ArgumentException.ThrowIfNullOrWhiteSpace(clientName);
 
         var normalizedSecrets = clientSecrets?.ToList() ?? [];
-        var normalizedAuthMethods = NormalizeTokenEndpointAuthMethods(tokenEndpointAuthMethods);
-        ValidateTokenEndpointAuthentication(normalizedAuthMethods, normalizedSecrets);
+        var normalizedAuthMethod = NormalizeTokenEndpointAuthMethod(tokenEndpointAuthMethod);
+        ValidateTokenEndpointAuthentication(normalizedAuthMethod, normalizedSecrets, jwks, jwksUri);
 
         var client = new OAuthClient(id)
         {
             ClientId = clientId,
             ClientSecrets = normalizedSecrets,
-            TokenEndpointAuthMethods = normalizedAuthMethods,
+            TokenEndpointAuthMethod = normalizedAuthMethod,
+            Jwks = NormalizeNullableValue(jwks),
+            JwksUri = NormalizeNullableValue(jwksUri),
             ClientName = clientName,
             Description = description,
             RedirectUris = redirectUris?.ToList() ?? [],
@@ -96,7 +104,9 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
         IEnumerable<string>? allowedGrantTypes = null,
         bool requirePkce = true,
         string tokenEndpointAuthMethod = TokenEndpointAuthMethodClientSecretBasic,
-        IEnumerable<OAuthClientSecret>? clientSecrets = null)
+        IEnumerable<OAuthClientSecret>? clientSecrets = null,
+        string? jwks = null,
+        string? jwksUri = null)
     {
         return Create(
             Guid.NewGuid(),
@@ -108,34 +118,10 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
             allowedScopes,
             allowedGrantTypes,
             requirePkce,
-            [tokenEndpointAuthMethod],
-            clientSecrets);
-    }
-
-    public static OAuthClient Create(
-        string clientId,
-        string clientName,
-        string? description = null,
-        IEnumerable<string>? redirectUris = null,
-        IEnumerable<string>? postLogoutRedirectUris = null,
-        IEnumerable<string>? allowedScopes = null,
-        IEnumerable<string>? allowedGrantTypes = null,
-        bool requirePkce = true,
-        IEnumerable<string>? tokenEndpointAuthMethods = null,
-        IEnumerable<OAuthClientSecret>? clientSecrets = null)
-    {
-        return Create(
-            Guid.NewGuid(),
-            clientId,
-            clientName,
-            description,
-            redirectUris,
-            postLogoutRedirectUris,
-            allowedScopes,
-            allowedGrantTypes,
-            requirePkce,
-            tokenEndpointAuthMethods,
-            clientSecrets);
+            tokenEndpointAuthMethod,
+            clientSecrets,
+            jwks,
+            jwksUri);
     }
 
     public bool VerifyClientSecret(string rawSecret)
@@ -143,33 +129,23 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
         return ClientSecrets.Any(secret => secret.VerifySharedSecret(rawSecret));
     }
 
-    /// <summary>
-    /// 返回当前客户端注册的 JWKS。
-    /// 主要调用方：private_key_jwt 断言验签。
-    /// </summary>
-    public string? GetJwks()
-    {
-        return ClientSecrets
-            .FirstOrDefault(secret => secret.IsActive && string.Equals(secret.Type, OAuthClientSecret.TypeJwks, StringComparison.Ordinal))
-            ?.Value;
-    }
-
-    public IReadOnlyList<string> GetJwksValues()
+    public IReadOnlyList<string> GetSharedSecretValues()
     {
         return [.. ClientSecrets
-            .Where(secret => secret.IsActive && string.Equals(secret.Type, OAuthClientSecret.TypeJwks, StringComparison.Ordinal))
-            .Select(secret => secret.Value)];
+            .Where(secret => secret.IsActive && !string.IsNullOrWhiteSpace(secret.PlainValue))
+            .Select(secret => secret.PlainValue!)];
     }
 
     public bool RequiresPrivateKeyJwtAuthentication()
     {
-        return TokenEndpointAuthMethods.Contains(TokenEndpointAuthMethodPrivateKeyJwt, StringComparer.Ordinal);
+        return string.Equals(TokenEndpointAuthMethod, TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal);
     }
 
     public bool AllowsClientSecretAuthentication()
     {
-        return TokenEndpointAuthMethods.Contains(TokenEndpointAuthMethodClientSecretBasic, StringComparer.Ordinal)
-            || TokenEndpointAuthMethods.Contains(TokenEndpointAuthMethodClientSecretPost, StringComparer.Ordinal);
+        return string.Equals(TokenEndpointAuthMethod, TokenEndpointAuthMethodClientSecretBasic, StringComparison.Ordinal)
+            || string.Equals(TokenEndpointAuthMethod, TokenEndpointAuthMethodClientSecretPost, StringComparison.Ordinal)
+            || string.Equals(TokenEndpointAuthMethod, TokenEndpointAuthMethodClientSecretJwt, StringComparison.Ordinal);
     }
 
     public bool IsValidRedirectUri(string uri)
@@ -200,8 +176,10 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
         IEnumerable<string>? allowedGrantTypes = null,
         bool? requirePkce = null,
         bool? isActive = null,
-        IEnumerable<string>? tokenEndpointAuthMethods = null,
-        IEnumerable<OAuthClientSecret>? clientSecrets = null)
+        string? tokenEndpointAuthMethod = null,
+        IEnumerable<OAuthClientSecret>? clientSecrets = null,
+        string? jwks = null,
+        string? jwksUri = null)
     {
         if (!string.IsNullOrWhiteSpace(clientName))
             ClientName = clientName;
@@ -227,43 +205,77 @@ public class OAuthClient : AggregateRootWithIdentity<Guid>
         if (isActive is { } isActiveValue)
             IsActive = isActiveValue;
 
-        if (tokenEndpointAuthMethods is { })
-            TokenEndpointAuthMethods = NormalizeTokenEndpointAuthMethods(tokenEndpointAuthMethods);
-        
+        if (tokenEndpointAuthMethod is { })
+            TokenEndpointAuthMethod = NormalizeTokenEndpointAuthMethod(tokenEndpointAuthMethod);
+
         if (clientSecrets is { } secrets)
             ClientSecrets.AddRange(secrets);
 
-        ValidateTokenEndpointAuthentication(TokenEndpointAuthMethods, ClientSecrets);
+        if (jwks is { })
+            Jwks = NormalizeNullableValue(jwks);
+
+        if (jwksUri is { })
+            JwksUri = NormalizeNullableValue(jwksUri);
+
+        ValidateTokenEndpointAuthentication(TokenEndpointAuthMethod, ClientSecrets, Jwks, JwksUri);
     }
 
     public bool AllowsTokenEndpointAuthMethod(string tokenEndpointAuthMethod)
     {
-        return TokenEndpointAuthMethods.Contains(tokenEndpointAuthMethod, StringComparer.Ordinal);
+        return string.Equals(TokenEndpointAuthMethod, tokenEndpointAuthMethod, StringComparison.Ordinal);
     }
 
-    private static List<string> NormalizeTokenEndpointAuthMethods(IEnumerable<string>? tokenEndpointAuthMethods)
+    public void SetJwks(string? jwks, string? jwksUri = null)
     {
-        var methods = tokenEndpointAuthMethods?
-            .Where(method => !string.IsNullOrWhiteSpace(method))
-            .Select(method => method.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .ToList() ?? [];
-
-        return methods.Count == 0 ? [TokenEndpointAuthMethodClientSecretBasic] : methods;
+        Jwks = NormalizeNullableValue(jwks);
+        JwksUri = NormalizeNullableValue(jwksUri);
+        ValidateTokenEndpointAuthentication(TokenEndpointAuthMethod, ClientSecrets, Jwks, JwksUri);
     }
 
     private static void ValidateTokenEndpointAuthentication(
-        IReadOnlyCollection<string> tokenEndpointAuthMethods,
-        IReadOnlyCollection<OAuthClientSecret> clientSecrets)
+        string tokenEndpointAuthMethod,
+        IReadOnlyCollection<OAuthClientSecret> clientSecrets,
+        string? jwks,
+        string? jwksUri)
     {
-        foreach (var tokenEndpointAuthMethod in tokenEndpointAuthMethods)
+        if (!string.Equals(tokenEndpointAuthMethod, TokenEndpointAuthMethodClientSecretBasic, StringComparison.Ordinal)
+            && !string.Equals(tokenEndpointAuthMethod, TokenEndpointAuthMethodClientSecretPost, StringComparison.Ordinal)
+            && !string.Equals(tokenEndpointAuthMethod, TokenEndpointAuthMethodClientSecretJwt, StringComparison.Ordinal)
+            && !string.Equals(tokenEndpointAuthMethod, TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal))
         {
-            if (!string.Equals(tokenEndpointAuthMethod, TokenEndpointAuthMethodClientSecretBasic, StringComparison.Ordinal)
-                && !string.Equals(tokenEndpointAuthMethod, TokenEndpointAuthMethodClientSecretPost, StringComparison.Ordinal)
-                && !string.Equals(tokenEndpointAuthMethod, TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException($"Unsupported token_endpoint_auth_method '{tokenEndpointAuthMethod}'.");
-            }
+            throw new InvalidOperationException($"Unsupported token_endpoint_auth_method '{tokenEndpointAuthMethod}'.");
         }
+
+        if (string.Equals(tokenEndpointAuthMethod, TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal))
+        {
+            if (string.IsNullOrWhiteSpace(jwks) && string.IsNullOrWhiteSpace(jwksUri))
+                return;
+
+            if (!string.IsNullOrWhiteSpace(jwks) && !string.IsNullOrWhiteSpace(jwksUri))
+                throw new InvalidOperationException("private_key_jwt client cannot configure both jwks and jwks_uri.");
+
+            return;
+        }
+
+        if (string.Equals(tokenEndpointAuthMethod, TokenEndpointAuthMethodClientSecretJwt, StringComparison.Ordinal)
+            && clientSecrets.Any(secret => secret.IsActive && string.IsNullOrWhiteSpace(secret.PlainValue)))
+        {
+            throw new InvalidOperationException("client_secret_jwt requires retrievable shared secret material.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(jwks) || !string.IsNullOrWhiteSpace(jwksUri))
+            throw new InvalidOperationException($"token_endpoint_auth_method '{tokenEndpointAuthMethod}' does not use jwks or jwks_uri.");
+    }
+
+    private static string NormalizeTokenEndpointAuthMethod(string? tokenEndpointAuthMethod)
+    {
+        return string.IsNullOrWhiteSpace(tokenEndpointAuthMethod)
+            ? TokenEndpointAuthMethodClientSecretBasic
+            : tokenEndpointAuthMethod.Trim();
+    }
+
+    private static string? NormalizeNullableValue(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }

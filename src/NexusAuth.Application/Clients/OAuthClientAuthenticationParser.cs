@@ -16,7 +16,7 @@ public static class OAuthClientAuthenticationParser
         string? assertionAudience = null)
     {
         var formAuthMethod = !string.IsNullOrWhiteSpace(formClientAssertion) || !string.IsNullOrWhiteSpace(formClientAssertionType)
-            ? OAuthClient.TokenEndpointAuthMethodPrivateKeyJwt
+            ? null
             : !string.IsNullOrWhiteSpace(formClientSecret)
                 ? OAuthClient.TokenEndpointAuthMethodClientSecretPost
                 : null;

@@ -34,21 +34,27 @@
     min-height: 0;
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
+
     &::-webkit-scrollbar {
       width: 2px;
     }
+
     &::-webkit-scrollbar-track {
       background: transparent;
     }
+
     &::-webkit-scrollbar-thumb {
       background: transparent;
       border-radius: 999px;
     }
+
     &:hover {
       scrollbar-color: var(--td-bg-color-component) transparent;
+
       &::-webkit-scrollbar-thumb {
         background: var(--td-bg-color-component);
       }
+
       &::-webkit-scrollbar-thumb:hover {
         background: var(--td-bg-color-component-hover);
       }
@@ -68,6 +74,7 @@
     cursor: pointer;
     color: var(--td-text-color-secondary);
     border-top: 1px solid var(--td-component-stroke);
+
     &:hover {
       color: var(--td-text-color-primary);
       background: var(--td-bg-color-container-hover);
@@ -99,7 +106,7 @@
       padding: 0;
       display: flex;
       align-items: center;
-      height: 40px; 
+      height: 40px;
       overflow: hidden;
 
       .logo-title {
@@ -136,25 +143,35 @@
     flex-direction: column;
   }
 
+  .layout-content-tabs {
+    flex-shrink: 0;
+    width: 100%;
+    background-color: var(--td-bg-color-page);
+
+    .t-tabs {
+      width: 100%;
+    }
+
+    .t-tabs__header {
+      margin: 0;
+    }
+
+    .t-tabs__nav-wrap {
+      padding: 0;
+    }
+
+    .t-tabs__content {
+      display: none;
+    }
+  }
+
   .layout-content-inner {
     flex: 1;
     min-height: 0;
-    padding-top: 20px;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     background: var(--td-bg-color-page);
-  }
-
-  .layout-content-header {
-    flex-shrink: 0;
-    z-index: 5;
-    background: var(--td-bg-color-page);
-    padding: 0 24px 16px;
-  }
-
-  .layout-content-breadcrumb {
-    margin-bottom: 0;
   }
 
   .layout-main-content {
@@ -163,7 +180,7 @@
     overflow: auto;
     overflow-x: hidden;
     scrollbar-gutter: stable;
-    padding: 0 24px 20px;
+    padding: 10px;
     box-sizing: border-box;
   }
 

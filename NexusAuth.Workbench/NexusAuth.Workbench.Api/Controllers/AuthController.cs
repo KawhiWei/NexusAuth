@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NexusAuth.Extension;
@@ -96,9 +95,9 @@ public class AuthController : ControllerBase
                 new("id_token", idToken),
             };
 
-            var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
+            var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, WorkbenchAuthenticationDefaults.CookieScheme));
 
-            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties
+            await HttpContext.SignInAsync(WorkbenchAuthenticationDefaults.CookieScheme, principal, new AuthenticationProperties
             {
                 IsPersistent = true,
                 ExpiresUtc = DateTimeOffset.UtcNow.AddHours(24),
@@ -131,6 +130,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("/api/auth/logout")]
+    [Authorize]
     public async Task<IActionResult> Logout(CancellationToken ct)
     {
         var logoutUrl = string.Empty;

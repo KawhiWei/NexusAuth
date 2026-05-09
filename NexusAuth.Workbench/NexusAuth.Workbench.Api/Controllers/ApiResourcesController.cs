@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NexusAuth.Application;
 using NexusAuth.Application.Services.ApiResources;
 
 namespace NexusAuth.Workbench.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/api-resources")]
 public class ApiResourcesController : ControllerBase

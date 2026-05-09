@@ -112,7 +112,6 @@ const PublicContent = () => {
         };
     }, [breadcrumbItems.length, updateContentMaxHeight]);
 
-
     return (
 
         <Suspense fallback={<GlobalLoading height={contentMaxHeight || 320} />}>

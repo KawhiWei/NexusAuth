@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Card, Form, Input, Pagination, Select, Space, Table, type TableProps } from 'tdesign-react';
+import { Button, Form, Input, Pagination, Select, Space, Table, type TableProps } from 'tdesign-react';
 
 type DictionaryStatus = '启用' | '停用';
 type DictionaryCategory = '基础字典' | '业务字典' | '系统字典';
@@ -152,7 +152,7 @@ const DictionaryConfigPage = () => {
 
   return (
     <div>
-      <Card bordered>
+      <div className="page-filter-bar">
         <Form layout="inline">
           <Form.FormItem label="关键词">
             <Input
@@ -203,9 +203,9 @@ const DictionaryConfigPage = () => {
             </Space>
           </Form.FormItem>
         </Form>
-      </Card>
+      </div>
 
-      <Card bordered style={{ marginTop: 16 }}>
+      <div className="page-table-section">
         <div ref={tableWrapRef}>
           <Table
             rowKey="id"
@@ -229,7 +229,7 @@ const DictionaryConfigPage = () => {
             onPageSizeChange={onPageSizeChange}
           />
         </div>
-      </Card>
+      </div>
     </div>
   );
 };

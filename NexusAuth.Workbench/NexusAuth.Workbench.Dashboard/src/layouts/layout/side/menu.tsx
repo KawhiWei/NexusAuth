@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { Menu, MenuValue } from "tdesign-react";
-import { getMenuList } from "../../../api/auth";
+import { getVisibleMenuList } from "../../../api/auth";
 import { setPageLoading } from '../../../page-loading';
 import IconComponent from "../../common/icon";
 
@@ -17,6 +17,7 @@ interface MenuItemData {
     id: string;
     route: string;
     name: string;
+    show?: boolean;
     iconName: string | null;
     parentId: string | null;
     path: string;
@@ -28,6 +29,7 @@ interface RawMenuItem {
     id: string;
     route: string;
     name: string;
+    show?: boolean;
     iconName: string | null;
     parentId: string | null;
 }
@@ -40,6 +42,10 @@ interface ParentMenuNode {
 const resolveMenuPath = (route: string, parentMenu?: ParentMenuNode) => {
     if (!parentMenu) {
         return route || '';
+    }
+
+    if (route.startsWith('/')) {
+        return route;
     }
 
     const parentPath = parentMenu.parentPaths[parentMenu.parentPaths.length - 1] || '';
@@ -59,14 +65,14 @@ const MenuComponent = (props: IProp) => {
     const [initialized, setInitialized] = useState(false);
 
     useEffect(() => {
-        getMenuList().then(res => {
+        getVisibleMenuList().then(res => {
             setMenus(res);
         });
     }, []);
 
     const transferTreeMenuData = useCallback((menuList: RawMenuItem[], parentMenu?: ParentMenuNode): MenuItemData[] => {
         const parentId = parentMenu ? parentMenu.id : null;
-        return menuList.filter(item => item.parentId === parentId).map(item => {
+        return menuList.filter(item => item.parentId === parentId && item.show === true).map(item => {
             const parentPaths = parentMenu?.parentPaths || [];
             const path = resolveMenuPath(item.route, parentMenu);
             return {

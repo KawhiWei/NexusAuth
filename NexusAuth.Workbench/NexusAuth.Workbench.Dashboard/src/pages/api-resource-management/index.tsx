@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AxiosError } from 'axios';
-import { Button, Card, Drawer, Form, Input, MessagePlugin, Pagination, Select, Space, Switch, Table, Tag, Textarea, Tooltip, type TableProps } from 'tdesign-react';
+import { Button, Drawer, Form, Input, MessagePlugin, Pagination, Select, Space, Switch, Table, Tag, Textarea, Tooltip, type TableProps } from 'tdesign-react';
 import { ErrorCircleFilledIcon } from 'tdesign-icons-react';
 import {
   createApiResource,
@@ -377,7 +377,7 @@ const ApiResourceManagementPage = () => {
         </div>
       </Drawer>
 
-      <Card bordered>
+      <div className="page-filter-bar">
         <Form layout="inline">
           <Form.FormItem label="关键词">
             <Input
@@ -414,9 +414,9 @@ const ApiResourceManagementPage = () => {
             </Space>
           </Form.FormItem>
         </Form>
-      </Card>
+      </div>
 
-      <Card bordered style={{ marginTop: 16 }}>
+      <div className="page-table-section">
         <div ref={tableWrapRef}>
           <Table
             rowKey="id"
@@ -444,7 +444,7 @@ const ApiResourceManagementPage = () => {
             }}
           />
         </div>
-      </Card>
+      </div>
     </div>
   );
 };

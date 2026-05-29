@@ -36,6 +36,28 @@ export const getMenuList = () => {
                     children: [],
                 },
                 {
+                    id: 'oauth-client-create',
+                    route: '/oauth/client-management/create',
+                    componentPath: '/client-management/create/index.tsx',
+                    name: '新增客户端',
+                    show: false,
+                    iconName: null,
+                    parentId: 'oauth-client',
+                    parentPaths: Array<string>,
+                    children: [],
+                },
+                {
+                    id: 'oauth-client-edit',
+                    route: '/oauth/client-management/edit/:id',
+                    componentPath: '/client-management/edit/index.tsx',
+                    name: '编辑客户端',
+                    show: false,
+                    iconName: null,
+                    parentId: 'oauth-client',
+                    parentPaths: Array<string>,
+                    children: [],
+                },
+                {
                     id: 'oauth-user',
                     route: '/oauth/user-management',
                     componentPath: '/user-management/index.tsx',
@@ -137,4 +159,9 @@ export const getMenuList = () => {
             ])
         })
     })
+}
+
+export const getVisibleMenuList = async () => {
+    const menus = await getMenuList();
+    return menus.filter(menu => menu.show === true);
 }

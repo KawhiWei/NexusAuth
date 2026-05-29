@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Card, Form, Input, Pagination, Select, Space, Table, type TableProps } from 'tdesign-react';
+import { Button, Form, Input, Pagination, Select, Space, Table, type TableProps } from 'tdesign-react';
 
 type MappingStatus = '启用' | '停用';
 type SourceSystem = 'CRM' | 'OMS' | 'ERP';
@@ -144,7 +144,7 @@ const SaleRefIdMappingConfigPage = () => {
 
   return (
     <div>
-      <Card bordered>
+      <div className="page-filter-bar">
         <Form layout="inline">
           <Form.FormItem label="关键词">
             <Input
@@ -195,9 +195,9 @@ const SaleRefIdMappingConfigPage = () => {
             </Space>
           </Form.FormItem>
         </Form>
-      </Card>
+      </div>
 
-      <Card bordered style={{ marginTop: 16 }}>
+      <div className="page-table-section">
         <div ref={tableWrapRef}>
           <Table
             rowKey="id"
@@ -224,7 +224,7 @@ const SaleRefIdMappingConfigPage = () => {
             }}
           />
         </div>
-      </Card>
+      </div>
     </div>
   );
 };

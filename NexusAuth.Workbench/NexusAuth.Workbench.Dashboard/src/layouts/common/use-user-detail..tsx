@@ -11,6 +11,10 @@ const resolveMenuPath = (route: string, parentMenu?: { parentPaths?: string[] })
         return route || '';
     }
 
+    if (route.startsWith('/')) {
+        return route;
+    }
+
     const parentPaths = parentMenu.parentPaths || [];
     const parentPath = parentPaths[parentPaths.length - 1] || '';
     if (parentPath && route.startsWith(`${parentPath}/`)) {
@@ -50,14 +54,18 @@ const useUserDetail = () => {
                         parentPaths,
                     });
 
+                    if (children?.length) {
+                        formatMenus(children, menuGroup, routes, {
+                            ...menu,
+                            parentPaths: [...parentPaths, path || ''].filter(o => o),
+                        });
+                    }
+
                     return {
                         ...menu,
                         path,
                         parentPaths,
-                        children: children?.length ? formatMenus(children, menuGroup, routes, {
-                            ...menu,
-                            parentPaths: [...parentPaths, path || ''].filter(o => o),
-                        }) : undefined,
+                        children,
                     };
                 });
             }
@@ -92,9 +100,8 @@ const useUserDetail = () => {
                     /**
                      * @description: 路由格式化将二级路由和一级路由合并生成路由列表
                      */
-                    const routePath = menu.path.replace(/^\//, '');
                     var route = {
-                        path: routePath,
+                        path: menu.path,
                         id: menu.path,
                         // Component: menu.componentPath ? lazy(modules[`../pages/${menu.componentPath}/index.tsx`]) : ErrorPage,
                         Component: menu.componentPath ? lazyLoad[menu.componentPath] ? lazy(lazyLoad[menu.componentPath]) : ErrorPage : ErrorPage,
@@ -104,10 +111,12 @@ const useUserDetail = () => {
                             path: menu.route,
                             name: menu.name,
                             icon: menu.icon,
+                            show: menu.show,
                         },
                     }
                     return route
-                }), {
+                }),
+                {
                     id: '*',
                     path: '*',
                     Component: ErrorPage,

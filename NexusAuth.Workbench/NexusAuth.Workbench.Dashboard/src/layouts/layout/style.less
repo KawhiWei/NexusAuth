@@ -180,8 +180,35 @@
     overflow: auto;
     overflow-x: hidden;
     scrollbar-gutter: stable;
-    padding: 10px;
+    padding: 16px;
     box-sizing: border-box;
+
+    > div {
+      min-height: 100%;
+      box-sizing: border-box;
+      padding: 16px;
+      border: 1px solid var(--td-component-stroke);
+      border-radius: var(--td-radius-medium);
+      background: var(--td-bg-color-container);
+    }
+
+    .dashboard-page,
+    .ai-agent-page {
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+    }
+
+    .page-filter-bar {
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--td-component-stroke);
+    }
+
+    .page-table-section {
+      min-height: 0;
+    }
   }
 
   .layout-footer {

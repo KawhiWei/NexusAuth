@@ -31,6 +31,26 @@ interface TabItem {
 
 const DEFAULT_TAB_PATH = '/dashboard';
 const DEFAULT_TAB_LABEL = '仪表盘';
+const TABS_STORAGE_KEY = 'nexus-auth-layout-tabs';
+
+const getInitialTabs = (): TabItem[] => {
+  const defaultTabs = [{ value: DEFAULT_TAB_PATH, label: DEFAULT_TAB_LABEL, removable: false }];
+  try {
+    const raw = window.localStorage.getItem(TABS_STORAGE_KEY);
+    if (!raw) {
+      return defaultTabs;
+    }
+    const parsed = JSON.parse(raw) as TabItem[];
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      return defaultTabs;
+    }
+    const validTabs = parsed.filter((tab) => tab?.value && tab?.label);
+    const hasDashboard = validTabs.some((tab) => tab.value === DEFAULT_TAB_PATH);
+    return hasDashboard ? validTabs : [...defaultTabs, ...validTabs];
+  } catch {
+    return defaultTabs;
+  }
+};
 
 const PublicLayout = () => {
   const matches = useMatches();
@@ -43,7 +63,11 @@ const PublicLayout = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => getThemeMode());
   const [menuMap, setMenuMap] = useState<Record<string, MenuInfo>>({});
-  const [tabs, setTabs] = useState<TabItem[]>([{ value: DEFAULT_TAB_PATH, label: DEFAULT_TAB_LABEL, removable: false }]);
+  const [tabs, setTabs] = useState<TabItem[]>(getInitialTabs);
+
+  useEffect(() => {
+    window.localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify(tabs));
+  }, [tabs]);
 
   useEffect(() => {
     getMenuList().then((res) => {
@@ -56,7 +80,7 @@ const PublicLayout = () => {
           .forEach((item) => {
             const parentPaths = parentMenu?.parentPaths || [];
             const lastPath = parentPaths.length > 0 ? parentPaths[parentPaths.length - 1] : '';
-            const path = (parentMenu ? `${lastPath}${item.route}` : item.route) || '';
+            const path = (parentMenu && !item.route.startsWith('/') ? `${lastPath}${item.route}` : item.route) || '';
             if (path) {
               map[path] = { name: item.name };
             }

@@ -7,10 +7,17 @@ using NexusAuth.Domain.Repositories;
 
 namespace NexusAuth.Persistence.Repositories;
 
-public class DeviceAuthorizationRepository(IUnitOfWork unitOfWork) : EfCoreEntityRepository<DeviceAuthorization, Guid>(unitOfWork), IDeviceAuthorizationRepository
+public class DeviceAuthorizationRepository : EfCoreEntityRepository<DeviceAuthorization, Guid>, IDeviceAuthorizationRepository
 {
-    private readonly LuckDbContextBase _dbContext = unitOfWork.GetLuckDbContext() as LuckDbContextBase
-        ?? throw new InvalidOperationException("Failed to resolve LuckDbContext.");
+    private readonly LuckDbContextBase _dbContext;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public DeviceAuthorizationRepository(IUnitOfWork unitOfWork) : base(unitOfWork)
+    {
+        _unitOfWork = unitOfWork;
+        _dbContext = unitOfWork.GetLuckDbContext() as LuckDbContextBase
+            ?? throw new InvalidOperationException("Failed to resolve LuckDbContext.");
+    }
 
     public async Task<DeviceAuthorization?> FindByDeviceCodeAsync(string deviceCode, CancellationToken ct = default)
     {
@@ -25,12 +32,12 @@ public class DeviceAuthorizationRepository(IUnitOfWork unitOfWork) : EfCoreEntit
     public async Task AddAsync(DeviceAuthorization authorization, CancellationToken ct = default)
     {
         _dbContext.Add(authorization);
-        await unitOfWork.CommitAsync(ct);
+        await _unitOfWork.CommitAsync(ct);
     }
 
     public async Task UpdateAsync(DeviceAuthorization authorization, CancellationToken ct = default)
     {
         _dbContext.Set<DeviceAuthorization>().Update(authorization);
-        await unitOfWork.CommitAsync(ct);
+        await _unitOfWork.CommitAsync(ct);
     }
 }

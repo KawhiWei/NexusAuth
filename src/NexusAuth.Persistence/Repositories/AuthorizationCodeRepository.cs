@@ -7,10 +7,17 @@ using NexusAuth.Domain.Repositories;
 
 namespace NexusAuth.Persistence.Repositories;
 
-public class AuthorizationCodeRepository(IUnitOfWork unitOfWork) : EfCoreEntityRepository<AuthorizationCode, Guid>(unitOfWork), IAuthorizationCodeRepository
+public class AuthorizationCodeRepository : EfCoreEntityRepository<AuthorizationCode, Guid>, IAuthorizationCodeRepository
 {
-    private readonly LuckDbContextBase _dbContext = unitOfWork.GetLuckDbContext() as LuckDbContextBase
-        ?? throw new InvalidOperationException("Failed to resolve LuckDbContext.");
+    private readonly LuckDbContextBase _dbContext;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public AuthorizationCodeRepository(IUnitOfWork unitOfWork) : base(unitOfWork)
+    {
+        _unitOfWork = unitOfWork;
+        _dbContext = unitOfWork.GetLuckDbContext() as LuckDbContextBase
+            ?? throw new InvalidOperationException("Failed to resolve LuckDbContext.");
+    }
 
     public async Task<AuthorizationCode?> FindByCodeAsync(string code, CancellationToken ct = default)
     {
@@ -20,7 +27,7 @@ public class AuthorizationCodeRepository(IUnitOfWork unitOfWork) : EfCoreEntityR
     public async Task AddAsync(AuthorizationCode code, CancellationToken ct = default)
     {
         _dbContext.Add(code);
-        await unitOfWork.CommitAsync(ct);
+        await _unitOfWork.CommitAsync(ct);
     }
 
     public async Task MarkUsedAsync(Guid id, CancellationToken ct = default)
@@ -29,7 +36,7 @@ public class AuthorizationCodeRepository(IUnitOfWork unitOfWork) : EfCoreEntityR
         if (entity is not null)
         {
             entity.MarkAsUsed();
-            await unitOfWork.CommitAsync(ct);
+            await _unitOfWork.CommitAsync(ct);
         }
     }
 }

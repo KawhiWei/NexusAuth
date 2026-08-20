@@ -123,7 +123,7 @@ dotnet run --project demo/src/Demo.RefreshToken
 ```bash
 psql -U nexusauth -f production-init.sql
 psql -U nexusauth -d nexusauth -f demo/seed.sql
-psql -U nexusauth -d nexusauth -f NexusAuth.Workbench/NexusAuth.Workbench.Api/seed.sql
+psql -U nexusauth -d nexusauth -f admin/src/NexusAuth.Workbench.Api/seed.sql
 ```
 
 ### 测试账号

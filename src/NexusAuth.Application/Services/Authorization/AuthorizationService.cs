@@ -6,7 +6,6 @@ namespace NexusAuth.Application.Services.Authorization;
 
 public class AuthorizationService(
     IAuthorizationCodeRepository codeRepository,
-    IOAuthClientRepository clientRepository,
     IClientService clientService,
     ISecurityPolicyService securityPolicyService) : IAuthorizationService
 {

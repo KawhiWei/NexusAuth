@@ -7,10 +7,17 @@ using NexusAuth.Domain.Repositories;
 
 namespace NexusAuth.Persistence.Repositories;
 
-public class TokenBlacklistRepository(IUnitOfWork unitOfWork) : EfCoreEntityRepository<TokenBlacklistEntry, Guid>(unitOfWork), ITokenBlacklistRepository
+public class TokenBlacklistRepository : EfCoreEntityRepository<TokenBlacklistEntry, Guid>, ITokenBlacklistRepository
 {
-    private readonly LuckDbContextBase _dbContext = unitOfWork.GetLuckDbContext() as LuckDbContextBase
-        ?? throw new InvalidOperationException("Failed to resolve LuckDbContext.");
+    private readonly LuckDbContextBase _dbContext;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public TokenBlacklistRepository(IUnitOfWork unitOfWork) : base(unitOfWork)
+    {
+        _unitOfWork = unitOfWork;
+        _dbContext = unitOfWork.GetLuckDbContext() as LuckDbContextBase
+            ?? throw new InvalidOperationException("Failed to resolve LuckDbContext.");
+    }
 
     public async Task<TokenBlacklistEntry?> FindByJtiAsync(string jti, CancellationToken ct = default)
     {
@@ -25,6 +32,6 @@ public class TokenBlacklistRepository(IUnitOfWork unitOfWork) : EfCoreEntityRepo
     public async Task AddAsync(TokenBlacklistEntry entry, CancellationToken ct = default)
     {
         _dbContext.Add(entry);
-        await unitOfWork.CommitAsync(ct);
+        await _unitOfWork.CommitAsync(ct);
     }
 }

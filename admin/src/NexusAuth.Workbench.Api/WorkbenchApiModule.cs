@@ -30,15 +30,21 @@ public class WorkbenchApiModule : LuckAppModule
         var audience = configuration["Auth:Audience"];
         var requireHttpsMetadata = bool.TryParse(configuration["Auth:RequireHttpsMetadata"], out var parsedRequireHttpsMetadata)
             && parsedRequireHttpsMetadata;
+        var requiredAuthConfiguration = RequireAuthConfiguration(
+            authority,
+            clientId,
+            redirectUri,
+            postLogoutRedirectUri,
+            scope);
 
         services.AddNexusAuth(options =>
         {
-            options.Authority = authority;
-            options.ClientId = clientId;
+            options.Authority = requiredAuthConfiguration.Authority;
+            options.ClientId = requiredAuthConfiguration.ClientId;
             options.ClientSecret = clientSecret;
-            options.RedirectUri = redirectUri;
-            options.PostLogoutRedirectUri = postLogoutRedirectUri;
-            options.Scope = scope;
+            options.RedirectUri = requiredAuthConfiguration.RedirectUri;
+            options.PostLogoutRedirectUri = requiredAuthConfiguration.PostLogoutRedirectUri;
+            options.Scope = requiredAuthConfiguration.Scope;
         });
 
         services.AddAuthentication(WorkbenchAuthenticationDefaults.Scheme)
@@ -68,7 +74,7 @@ public class WorkbenchApiModule : LuckAppModule
             })
             .AddJwtBearer(WorkbenchAuthenticationDefaults.BearerScheme, options =>
             {
-                var normalizedAuthority = authority!.TrimEnd('/');
+                var normalizedAuthority = requiredAuthConfiguration.Authority.TrimEnd('/');
                 options.Authority = normalizedAuthority;
                 options.RequireHttpsMetadata = requireHttpsMetadata;
                 options.MetadataAddress = $"{normalizedAuthority}/.well-known/openid-configuration";
@@ -102,6 +108,43 @@ public class WorkbenchApiModule : LuckAppModule
 
         base.ConfigureServices(context);
     }
+
+    private static RequiredAuthConfiguration RequireAuthConfiguration(
+        string? authority,
+        string? clientId,
+        string? redirectUri,
+        string? postLogoutRedirectUri,
+        string? scope)
+    {
+        var errors = new List<string>();
+        if (string.IsNullOrWhiteSpace(authority))
+            errors.Add("Authority is required.");
+        if (string.IsNullOrWhiteSpace(clientId))
+            errors.Add("ClientId is required.");
+        if (string.IsNullOrWhiteSpace(redirectUri))
+            errors.Add("RedirectUri is required.");
+        if (string.IsNullOrWhiteSpace(postLogoutRedirectUri))
+            errors.Add("PostLogoutRedirectUri is required.");
+        if (string.IsNullOrWhiteSpace(scope))
+            errors.Add("Scope is required.");
+
+        if (errors.Count > 0)
+            throw new InvalidOperationException(string.Join(" ", errors));
+
+        return new RequiredAuthConfiguration(
+            authority ?? throw new InvalidOperationException("Authority is required."),
+            clientId ?? throw new InvalidOperationException("ClientId is required."),
+            redirectUri ?? throw new InvalidOperationException("RedirectUri is required."),
+            postLogoutRedirectUri ?? throw new InvalidOperationException("PostLogoutRedirectUri is required."),
+            scope ?? throw new InvalidOperationException("Scope is required."));
+    }
+
+    private sealed record RequiredAuthConfiguration(
+        string Authority,
+        string ClientId,
+        string RedirectUri,
+        string PostLogoutRedirectUri,
+        string Scope);
 
     public override void ApplicationInitialization(ApplicationContext context)
     {

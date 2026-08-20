@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Workbench.Api", "NexusAuth.Workbench.Api\NexusAuth.Workbench.Api.csproj", "{D98CB79B-9360-427D-AF3E-8D44335FC93A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Workbench.Api", "src\NexusAuth.Workbench.Api\NexusAuth.Workbench.Api.csproj", "{D98CB79B-9360-427D-AF3E-8D44335FC93A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{BB8C138D-5197-42D8-87C8-CB6B2A25AB0A}"
 EndProject
@@ -8,7 +8,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Application", "..
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Domain", "..\src\NexusAuth.Domain\NexusAuth.Domain.csproj", "{549DF4B5-F54E-4286-B617-9A22C4BECC4D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Extension", "..\src\NexusAuth.Extension\NexusAuth.Extension.csproj", "{491A9768-5950-40DF-B3C3-FC6B8DF094DA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Extension", "src\NexusAuth.Extension\NexusAuth.Extension.csproj", "{491A9768-5950-40DF-B3C3-FC6B8DF094DA}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Persistence", "..\src\NexusAuth.Persistence\NexusAuth.Persistence.csproj", "{C71E0D1A-DB81-4431-96D7-15320236CBF1}"
 EndProject

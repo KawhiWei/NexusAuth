@@ -3,6 +3,7 @@
     <ItemGroup>
         <PackageReference Include="Luck.EntityFrameworkCore" />
         <PackageReference Include="Luck.EntityFrameworkCore.PostgreSQL" />
+        <PackageReference Include="Luck.Framework" />
     </ItemGroup>
 
     <ItemGroup>

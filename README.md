@@ -80,22 +80,25 @@ NexusAuth 是一个基于 ASP.NET Core 的 OAuth 2.0 / OpenID Connect 认证授�
 | 目录 | 说明 | 端口 |
 |------|------|------|
 | `src/NexusAuth.Host` | OAuth Provider (认证服务) | 5100 |
-| `src/NexusAuth.Extension` | 通用扩展类库 | - |
+| `src/NexusAuth.Application` | SSO 与 Admin 共享的应用服务 | - |
+| `src/NexusAuth.Domain` | SSO 与 Admin 共享的领域模型 | - |
+| `src/NexusAuth.Persistence` | SSO 与 Admin 共享的数据访问 | - |
 
-### Workbench 管理端 (NexusAuth.Workbench/)
+### Workbench 管理端 (admin/)
 
 NexusAuth.Workbench 是基于 NexusAuth 构建的管理端站点，用于管理 OAuth 客户端和 API 资源。
+Admin 解决方案直接引用根目录的共享项目，不复制领域、应用或数据访问代码。
 
 | 目录 | 说明 | 端口 |
 |------|------|------|
-| `NexusAuth.Workbench/NexusAuth.Workbench.Api` | 后端服务 (BFF) | 5051 |
-| `NexusAuth.Workbench/NexusAuth.Workbench.Dashboard` | 前端仪表板 | 5273 |
+| `admin/src/NexusAuth.Workbench.Api` | 后端服务 (BFF) | 5051 |
+| `admin/src/NexusAuth.Workbench.Dashboard` | 前端仪表板 | 5273 |
+| `admin/src/NexusAuth.Extension` | Admin OIDC 客户端扩展 | - |
 
 启动方式：
 ```bash
-# 使用 NexusAuth.Workbench/NexusAuth.Workbench.sln
-cd NexusAuth.Workbench
-dotnet run --project NexusAuth.Workbench.Api
+# 使用 admin/NexusAuth.Admin.sln
+dotnet run --project admin/src/NexusAuth.Workbench.Api
 ```
 
 ## Demo 示例
@@ -119,7 +122,7 @@ Demo 详细文档移至 [document/10-Demo示例详解.md](./document/10-Demo示�
 ```bash
 psql -U nexusauth -f production-init.sql
 psql -U nexusauth -d nexusauth -f demo/seed.sql
-psql -U nexusauth -d nexusauth -f NexusAuth.Workbench/NexusAuth.Workbench.Api/seed.sql
+psql -U nexusauth -d nexusauth -f admin/src/NexusAuth.Workbench.Api/seed.sql
 ```
 
 测试账号：`alice / Pass@123`、`bob / Pass@123`、`admin / Pass@123`
@@ -142,12 +145,11 @@ dotnet run --project src/NexusAuth.Host
 ### 2. 启动 Workbench 管理端
 
 ```bash
-# 启动后端 (使用 NexusAuth.Workbench.sln)
-cd NexusAuth.Workbench
-dotnet run --project NexusAuth.Workbench.Api
+# 启动后端 (使用 admin/NexusAuth.Admin.sln)
+dotnet run --project admin/src/NexusAuth.Workbench.Api
 
 # 启动前端
-cd NexusAuth.Workbench/NexusAuth.Workbench.Dashboard
+cd admin/src/NexusAuth.Workbench.Dashboard
 npm install && npm run dev
 
 # 访问 http://localhost:5273

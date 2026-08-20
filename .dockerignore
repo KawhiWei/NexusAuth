@@ -1,0 +1,15 @@
+.git
+.gitignore
+.DS_Store
+
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/.vite/
+**/.cache/
+
+*.user
+*.suo
+*.swp
+*.log

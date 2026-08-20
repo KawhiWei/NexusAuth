@@ -19,6 +19,12 @@ public sealed class OidcSessionCookieEvents : CookieAuthenticationEvents
 
     public override async Task ValidatePrincipal(CookieValidatePrincipalContext context)
     {
+        if (context.Principal is null)
+        {
+            context.RejectPrincipal();
+            return;
+        }
+
         var result = await _oidcBffService.EnsureActiveSessionAsync(context.Principal, context.HttpContext.RequestAborted);
         if (result is null)
         {

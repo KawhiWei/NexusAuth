@@ -13,9 +13,9 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
         builder.HasKey(r => r.Id);
         builder.Property(r => r.Id).HasColumnName("id");
 
-        builder.Property(r => r.Token)
-            .HasColumnName("token")
-            .HasMaxLength(512)
+        builder.Property(r => r.TokenHash)
+            .HasColumnName("token_hash")
+            .HasMaxLength(43)
             .IsRequired();
 
         builder.Property(r => r.ClientId)
@@ -45,6 +45,15 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
             .HasColumnName("created_at")
             .IsRequired();
 
-        builder.HasIndex(r => r.Token).IsUnique();
+        builder.HasIndex(r => r.TokenHash)
+            .HasDatabaseName("ix_refresh_tokens_token_hash")
+            .IsUnique();
+
+        builder.HasIndex(r => new { r.TokenHash, r.ClientId, r.IsRevoked, r.ExpiresAt })
+            .HasDatabaseName("ix_refresh_tokens_rotate");
+
+        builder.ToTable(table => table.HasCheckConstraint(
+            "ck_refresh_tokens_token_hash_base64url",
+            "token_hash ~ '^[A-Za-z0-9_-]{43}$'"));
     }
 }

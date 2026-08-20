@@ -1,11 +1,16 @@
-using System.Security.Cryptography;
 using Luck.DDD.Domain.Domain.Entities;
 
 namespace NexusAuth.Domain.Entities;
 
 public class RefreshToken : EntityWithIdentity<Guid>
 {
-    public string Token { get; private set; } = default!;
+    /// <summary>
+    /// SHA-256 hash of the bearer token, encoded as unpadded Base64Url.
+    /// The raw token is deliberately not part of the entity and must only be
+    /// carried by <see cref="RefreshTokenCreationResult"/> until returned to
+    /// the client.
+    /// </summary>
+    public string TokenHash { get; private set; } = default!;
 
     public string ClientId { get; private set; } = default!;
 
@@ -26,7 +31,7 @@ public class RefreshToken : EntityWithIdentity<Guid>
     {
     }
 
-    public static RefreshToken Create(
+    public static RefreshTokenCreationResult Create(
         string clientId,
         Guid userId,
         string scope,
@@ -37,9 +42,10 @@ public class RefreshToken : EntityWithIdentity<Guid>
 
         var now = DateTimeOffset.UtcNow;
 
-        return new RefreshToken(Guid.NewGuid())
+        var rawToken = GenerateUrlSafeRandomString(64);
+        var entity = new RefreshToken(Guid.NewGuid())
         {
-            Token = GenerateUrlSafeRandomString(64),
+            TokenHash = Hash(rawToken),
             ClientId = clientId,
             UserId = userId,
             Scope = scope,
@@ -47,6 +53,18 @@ public class RefreshToken : EntityWithIdentity<Guid>
             ExpiresAt = now.Add(lifetime ?? TimeSpan.FromDays(30)),
             CreatedAt = now,
         };
+
+        return new RefreshTokenCreationResult(entity, rawToken);
+    }
+
+    public static string Hash(string token)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(token);
+
+        return Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(token)))
+            .Replace('+', '-')
+            .Replace('/', '_')
+            .TrimEnd('=');
     }
 
     public void Revoke()
@@ -63,3 +81,5 @@ public class RefreshToken : EntityWithIdentity<Guid>
             .TrimEnd('=');
     }
 }
+
+public sealed record RefreshTokenCreationResult(RefreshToken Entity, string RawToken);

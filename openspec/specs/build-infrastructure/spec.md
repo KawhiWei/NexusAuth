@@ -29,8 +29,8 @@ Define shared build, package versioning, and framework-targeting requirements fo
 - **THEN** `Microsoft.EntityFrameworkCore.Design` SHALL have a declared `<PackageVersion>` entry
 
 ### Requirement: Unified Target Framework
-All projects in the solution SHALL target `net9.0` as defined by `Directory.Build.props`. No individual `.csproj` file SHALL override `<TargetFramework>`.
+All projects in the solution SHALL target `net10.0` as defined by `Directory.Build.props`. No individual `.csproj` file SHALL override `<TargetFramework>`.
 
-#### Scenario: All projects build against net9.0
+#### Scenario: All projects build against net10.0
 - **WHEN** `dotnet build` is executed at the solution root
-- **THEN** all projects SHALL compile targeting `net9.0` without errors
+- **THEN** all projects SHALL compile targeting `net10.0` without errors

@@ -37,7 +37,8 @@ public class OidcWorkbenchService(
     public async Task<DiscoveryDocument> FetchDiscoveryAsync(CancellationToken ct)
     {
         var client = httpClientFactory.CreateClient();
-        var response = await client.GetAsync($"{Authority.TrimEnd('/')}/.well-known/openid-configuration", ct);
+        var discoveryAuthority = GetBackchannelAuthority();
+        var response = await client.GetAsync($"{discoveryAuthority}/.well-known/openid-configuration", ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<DiscoveryDocument>(cancellationToken: ct)
             ?? throw new InvalidOperationException("Unable to load OpenID Connect discovery document.");
@@ -83,7 +84,8 @@ public class OidcWorkbenchService(
             ["code_verifier"] = codeVerifier,
         };
 
-        var response = await client.PostAsync(discovery.TokenEndpoint, new FormUrlEncodedContent(form), ct);
+        var tokenEndpoint = ResolveBackchannelEndpoint(discovery.TokenEndpoint);
+        var response = await client.PostAsync(tokenEndpoint, new FormUrlEncodedContent(form), ct);
         var json = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
@@ -99,6 +101,27 @@ public class OidcWorkbenchService(
         var expiresIn = root.TryGetProperty("expires_in", out var exp) ? exp.GetInt32() : 3600;
 
         return (accessToken, idToken, expiresIn);
+    }
+
+    private string GetBackchannelAuthority()
+    {
+        var authority = string.IsNullOrWhiteSpace(_options.BackchannelAuthority)
+            ? Authority
+            : _options.BackchannelAuthority;
+
+        return authority.TrimEnd('/');
+    }
+
+    private Uri ResolveBackchannelEndpoint(string endpoint)
+    {
+        if (string.IsNullOrWhiteSpace(_options.BackchannelAuthority))
+            return new Uri(endpoint, UriKind.Absolute);
+
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri))
+            throw new InvalidOperationException("OpenID Connect token endpoint is not an absolute URI.");
+
+        var authority = new Uri(GetBackchannelAuthority(), UriKind.Absolute);
+        return new Uri(authority, endpointUri.PathAndQuery.TrimStart('/'));
     }
 
     public Task ApplyClientAuthenticationAsync(HttpClient client)

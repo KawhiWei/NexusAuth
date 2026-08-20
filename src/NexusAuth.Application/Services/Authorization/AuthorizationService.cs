@@ -54,9 +54,9 @@ public class AuthorizationService(
             acr,
             amr);
 
-        await codeRepository.AddAsync(code, ct);
+        await codeRepository.AddAsync(code.Entity, ct);
 
-        return code.Code;
+        return code.RawCode;
     }
 
     /// <summary>
@@ -85,10 +85,13 @@ public class AuthorizationService(
     /// </summary>
     public async Task<AuthorizationCodeResult> ValidateAndConsumeCodeAsync(
         string code,
+        string clientId,
         string redirectUri,
         string? codeVerifier = null,
         CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
+
         var authCode = await codeRepository.FindByCodeAsync(code, ct);
 
         if (authCode is null)
@@ -99,6 +102,9 @@ public class AuthorizationService(
 
         if (authCode.ExpiresAt <= DateTimeOffset.UtcNow)
             return AuthorizationCodeResult.Failure("Authorization code has expired.");
+
+        if (!string.Equals(authCode.ClientId, clientId, StringComparison.Ordinal))
+            return AuthorizationCodeResult.Failure("Authorization code does not belong to the authenticated client.");
 
         if (authCode.RedirectUri != redirectUri)
             return AuthorizationCodeResult.Failure("Redirect URI mismatch.");
@@ -117,18 +123,19 @@ public class AuthorizationService(
                 return AuthorizationCodeResult.Failure("PKCE verification failed.");
         }
 
-        authCode.MarkAsUsed();
-        await codeRepository.MarkUsedAsync(authCode.Id, ct);
+        var consumedCode = await codeRepository.ConsumeAsync(code, clientId, ct);
+        if (consumedCode is null)
+            return AuthorizationCodeResult.Failure("Authorization code has already been used or expired.");
 
         return AuthorizationCodeResult.Success(
-            authCode.UserId,
-            authCode.ClientId,
-            authCode.Scope,
-            authCode.Nonce,
-            authCode.ClaimsJson,
-            authCode.AuthenticatedAt,
-            authCode.Acr,
-            authCode.Amr);
+            consumedCode.UserId,
+            consumedCode.ClientId,
+            consumedCode.Scope,
+            consumedCode.Nonce,
+            consumedCode.ClaimsJson,
+            consumedCode.AuthenticatedAt,
+            consumedCode.Acr,
+            consumedCode.Amr);
     }
 
     /// <summary>

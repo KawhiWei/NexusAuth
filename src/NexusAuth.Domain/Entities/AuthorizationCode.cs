@@ -1,11 +1,16 @@
-using System.Security.Cryptography;
 using Luck.DDD.Domain.Domain.Entities;
 
 namespace NexusAuth.Domain.Entities;
 
 public class AuthorizationCode : EntityWithIdentity<Guid>
 {
-    public string Code { get; private set; } = default!;
+    /// <summary>
+    /// SHA-256 hash of the one-time code, encoded as unpadded Base64Url.
+    /// The raw code is deliberately not part of the entity and must only be
+    /// carried by <see cref="AuthorizationCodeCreationResult"/> until sent to
+    /// the client.
+    /// </summary>
+    public string CodeHash { get; private set; } = default!;
 
     public string ClientId { get; private set; } = default!;
 
@@ -42,7 +47,7 @@ public class AuthorizationCode : EntityWithIdentity<Guid>
     {
     }
 
-    public static AuthorizationCode Create(
+    public static AuthorizationCodeCreationResult Create(
         string clientId,
         Guid userId,
         string redirectUri,
@@ -61,9 +66,10 @@ public class AuthorizationCode : EntityWithIdentity<Guid>
 
         var now = DateTimeOffset.UtcNow;
 
-        return new AuthorizationCode(Guid.NewGuid())
+        var rawCode = GenerateUrlSafeRandomString(32);
+        var entity = new AuthorizationCode(Guid.NewGuid())
         {
-            Code = GenerateUrlSafeRandomString(32),
+            CodeHash = Hash(rawCode),
             ClientId = clientId,
             UserId = userId,
             RedirectUri = redirectUri,
@@ -79,6 +85,18 @@ public class AuthorizationCode : EntityWithIdentity<Guid>
             ExpiresAt = now.AddMinutes(10),
             CreatedAt = now,
         };
+
+        return new AuthorizationCodeCreationResult(entity, rawCode);
+    }
+
+    public static string Hash(string code)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(code);
+
+        return Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(code)))
+            .Replace('+', '-')
+            .Replace('/', '_')
+            .TrimEnd('=');
     }
 
     public void MarkAsUsed()
@@ -95,3 +113,5 @@ public class AuthorizationCode : EntityWithIdentity<Guid>
             .TrimEnd('=');
     }
 }
+
+public sealed record AuthorizationCodeCreationResult(AuthorizationCode Entity, string RawCode);

@@ -179,9 +179,9 @@ public class TokenService(
     {
         var refreshLifetime = TimeSpan.FromMinutes(jwtOptions.RefreshTokenLifetimeMinutes);
         var refreshToken = RefreshToken.Create(clientId, userId, scope, refreshLifetime);
-        await refreshTokenRepository.AddAsync(refreshToken, ct);
+        await refreshTokenRepository.AddAsync(refreshToken.Entity, ct);
 
-        return refreshToken.Token;
+        return refreshToken.RawToken;
     }
 
     /// <summary>
@@ -219,16 +219,21 @@ public class TokenService(
             return RefreshResult.Failure("Refresh token does not belong to the authenticated client.");
         }
 
-        // Revoke old token
-        await refreshTokenRepository.RevokeAsync(existingToken.Id, ct);
-
-        // Issue new refresh token
+        // The database transaction atomically revokes the old token and stores
+        // the replacement. A concurrent reuse of the same bearer value loses
+        // the conditional update and never receives a new token.
         var newRefreshToken = RefreshToken.Create(
             existingToken.ClientId,
             existingToken.UserId,
             existingToken.Scope,
             TimeSpan.FromMinutes(jwtOptions.RefreshTokenLifetimeMinutes));
-        await refreshTokenRepository.AddAsync(newRefreshToken, ct);
+        var rotatedToken = await refreshTokenRepository.RotateAsync(
+            RefreshToken.Hash(refreshTokenString),
+            existingToken.ClientId,
+            newRefreshToken.Entity,
+            ct);
+        if (rotatedToken is null)
+            return RefreshResult.Failure("Refresh token has been revoked, expired, or already used.");
 
         // Issue new access token
         var accessToken = await IssueAccessTokenAsync(
@@ -239,7 +244,7 @@ public class TokenService(
             null,
             ct);
 
-        return RefreshResult.Success(accessToken, newRefreshToken.Token);
+        return RefreshResult.Success(accessToken, newRefreshToken.RawToken);
     }
 
     /// <summary>

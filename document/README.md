@@ -1,7 +1,7 @@
 # NexusAuth 统一身份认证平台
 
 <p align="center">
-  <img src="https://img.shields.io/badge/.NET-9.0-blue" alt=".NET 9.0">
+  <img src="https://img.shields.io/badge/.NET-10.0-blue" alt=".NET 10.0">
   <img src="https://img.shields.io/badge/React-19-blue" alt="React 19">
   <img src="https://img.shields.io/badge/PostgreSQL-16-blue" alt="PostgreSQL 16">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
@@ -58,7 +58,7 @@ NexusAuth 是一个开源的统一身份认证平台（OAuth 2.0 / OIDC Provider
 
 ## 技术栈
 
-- **后端**：.NET 9.0 + ASP.NET Core
+- **后端**：.NET 10.0 + ASP.NET Core
 - **前端**：React 19 + TDesign React
 - **数据库**：PostgreSQL 16
 - **ORM**：Entity Framework Core

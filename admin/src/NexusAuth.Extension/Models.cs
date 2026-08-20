@@ -35,6 +35,7 @@ public class DiscoveryDocument
 public class WorkbenchAuthOptions
 {
     public required string Authority { get; set; }
+    public string? BackchannelAuthority { get; set; }
     public required string ClientId { get; set; }
     public string? ClientSecret { get; set; }
     public required string RedirectUri { get; set; }

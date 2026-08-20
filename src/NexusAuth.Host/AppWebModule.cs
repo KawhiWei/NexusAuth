@@ -24,7 +24,7 @@ public class AppWebModule : LuckAppModule
         var services = context.Services;
         var configuration = services.GetConfiguration();
 
-        services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
+        services.AddNexusAuthTokenSigning(configuration);
         services.Configure<NexusAuthSecurityOptions>(configuration.GetSection("Security"));
 
         // Cookie Authentication for SSO login session

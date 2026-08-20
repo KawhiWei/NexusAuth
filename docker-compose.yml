@@ -1,0 +1,110 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nexusauth}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexusauth_dev_password}
+      POSTGRES_DB: postgres
+    volumes:
+      - nexusauth-db-data:/var/lib/postgresql/data
+      - ./docker/postgres-init.sh:/docker-entrypoint-initdb.d/000-postgres-init.sh:ro
+      - ./production-init.sql:/opt/nexusauth-init/production-init.sql:ro
+      - ./demo/seed.sql:/opt/nexusauth-init/demo-seed.sql:ro
+      - ./admin/src/NexusAuth.Workbench.Api/seed.sql:/opt/nexusauth-init/admin-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+  sso:
+    build:
+      context: .
+      dockerfile: src/NexusAuth.Host/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${NEXUSAUTH_SSO_ENVIRONMENT:-Development}
+      ConnectionStrings__Default: Host=db;Port=5432;Database=nexusauth;Username=${POSTGRES_USER:-nexusauth};Password=${POSTGRES_PASSWORD:-nexusauth_dev_password};Search Path=nexusauth
+      Jwt__Issuer: ${NEXUSAUTH_ISSUER:-http://localhost:5100}
+      Jwt__SigningMode: ${NEXUSAUTH_SIGNING_MODE:-Certificate}
+      Jwt__DevelopmentSigningCertificatePath: App_Data/development-signing-certificate.pfx
+      Jwt__DevelopmentSigningCertificatePassword: ${NEXUSAUTH_DEVELOPMENT_SIGNING_CERTIFICATE_PASSWORD:-nexusauth-compose-dev}
+      Jwt__SigningCertificatePath: ${NEXUSAUTH_SIGNING_CERTIFICATE_PATH:-}
+      Jwt__SigningCertificatePassword: ${NEXUSAUTH_SIGNING_CERTIFICATE_PASSWORD:-}
+      Jwt__DevelopmentSigningKeyPath: App_Data/signing-key.json
+      Jwt__SigningKeyPath: ${NEXUSAUTH_SIGNING_KEY_PATH:-}
+    volumes:
+      - nexusauth-signing-key:/app/App_Data
+      - nexusauth-sso-keys:/root/.aspnet/DataProtection-Keys
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "5100:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  admin-api:
+    build:
+      context: .
+      dockerfile: admin/src/NexusAuth.Workbench.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ConnectionStrings__Default: Host=db;Port=5432;Database=nexusauth;Username=${POSTGRES_USER:-nexusauth};Password=${POSTGRES_PASSWORD:-nexusauth_dev_password};Search Path=nexusauth
+      Auth__Authority: ${NEXUSAUTH_ISSUER:-http://localhost:5100}
+      Auth__BackchannelAuthority: http://sso:8080
+      Auth__ClientId: NexusAuth.Workbench
+      Auth__ClientSecret: ${WORKBENCH_CLIENT_SECRET:-c57cf0e110c54ad2ac5591b99801b852}
+      Auth__RedirectUri: http://localhost:5051/signin-oidc
+      Auth__PostLogoutRedirectUri: http://localhost:5273/
+      Auth__Scope: openid profile workbench
+      Auth__Audience: workbench
+      Auth__RequireHttpsMetadata: "false"
+      Auth__SignOutProvider: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+      sso:
+        condition: service_healthy
+    ports:
+      - "5051:8080"
+    volumes:
+      - nexusauth-admin-keys:/root/.aspnet/DataProtection-Keys
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: admin/src/NexusAuth.Workbench.Dashboard/Dockerfile
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+    depends_on:
+      admin-api:
+        condition: service_healthy
+    ports:
+      - "5273:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider http://127.0.0.1/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  nexusauth-db-data:
+  nexusauth-signing-key:
+  nexusauth-sso-keys:
+  nexusauth-admin-keys:

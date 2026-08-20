@@ -89,14 +89,14 @@ public class TokenController(
         if (string.IsNullOrWhiteSpace(redirectUri))
             return BadRequest(new { error = "invalid_request", error_description = "redirect_uri is required." });
 
-        if (!string.IsNullOrWhiteSpace(authentication.ClientId))
-        {
-            var clientAuthentication = await _clientService.AuthenticateClientAsync(authentication, requireClientAuthentication: true, ct);
-            if (!clientAuthentication.IsSuccess)
-                return Unauthorized(new { error = clientAuthentication.ErrorCode ?? "invalid_client", error_description = clientAuthentication.Error });
-        }
+        if (string.IsNullOrWhiteSpace(authentication.ClientId))
+            return BadRequest(new { error = "invalid_request", error_description = "client_id is required." });
 
-        var result = await _authorizationService.ValidateAndConsumeCodeAsync(code, redirectUri, codeVerifier, ct);
+        var clientAuthentication = await _clientService.AuthenticateClientAsync(authentication, requireClientAuthentication: true, ct);
+        if (!clientAuthentication.IsSuccess)
+            return Unauthorized(new { error = clientAuthentication.ErrorCode ?? "invalid_client", error_description = clientAuthentication.Error });
+
+        var result = await _authorizationService.ValidateAndConsumeCodeAsync(code, authentication.ClientId, redirectUri, codeVerifier, ct);
 
         if (!result.IsSuccess)
             return BadRequest(new { error = "invalid_grant", error_description = result.Error });
@@ -129,7 +129,7 @@ public class TokenController(
             refresh_token = refreshToken,
             scope = result.Scope,
             id_token = idToken,
-            expires_in = 3600,
+            expires_in = GetAccessTokenLifetimeSeconds(),
         });
     }
 
@@ -156,6 +156,7 @@ public class TokenController(
             access_token = accessToken,
             token_type = "Bearer",
             scope = result.Scope,
+            expires_in = GetAccessTokenLifetimeSeconds(),
         });
     }
 
@@ -185,7 +186,7 @@ public class TokenController(
             access_token = result.AccessToken,
             token_type = "Bearer",
             refresh_token = result.RefreshToken,
-            expires_in = 3600,
+            expires_in = GetAccessTokenLifetimeSeconds(),
         });
     }
 
@@ -226,7 +227,7 @@ public class TokenController(
             refresh_token = refreshToken,
             scope = result.Scope,
             id_token = idToken,
-            expires_in = 3600,
+            expires_in = GetAccessTokenLifetimeSeconds(),
         });
     }
 
@@ -243,6 +244,11 @@ public class TokenController(
     private string GetIssuer()
     {
         return _jwtOptions.Issuer.TrimEnd('/');
+    }
+
+    private int GetAccessTokenLifetimeSeconds()
+    {
+        return checked(_jwtOptions.AccessTokenLifetimeMinutes * 60);
     }
 
     private static bool ShouldIssueRefreshToken(string scope)

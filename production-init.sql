@@ -120,7 +120,8 @@ CREATE INDEX ix_client_api_resources_api_resource_id ON nexusauth.client_api_res
 -- ============================================================
 CREATE TABLE nexusauth.authorization_codes (
     id                      uuid            NOT NULL,
-    code                    varchar(256)    NOT NULL,
+    -- SHA-256(raw code), encoded as unpadded Base64Url (43 characters).
+    code_hash               varchar(43)     NOT NULL,
     client_id               varchar(128)    NOT NULL,
     user_id                 uuid            NOT NULL,
     redirect_uri            varchar(2048)   NOT NULL,
@@ -138,16 +139,22 @@ CREATE TABLE nexusauth.authorization_codes (
     CONSTRAINT pk_authorization_codes PRIMARY KEY (id)
 );
 
-CREATE UNIQUE INDEX ix_authorization_codes_code ON nexusauth.authorization_codes (code);
+CREATE UNIQUE INDEX ix_authorization_codes_code_hash ON nexusauth.authorization_codes (code_hash);
+CREATE INDEX ix_authorization_codes_consume
+    ON nexusauth.authorization_codes (code_hash, client_id, is_used, expires_at);
 CREATE INDEX ix_authorization_codes_client_id ON nexusauth.authorization_codes (client_id);
 CREATE INDEX ix_authorization_codes_user_id ON nexusauth.authorization_codes (user_id);
+ALTER TABLE nexusauth.authorization_codes
+    ADD CONSTRAINT ck_authorization_codes_code_hash_base64url
+    CHECK (code_hash ~ '^[A-Za-z0-9_-]{43}$');
 
 -- ============================================================
 -- refresh_tokens
 -- ============================================================
 CREATE TABLE nexusauth.refresh_tokens (
     id          uuid            NOT NULL,
-    token       varchar(512)    NOT NULL,
+    -- SHA-256(raw token), encoded as unpadded Base64Url (43 characters).
+    token_hash  varchar(43)     NOT NULL,
     client_id   varchar(128)    NOT NULL,
     user_id     uuid            NOT NULL,
     scope       varchar(512)    NOT NULL,
@@ -157,9 +164,14 @@ CREATE TABLE nexusauth.refresh_tokens (
     CONSTRAINT pk_refresh_tokens PRIMARY KEY (id)
 );
 
-CREATE UNIQUE INDEX ix_refresh_tokens_token ON nexusauth.refresh_tokens (token);
+CREATE UNIQUE INDEX ix_refresh_tokens_token_hash ON nexusauth.refresh_tokens (token_hash);
+CREATE INDEX ix_refresh_tokens_rotate
+    ON nexusauth.refresh_tokens (token_hash, client_id, is_revoked, expires_at);
 CREATE INDEX ix_refresh_tokens_client_id ON nexusauth.refresh_tokens (client_id);
 CREATE INDEX ix_refresh_tokens_user_id ON nexusauth.refresh_tokens (user_id);
+ALTER TABLE nexusauth.refresh_tokens
+    ADD CONSTRAINT ck_refresh_tokens_token_hash_base64url
+    CHECK (token_hash ~ '^[A-Za-z0-9_-]{43}$');
 
 -- ============================================================
 -- device_authorizations

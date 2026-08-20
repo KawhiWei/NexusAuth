@@ -22,6 +22,7 @@ public class WorkbenchApiModule : LuckAppModule
         var configuration = services.GetConfiguration();
 
         var authority = configuration["Auth:Authority"];
+        var backchannelAuthority = configuration["Auth:BackchannelAuthority"];
         var clientId = configuration["Auth:ClientId"];
         var clientSecret = configuration["Auth:ClientSecret"];
         var redirectUri = configuration["Auth:RedirectUri"];
@@ -40,6 +41,9 @@ public class WorkbenchApiModule : LuckAppModule
         services.AddNexusAuth(options =>
         {
             options.Authority = requiredAuthConfiguration.Authority;
+            options.BackchannelAuthority = string.IsNullOrWhiteSpace(backchannelAuthority)
+                ? null
+                : backchannelAuthority;
             options.ClientId = requiredAuthConfiguration.ClientId;
             options.ClientSecret = clientSecret;
             options.RedirectUri = requiredAuthConfiguration.RedirectUri;
@@ -75,9 +79,17 @@ public class WorkbenchApiModule : LuckAppModule
             .AddJwtBearer(WorkbenchAuthenticationDefaults.BearerScheme, options =>
             {
                 var normalizedAuthority = requiredAuthConfiguration.Authority.TrimEnd('/');
+                var normalizedBackchannelAuthority = string.IsNullOrWhiteSpace(backchannelAuthority)
+                    ? normalizedAuthority
+                    : backchannelAuthority.TrimEnd('/');
                 options.Authority = normalizedAuthority;
                 options.RequireHttpsMetadata = requireHttpsMetadata;
-                options.MetadataAddress = $"{normalizedAuthority}/.well-known/openid-configuration";
+                options.MetadataAddress = $"{normalizedBackchannelAuthority}/.well-known/openid-configuration";
+                if (!string.Equals(normalizedAuthority, normalizedBackchannelAuthority, StringComparison.OrdinalIgnoreCase))
+                {
+                    options.Backchannel = new HttpClient(
+                        new PublicAuthorityRewritingHandler(normalizedAuthority, normalizedBackchannelAuthority));
+                }
                 options.MapInboundClaims = false;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
@@ -145,6 +157,36 @@ public class WorkbenchApiModule : LuckAppModule
         string RedirectUri,
         string PostLogoutRedirectUri,
         string Scope);
+
+    private sealed class PublicAuthorityRewritingHandler(string publicAuthority, string backchannelAuthority)
+        : DelegatingHandler(new HttpClientHandler())
+    {
+        private readonly Uri _publicAuthority = new(publicAuthority, UriKind.Absolute);
+        private readonly Uri _backchannelAuthority = new(backchannelAuthority, UriKind.Absolute);
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            if (request.RequestUri is { } requestUri
+                && Uri.Compare(
+                    requestUri,
+                    _publicAuthority,
+                    UriComponents.SchemeAndServer,
+                    UriFormat.Unescaped,
+                    StringComparison.OrdinalIgnoreCase) == 0)
+            {
+                var builder = new UriBuilder(_backchannelAuthority)
+                {
+                    Path = requestUri.AbsolutePath,
+                    Query = requestUri.Query,
+                };
+                request.RequestUri = builder.Uri;
+            }
+
+            return base.SendAsync(request, cancellationToken);
+        }
+    }
 
     public override void ApplicationInitialization(ApplicationContext context)
     {

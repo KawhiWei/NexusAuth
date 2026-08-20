@@ -3,7 +3,7 @@
 `Nexus` 意为"连接点"，隐喻统一认证中心作为多个系统之间的连接枢纽。
 
 <p align="center">
-  <img src="https://img.shields.io/badge/.NET-9.0-blue" alt=".NET 9.0">
+  <img src="https://img.shields.io/badge/.NET-10.0-blue" alt=".NET 10.0">
   <img src="https://img.shields.io/badge/React-19-blue" alt="React 19">
   <img src="https://img.shields.io/badge/PostgreSQL-16-blue" alt="PostgreSQL 16">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
@@ -133,6 +133,14 @@ psql -U nexusauth -d nexusauth -f admin/src/NexusAuth.Workbench.Api/seed.sql
 psql -U nexusauth -f production-init.sql
 ```
 
+### 已有数据库升级
+
+从旧版本升级时，授权码和 refresh token 可能仍以原文保存在 `code` / `token` 列。停机后执行一次以下迁移；它会将现有值转换为 SHA-256 Base64Url 哈希、替换索引并保留尚未过期的令牌可用性。新建数据库无需执行此脚本。
+
+```bash
+psql -U nexusauth -d nexusauth -v ON_ERROR_STOP=1 -f database/001_token_secret_hashing.sql
+```
+
 ## 启动服务
 
 ### 1. 启动 OAuth Provider
@@ -153,6 +161,29 @@ cd admin/src/NexusAuth.Workbench.Dashboard
 npm install && npm run dev
 
 # 访问 http://localhost:5273
+```
+
+### 3. Docker Compose 一键启动
+
+Docker Compose 会启动 PostgreSQL、NexusAuth SSO、Workbench API 和 Dashboard：
+
+```bash
+docker compose up --build
+```
+
+启动后访问 `http://localhost:5273`，点击登录进入公开的 `http://localhost:5100` SSO 页面。API 容器通过 Compose 内部地址访问 SSO，浏览器仍使用公开地址完成授权回调。
+
+SSO 使用持久化的 X.509 PFX 证书签名 Access Token 和 ID Token。本地 Compose 默认以 `Development` 运行 SSO，首次启动会生成开发用自签名证书并保存到 `nexusauth-signing-key` 卷；可通过 `NEXUSAUTH_DEVELOPMENT_SIGNING_CERTIFICATE_PASSWORD` 设置开发 PFX 密码。
+
+生产部署必须将 `NEXUSAUTH_SSO_ENVIRONMENT` 设为 `Production`，挂载由证书管理系统提供的 PFX，通过 `NEXUSAUTH_SIGNING_CERTIFICATE_PATH` 指定容器内路径，并通过 Secret 注入 `NEXUSAUTH_SIGNING_CERTIFICATE_PASSWORD`。生产环境不会读取或生成开发证书；证书路径无效或证书校验失败时 SSO 将拒绝提供签名服务。
+
+签名凭据可通过 `NEXUSAUTH_SIGNING_MODE` 选择：推荐的 `Certificate` 使用上述 X.509 PFX；兼容模式 `RsaKeyFile` 使用原有 JSON RSA 私钥。本地开发会在所选文件缺失时自动生成；生产环境的 `RsaKeyFile` 模式必须通过 `NEXUSAUTH_SIGNING_KEY_PATH` 指向预置的 `signing-key.json`，同样不会自动生成密钥。
+
+首次启动会自动执行生产表结构、Demo 用户和 Workbench seed（测试账号：`admin / Pass@123`）。数据库初始化脚本只在空数据卷上执行；需要重新初始化时运行：
+
+```bash
+docker compose down -v
+docker compose up --build
 ```
 
 ## 当前核心客户端

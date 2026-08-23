@@ -3,11 +3,11 @@ namespace NexusAuth.Application.Clients;
 public static class OAuthClientAuthenticationParser
 {
     /// <summary>
-    /// 统一解析 OAuth2 客户端认证输入，优先兼容 client_secret_basic�?
-    /// 如果请求头不存在或格式错误，则回退到表单中�?client_id / client_secret�?
-    /// 主要调用方：Host 层的 token、introspect、revocation、device authorization 端点�?
+    /// Parses the client authentication methods defined by RFC 6749 and RFC 7523.
+    /// A malformed or ambiguous request is a failed authentication, never a fallback
+    /// to a different method.
     /// </summary>
-    public static ClientAuthenticationInput ResolveClientAuthentication(
+    public static ClientAuthenticationParseResult ResolveClientAuthentication(
         string? authorizationHeader,
         string? formClientId,
         string? formClientSecret,
@@ -15,58 +15,113 @@ public static class OAuthClientAuthenticationParser
         string? formClientAssertion = null,
         string? assertionAudience = null)
     {
-        var formAuthMethod = !string.IsNullOrWhiteSpace(formClientAssertion) || !string.IsNullOrWhiteSpace(formClientAssertionType)
-            ? null
-            : !string.IsNullOrWhiteSpace(formClientSecret)
-                ? OAuthClient.TokenEndpointAuthMethodClientSecretPost
-                : null;
+        var hasFormSecret = formClientSecret is not null;
+        var hasFormAssertionType = formClientAssertionType is not null;
+        var hasFormAssertion = formClientAssertion is not null;
+        var hasFormAssertionData = hasFormAssertionType || hasFormAssertion;
 
-        if (string.IsNullOrWhiteSpace(authorizationHeader)
-            || !authorizationHeader.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
+        if (hasFormSecret && hasFormAssertionData)
+            return ClientAuthenticationParseResult.Failure("Multiple client authentication methods were supplied.");
+
+        if (string.IsNullOrWhiteSpace(authorizationHeader))
         {
-            return new ClientAuthenticationInput(
+            return ClientAuthenticationParseResult.Success(new ClientAuthenticationInput(
                 formClientId,
                 formClientSecret,
                 formClientAssertionType,
                 formClientAssertion,
                 assertionAudience,
-                formAuthMethod);
+                hasFormAssertionData
+                    ? null
+                    : hasFormSecret
+                        ? OAuthClient.TokenEndpointAuthMethodClientSecretPost
+                        : null));
+        }
+
+        var header = authorizationHeader.Trim();
+        var separator = header.IndexOfAny([' ', '\t']);
+        if (separator <= 0)
+            return ClientAuthenticationParseResult.Failure("Authorization header is malformed.");
+
+        var scheme = header[..separator];
+        if (!string.Equals(scheme, "Basic", StringComparison.OrdinalIgnoreCase))
+            return ClientAuthenticationParseResult.Failure("Unsupported client authentication scheme.");
+
+        var encodedCredentials = header[(separator + 1)..].Trim();
+        if (encodedCredentials.Length == 0 || encodedCredentials.Any(char.IsWhiteSpace))
+            return ClientAuthenticationParseResult.Failure("Authorization header is malformed.");
+
+        if (hasFormSecret || hasFormAssertionData)
+            return ClientAuthenticationParseResult.Failure("Multiple client authentication methods were supplied.");
+
+        string decoded;
+        try
+        {
+            decoded = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true)
+                .GetString(Convert.FromBase64String(encodedCredentials));
+        }
+        catch (FormatException)
+        {
+            return ClientAuthenticationParseResult.Failure("Authorization header is malformed.");
+        }
+        catch (DecoderFallbackException)
+        {
+            return ClientAuthenticationParseResult.Failure("Authorization header is malformed.");
+        }
+
+        var credentialSeparator = decoded.IndexOf(':');
+        if (credentialSeparator <= 0)
+            return ClientAuthenticationParseResult.Failure("Authorization header is malformed.");
+
+        if (!TryDecodeFormComponent(decoded[..credentialSeparator], out var headerClientId)
+            || !TryDecodeFormComponent(decoded[(credentialSeparator + 1)..], out var headerClientSecret)
+            || string.IsNullOrWhiteSpace(headerClientId)
+            || string.IsNullOrWhiteSpace(headerClientSecret))
+        {
+            return ClientAuthenticationParseResult.Failure("Authorization header is malformed.");
+        }
+
+        if (formClientId is not null
+            && !string.Equals(formClientId, headerClientId, StringComparison.Ordinal))
+        {
+            return ClientAuthenticationParseResult.Failure("Conflicting client_id values were supplied.");
+        }
+
+        return ClientAuthenticationParseResult.Success(new ClientAuthenticationInput(
+            headerClientId,
+            headerClientSecret,
+            null,
+            null,
+            assertionAudience,
+            OAuthClient.TokenEndpointAuthMethodClientSecretBasic));
+    }
+
+    private static bool TryDecodeFormComponent(string value, out string decoded)
+    {
+        decoded = string.Empty;
+        for (var index = 0; index < value.Length; index++)
+        {
+            if (value[index] != '%')
+                continue;
+
+            if (index + 2 >= value.Length
+                || !Uri.IsHexDigit(value[index + 1])
+                || !Uri.IsHexDigit(value[index + 2]))
+            {
+                return false;
+            }
+
+            index += 2;
         }
 
         try
         {
-            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(authorizationHeader[6..]));
-            var separatorIndex = decoded.IndexOf(':');
-            if (separatorIndex < 0)
-            {
-                return new ClientAuthenticationInput(
-                    formClientId,
-                    formClientSecret,
-                    formClientAssertionType,
-                    formClientAssertion,
-                    assertionAudience,
-                    formAuthMethod);
-            }
-
-            var headerClientId = decoded[..separatorIndex];
-            var headerClientSecret = decoded[(separatorIndex + 1)..];
-            return new ClientAuthenticationInput(
-                string.IsNullOrWhiteSpace(headerClientId) ? formClientId : headerClientId,
-                string.IsNullOrWhiteSpace(headerClientSecret) ? formClientSecret : headerClientSecret,
-                formClientAssertionType,
-                formClientAssertion,
-                assertionAudience,
-                OAuthClient.TokenEndpointAuthMethodClientSecretBasic);
+            decoded = Uri.UnescapeDataString(value.Replace('+', ' '));
+            return true;
         }
-        catch (FormatException)
+        catch (UriFormatException)
         {
-            return new ClientAuthenticationInput(
-                formClientId,
-                formClientSecret,
-                formClientAssertionType,
-                formClientAssertion,
-                assertionAudience,
-                formAuthMethod);
+            return false;
         }
     }
 }

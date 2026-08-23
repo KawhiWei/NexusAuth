@@ -69,7 +69,7 @@ public class OidcWorkbenchService(
         return (codeChallenge, codeVerifier);
     }
 
-    public async Task<(string accessToken, string idToken, int expiresIn)> ExchangeCodeAsync(string code, string codeVerifier, CancellationToken ct)
+    public async Task<WorkbenchTokenResult> ExchangeCodeAsync(string code, string codeVerifier, CancellationToken ct)
     {
         var discovery = await FetchDiscoveryAsync(ct);
 
@@ -89,18 +89,63 @@ public class OidcWorkbenchService(
         var json = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"Token exchange failed: {json}");
+            throw new InvalidOperationException("Token exchange failed.");
 
+        return ParseTokenResponse(json, requireIdToken: true);
+    }
+
+    public async Task<WorkbenchTokenResult> RefreshTokensAsync(string refreshToken, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            throw new ArgumentException("Refresh token is required.", nameof(refreshToken));
+
+        var discovery = await FetchDiscoveryAsync(ct);
+
+        var client = httpClientFactory.CreateClient();
+        await ApplyClientAuthenticationAsync(client);
+
+        var form = new Dictionary<string, string>
+        {
+            ["grant_type"] = "refresh_token",
+            ["refresh_token"] = refreshToken,
+        };
+
+        var tokenEndpoint = ResolveBackchannelEndpoint(discovery.TokenEndpoint);
+        var response = await client.PostAsync(tokenEndpoint, new FormUrlEncodedContent(form), ct);
+        var json = await response.Content.ReadAsStringAsync(ct);
+
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException("Refresh token request failed.");
+
+        return ParseTokenResponse(json, requireIdToken: false);
+    }
+
+    private static WorkbenchTokenResult ParseTokenResponse(string json, bool requireIdToken)
+    {
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
         var accessToken = root.GetProperty("access_token").GetString()
             ?? throw new InvalidOperationException("Missing access_token");
-        var idToken = root.GetProperty("id_token").GetString()
-            ?? throw new InvalidOperationException("Missing id_token");
-        var expiresIn = root.TryGetProperty("expires_in", out var exp) ? exp.GetInt32() : 3600;
+        var refreshToken = root.TryGetProperty("refresh_token", out var refreshTokenElement)
+            ? refreshTokenElement.GetString()
+            : null;
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            throw new InvalidOperationException("Missing refresh_token");
 
-        return (accessToken, idToken, expiresIn);
+        var idToken = root.TryGetProperty("id_token", out var idTokenElement)
+            ? idTokenElement.GetString()
+            : null;
+        if (requireIdToken && string.IsNullOrWhiteSpace(idToken))
+            throw new InvalidOperationException("Missing id_token");
+
+        var expiresIn = root.TryGetProperty("expires_in", out var exp) && exp.TryGetInt32(out var parsedExpiresIn)
+            ? parsedExpiresIn
+            : 3600;
+        if (expiresIn <= 0)
+            throw new InvalidOperationException("Invalid expires_in");
+
+        return new WorkbenchTokenResult(accessToken, refreshToken, idToken, expiresIn);
     }
 
     private string GetBackchannelAuthority()

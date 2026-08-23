@@ -10,12 +10,14 @@ public class TokenController(
     ITokenService tokenService,
     IDeviceAuthorizationService deviceAuthorizationService,
     IClientService clientService,
+    ISecurityPolicyService securityPolicyService,
     IOptions<JwtOptions> jwtOptions) : ControllerBase
 {
     private readonly IAuthorizationService _authorizationService = authorizationService;
     private readonly ITokenService _tokenService = tokenService;
     private readonly IDeviceAuthorizationService _deviceAuthorizationService = deviceAuthorizationService;
     private readonly IClientService _clientService = clientService;
+    private readonly ISecurityPolicyService _securityPolicyService = securityPolicyService;
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
 
     /// <summary>
@@ -39,7 +41,7 @@ public class TokenController(
     [HttpPost("/connect/token")]
     [Consumes("application/x-www-form-urlencoded")]
     public async Task<IActionResult> Token(
-        [FromForm(Name = "grant_type")] string grantType,
+        [FromForm(Name = "grant_type")] string? grantType,
         [FromForm(Name = "client_id")] string? clientId = null,
         [FromForm(Name = "client_secret")] string? clientSecret = null,
         [FromForm] string? code = null,
@@ -66,12 +68,17 @@ public class TokenController(
             clientAssertion,
             GetEndpointAudience());
 
+        if (!resolvedClientAuthentication.IsSuccess || resolvedClientAuthentication.Authentication is null)
+            return InvalidClient();
+
+        var authentication = resolvedClientAuthentication.Authentication;
+
         return grantType switch
         {
-            "authorization_code" => await HandleAuthorizationCodeAsync(resolvedClientAuthentication, code, redirectUri, codeVerifier, ct),
-            "client_credentials" => await HandleClientCredentialsAsync(resolvedClientAuthentication, scope, ct),
-            "refresh_token" => await HandleRefreshTokenAsync(resolvedClientAuthentication, refreshToken, ct),
-            "urn:ietf:params:oauth:grant-type:device_code" => await HandleDeviceCodeAsync(resolvedClientAuthentication, deviceCode, ct),
+            "authorization_code" => await HandleAuthorizationCodeAsync(authentication, code, redirectUri, codeVerifier, ct),
+            "client_credentials" => await HandleClientCredentialsAsync(authentication, scope, ct),
+            "refresh_token" => await HandleRefreshTokenAsync(authentication, refreshToken, ct),
+            "urn:ietf:params:oauth:grant-type:device_code" => await HandleDeviceCodeAsync(authentication, deviceCode, ct),
             _ => BadRequest(new { error = "unsupported_grant_type", error_description = $"Grant type '{grantType}' is not supported." }),
         };
     }
@@ -83,18 +90,18 @@ public class TokenController(
         string? codeVerifier,
         CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(authentication.ClientId))
+            return InvalidClient();
+
+        var clientAuthentication = await _clientService.AuthenticateClientAsync(authentication, requireClientAuthentication: true, ct);
+        if (!clientAuthentication.IsSuccess)
+            return InvalidClient();
+
         if (string.IsNullOrWhiteSpace(code))
             return BadRequest(new { error = "invalid_request", error_description = "code is required." });
 
         if (string.IsNullOrWhiteSpace(redirectUri))
             return BadRequest(new { error = "invalid_request", error_description = "redirect_uri is required." });
-
-        if (string.IsNullOrWhiteSpace(authentication.ClientId))
-            return BadRequest(new { error = "invalid_request", error_description = "client_id is required." });
-
-        var clientAuthentication = await _clientService.AuthenticateClientAsync(authentication, requireClientAuthentication: true, ct);
-        if (!clientAuthentication.IsSuccess)
-            return Unauthorized(new { error = clientAuthentication.ErrorCode ?? "invalid_client", error_description = clientAuthentication.Error });
 
         var result = await _authorizationService.ValidateAndConsumeCodeAsync(code, authentication.ClientId, redirectUri, codeVerifier, ct);
 
@@ -139,23 +146,50 @@ public class TokenController(
         CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(authentication.ClientId))
-            return BadRequest(new { error = "invalid_request", error_description = "client_id is required." });
+            return InvalidClient();
+
+        var clientAuthentication = await _clientService.AuthenticateClientAsync(authentication, requireClientAuthentication: true, ct);
+        if (!clientAuthentication.IsSuccess || clientAuthentication.Client is null)
+            return InvalidClient();
 
         if (string.IsNullOrWhiteSpace(scope))
             return BadRequest(new { error = "invalid_request", error_description = "scope is required." });
 
-        var result = await _authorizationService.ValidateClientCredentialsAsync(authentication, scope, ct);
+        var policy = _securityPolicyService.CheckClient(clientAuthentication.Client.ClientId);
+        if (!policy.IsSuccess)
+            return BadRequest(new { error = "access_denied", error_description = policy.Error });
 
-        if (!result.IsSuccess)
-            return BadRequest(new { error = "invalid_client", error_description = result.Error });
+        if (!clientAuthentication.Client.IsGrantTypeAllowed("client_credentials"))
+        {
+            return BadRequest(new
+            {
+                error = "unauthorized_client",
+                error_description = "Client is not allowed to use client_credentials grant type.",
+            });
+        }
 
-        var accessToken = await _tokenService.IssueAccessTokenAsync(result.ClientId, result.Scope, null, null, null, ct);
+        var scopeValidation = await _clientService.ValidateScopesAsync(
+            clientAuthentication.Client.ClientId,
+            scope,
+            allowIdentityScopes: false,
+            ct);
+
+        if (!scopeValidation.IsSuccess)
+            return BadRequest(new { error = scopeValidation.ErrorCode ?? "invalid_scope", error_description = scopeValidation.Error });
+
+        var accessToken = await _tokenService.IssueAccessTokenAsync(
+            clientAuthentication.Client.ClientId,
+            scopeValidation.NormalizedScope!,
+            null,
+            null,
+            null,
+            ct);
 
         return Ok(new
         {
             access_token = accessToken,
             token_type = "Bearer",
-            scope = result.Scope,
+            scope = scopeValidation.NormalizedScope,
             expires_in = GetAccessTokenLifetimeSeconds(),
         });
     }
@@ -166,15 +200,15 @@ public class TokenController(
         CancellationToken ct)
     {
         // 中文注释：refresh_token 分支会先校验客户端身份，再调用 TokenService 做旧 refresh token 吊销和新 token 轮换。
-        if (string.IsNullOrWhiteSpace(refreshToken))
-            return BadRequest(new { error = "invalid_request", error_description = "refresh_token is required." });
-
         if (string.IsNullOrWhiteSpace(authentication.ClientId))
-            return BadRequest(new { error = "invalid_request", error_description = "client_id is required." });
+            return InvalidClient();
 
         var clientAuthentication = await _clientService.AuthenticateClientAsync(authentication, requireClientAuthentication: true, ct);
         if (!clientAuthentication.IsSuccess)
-            return Unauthorized(new { error = clientAuthentication.ErrorCode ?? "invalid_client", error_description = clientAuthentication.Error });
+            return InvalidClient();
+
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            return BadRequest(new { error = "invalid_request", error_description = "refresh_token is required." });
 
         var result = await _tokenService.RefreshAsync(refreshToken, authentication.ClientId!, ct);
 
@@ -197,7 +231,7 @@ public class TokenController(
     {
         // 中文注释：device_code 分支本身只负责“兑换”，真正的 device_code 状态机在 DeviceAuthorizationService 中维护。
         if (string.IsNullOrWhiteSpace(authentication.ClientId))
-            return BadRequest(new { error = "invalid_request", error_description = "client_id is required." });
+            return InvalidClient();
 
         if (string.IsNullOrWhiteSpace(deviceCode))
             return BadRequest(new { error = "invalid_request", error_description = "device_code is required." });
@@ -206,7 +240,7 @@ public class TokenController(
         if (!result.IsSuccess)
         {
             if (result.ErrorCode == "invalid_client")
-                return Unauthorized(new { error = "invalid_client", error_description = result.Error });
+                return InvalidClient();
 
             if (result.ErrorCode == "invalid_request")
                 return BadRequest(new { error = "invalid_request", error_description = result.Error });
@@ -258,6 +292,12 @@ public class TokenController(
     private int GetAccessTokenLifetimeSeconds()
     {
         return checked(_jwtOptions.AccessTokenLifetimeMinutes * 60);
+    }
+
+    private IActionResult InvalidClient()
+    {
+        Response.Headers.WWWAuthenticate = "Basic realm=\"NexusAuth\"";
+        return Unauthorized(new { error = "invalid_client" });
     }
 
     private static bool ShouldIssueRefreshToken(string scope)

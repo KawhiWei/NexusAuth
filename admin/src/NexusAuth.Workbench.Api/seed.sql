@@ -32,7 +32,7 @@ VALUES (
     'NexusAuth Workbench Dashboard and API (client_secret_basic)',
     '["http://localhost:5051/signin-oidc"]',
     '["http://localhost:5273/"]',
-    '["openid","profile","workbench"]',
+    '["openid","profile","workbench","offline_access"]',
     '["authorization_code","refresh_token"]',
     true,
     true,

@@ -50,6 +50,7 @@ public class WorkbenchApiModule : LuckAppModule
             options.PostLogoutRedirectUri = requiredAuthConfiguration.PostLogoutRedirectUri;
             options.Scope = requiredAuthConfiguration.Scope;
         });
+        services.AddScoped<WorkbenchCookieAuthenticationEvents>();
 
         services.AddAuthentication(WorkbenchAuthenticationDefaults.Scheme)
             .AddPolicyScheme(WorkbenchAuthenticationDefaults.Scheme, "Cookie or Bearer", options =>
@@ -75,17 +76,7 @@ public class WorkbenchApiModule : LuckAppModule
                 options.LoginPath = "/api/auth/login";
                 options.SlidingExpiration = true;
                 options.ExpireTimeSpan = TimeSpan.FromHours(24);
-                options.Events.OnValidatePrincipal = context =>
-                {
-                    var compactPrincipal = WorkbenchPrincipalFactory.CompactLegacyPrincipal(context.Principal);
-                    if (compactPrincipal is not null)
-                    {
-                        context.ReplacePrincipal(compactPrincipal);
-                        context.ShouldRenew = true;
-                    }
-
-                    return Task.CompletedTask;
-                };
+                options.EventsType = typeof(WorkbenchCookieAuthenticationEvents);
             })
             .AddJwtBearer(WorkbenchAuthenticationDefaults.BearerScheme, options =>
             {

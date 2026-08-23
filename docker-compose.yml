@@ -34,6 +34,8 @@ services:
       Jwt__SigningCertificatePassword: ${NEXUSAUTH_SIGNING_CERTIFICATE_PASSWORD:-}
       Jwt__DevelopmentSigningKeyPath: App_Data/signing-key.json
       Jwt__SigningKeyPath: ${NEXUSAUTH_SIGNING_KEY_PATH:-}
+      Jwt__AccessTokenLifetimeMinutes: ${NEXUSAUTH_ACCESS_TOKEN_LIFETIME_MINUTES:-60}
+      Jwt__RefreshTokenLifetimeMinutes: ${NEXUSAUTH_REFRESH_TOKEN_LIFETIME_MINUTES:-43200}
     volumes:
       - nexusauth-signing-key:/app/App_Data
       - nexusauth-sso-keys:/root/.aspnet/DataProtection-Keys
@@ -63,7 +65,7 @@ services:
       Auth__ClientSecret: ${WORKBENCH_CLIENT_SECRET:-c57cf0e110c54ad2ac5591b99801b852}
       Auth__RedirectUri: http://localhost:5051/signin-oidc
       Auth__PostLogoutRedirectUri: http://localhost:5273/
-      Auth__Scope: openid profile workbench
+      Auth__Scope: openid profile workbench offline_access
       Auth__Audience: workbench
       Auth__RequireHttpsMetadata: "false"
       Auth__SignOutProvider: "true"

@@ -12,5 +12,12 @@ public interface IOidcWorkbenchService
     Task<DiscoveryDocument> FetchDiscoveryAsync(CancellationToken ct);
     string GenerateCodeVerifier();
     (string codeChallenge, string codeVerifier) GeneratePkce();
-    Task<(string accessToken, string idToken, int expiresIn)> ExchangeCodeAsync(string code, string codeVerifier, CancellationToken ct);
+    Task<WorkbenchTokenResult> ExchangeCodeAsync(string code, string codeVerifier, CancellationToken ct);
+    Task<WorkbenchTokenResult> RefreshTokensAsync(string refreshToken, CancellationToken ct);
 }
+
+public sealed record WorkbenchTokenResult(
+    string AccessToken,
+    string RefreshToken,
+    string? IdToken,
+    int ExpiresIn);

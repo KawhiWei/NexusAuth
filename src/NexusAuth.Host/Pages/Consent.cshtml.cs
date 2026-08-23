@@ -1,12 +1,16 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using NexusAuth.Application.Clients;
 using NexusAuth.Application.Services;
 
 namespace NexusAuth.Host.Pages;
 
-public class ConsentModel(IAuthorizationService authorizationService) : PageModel
+public class ConsentModel(
+    IAuthorizationService authorizationService,
+    IClientService clientService) : PageModel
 {
     private readonly IAuthorizationService _authorizationService = authorizationService;
+    private readonly IClientService _clientService = clientService;
 
     [BindProperty(SupportsGet = true, Name = "client_id")]
     public string ClientId { get; set; } = string.Empty;
@@ -29,6 +33,9 @@ public class ConsentModel(IAuthorizationService authorizationService) : PageMode
     [BindProperty(SupportsGet = true, Name = "max_age")]
     public int? MaxAge { get; set; }
 
+    [BindProperty(SupportsGet = true, Name = "response_mode")]
+    public string? ResponseMode { get; set; }
+
     [BindProperty(SupportsGet = true)]
     public string? Claims { get; set; }
 
@@ -44,7 +51,7 @@ public class ConsentModel(IAuthorizationService authorizationService) : PageMode
 
     public string? ErrorMessage { get; private set; }
 
-    public IActionResult OnGet()
+    public async Task<IActionResult> OnGetAsync(CancellationToken ct)
     {
         if (User.Identity?.IsAuthenticated != true)
         {
@@ -58,11 +65,26 @@ public class ConsentModel(IAuthorizationService authorizationService) : PageMode
             return Page();
         }
 
-        BindDisplayItems();
+        var validation = await ValidateAuthorizeRequestAsync(ct);
+        if (!validation.IsSuccess)
+        {
+            ErrorMessage = validation.Error;
+            return Page();
+        }
+
+        try
+        {
+            BindDisplayItems();
+        }
+        catch (InvalidOperationException ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+
         return Page();
     }
 
-    public IActionResult OnPostApprove()
+    public async Task<IActionResult> OnPostApproveAsync(CancellationToken ct)
     {
         if (User.Identity?.IsAuthenticated != true)
         {
@@ -70,18 +92,84 @@ public class ConsentModel(IAuthorizationService authorizationService) : PageMode
             return Redirect($"/account/login?returnUrl={Uri.EscapeDataString(returnUrl)}");
         }
 
+        var validation = await ValidateAuthorizeRequestAsync(ct);
+        if (!validation.IsSuccess)
+        {
+            ErrorMessage = validation.Error;
+            return Page();
+        }
+
         var authorizeUrl = BuildAuthorizeUrl(RemoveConsentPrompt(Prompt));
         return Redirect(authorizeUrl);
     }
 
-    public IActionResult OnPostDeny()
+    public async Task<IActionResult> OnPostDenyAsync(CancellationToken ct)
     {
-        var separator = RedirectUri.Contains('?') ? '&' : '?';
-        var redirectUrl = $"{RedirectUri}{separator}error=access_denied&error_description={Uri.EscapeDataString("The resource owner denied the request.")}";
-        if (!string.IsNullOrWhiteSpace(State))
-            redirectUrl += $"&state={Uri.EscapeDataString(State)}";
+        if (User.Identity?.IsAuthenticated != true)
+        {
+            var returnUrl = Request.Path + Request.QueryString;
+            return Redirect($"/account/login?returnUrl={Uri.EscapeDataString(returnUrl)}");
+        }
 
-        return Redirect(redirectUrl);
+        var validation = await ValidateAuthorizeRequestAsync(ct);
+        if (!validation.IsSuccess)
+        {
+            ErrorMessage = validation.Error;
+            return Page();
+        }
+
+        var responseMode = ResolveResponseMode(ResponseMode) ?? "query";
+        return BuildAuthorizationResponse(
+            RedirectUri,
+            responseMode,
+            new Dictionary<string, string?>
+            {
+                ["error"] = "access_denied",
+                ["error_description"] = "The resource owner denied the request.",
+                ["state"] = State,
+            });
+    }
+
+    private async Task<ClientValidationResult> ValidateAuthorizeRequestAsync(CancellationToken ct)
+    {
+        if (ResolveResponseMode(ResponseMode) is null)
+        {
+            return ClientValidationResult.Failure(
+                "invalid_request",
+                "response_mode must be query or form_post.",
+                redirectUriValidated: true);
+        }
+
+        if (MaxAge is < 0)
+        {
+            return ClientValidationResult.Failure(
+                "invalid_request",
+                "max_age must not be negative.",
+                redirectUriValidated: true);
+        }
+
+        var clientValidation = await _clientService.ValidateClientForAuthorizationAsync(
+            ClientId,
+            RedirectUri,
+            "authorization_code",
+            CodeChallenge,
+            CodeChallengeMethod,
+            ct);
+        if (!clientValidation.IsSuccess)
+            return clientValidation;
+
+        var scopeValidation = await _clientService.ValidateScopesAsync(
+            ClientId,
+            Scope,
+            allowIdentityScopes: true,
+            ct);
+        if (!scopeValidation.IsSuccess)
+            return ClientValidationResult.Failure(
+                scopeValidation.ErrorCode ?? "invalid_scope",
+                scopeValidation.Error ?? "The requested scope is invalid.",
+                redirectUriValidated: true);
+
+        return ClientValidationResult.Success();
     }
 
     private void BindDisplayItems()
@@ -129,6 +217,7 @@ public class ConsentModel(IAuthorizationService authorizationService) : PageMode
             ["nonce"] = Nonce,
             ["prompt"] = prompt,
             ["max_age"] = MaxAge?.ToString(),
+            ["response_mode"] = ResponseMode,
             ["claims"] = Claims,
             ["code_challenge"] = CodeChallenge,
             ["code_challenge_method"] = CodeChallengeMethod,
@@ -148,5 +237,49 @@ public class ConsentModel(IAuthorizationService authorizationService) : PageMode
             .ToArray();
 
         return values.Length == 0 ? null : string.Join(' ', values);
+    }
+
+    private static string? ResolveResponseMode(string? responseMode)
+    {
+        if (string.IsNullOrWhiteSpace(responseMode)
+            || string.Equals(responseMode, "query", StringComparison.Ordinal))
+            return "query";
+
+        return string.Equals(responseMode, "form_post", StringComparison.Ordinal)
+            ? "form_post"
+            : null;
+    }
+
+    private IActionResult BuildAuthorizationResponse(
+        string redirectUri,
+        string responseMode,
+        IReadOnlyDictionary<string, string?> parameters)
+    {
+        var presentParameters = parameters
+            .Where(pair => pair.Value is not null)
+            .ToDictionary(pair => pair.Key, pair => (string?)pair.Value, StringComparer.Ordinal);
+
+        if (!string.Equals(responseMode, "form_post", StringComparison.Ordinal))
+        {
+            var redirectUrl = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(
+                redirectUri,
+                presentParameters);
+            return new RedirectResult(redirectUrl);
+        }
+
+        Response.Headers["Cache-Control"] = "no-store";
+        Response.Headers["Pragma"] = "no-cache";
+        var action = System.Net.WebUtility.HtmlEncode(redirectUri);
+        var hiddenInputs = string.Join(
+            Environment.NewLine,
+            presentParameters.Select(pair =>
+                $"<input type=\"hidden\" name=\"{System.Net.WebUtility.HtmlEncode(pair.Key)}\" value=\"{System.Net.WebUtility.HtmlEncode(pair.Value)}\" />"));
+        var html = $"<!doctype html><html><head><meta charset=\"utf-8\"><title>Submitting authorization response</title></head><body><form method=\"post\" action=\"{action}\">{hiddenInputs}<noscript><button type=\"submit\">Continue</button></noscript></form><script>document.forms[0].submit();</script></body></html>";
+        return new ContentResult
+        {
+            Content = html,
+            ContentType = "text/html; charset=utf-8",
+            StatusCode = StatusCodes.Status200OK,
+        };
     }
 }

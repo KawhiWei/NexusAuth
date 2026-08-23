@@ -57,6 +57,7 @@ public class OpenIdController(
             end_session_endpoint = $"{issuer}/connect/endsession",
             scopes_supported = new[] { "openid", "profile", "email", "phone", "address", "offline_access" },
             response_types_supported = new[] { "code" },
+            response_modes_supported = new[] { "query", "form_post" },
             grant_types_supported = new[]
             {
                 "authorization_code",
@@ -149,15 +150,24 @@ public class OpenIdController(
             clientAssertion,
             GetEndpointAudience());
 
-        if (string.IsNullOrWhiteSpace(resolvedClientAuthentication.ClientId))
-            return BadRequest(new { error = "invalid_request", error_description = "client_id is required." });
+        if (!resolvedClientAuthentication.IsSuccess || resolvedClientAuthentication.Authentication is null)
+            return InvalidClient();
+
+        var authentication = resolvedClientAuthentication.Authentication;
+        if (string.IsNullOrWhiteSpace(authentication.ClientId))
+            return InvalidClient();
 
         if (string.IsNullOrWhiteSpace(scope))
             return BadRequest(new { error = "invalid_request", error_description = "scope is required." });
 
-        var result = await _deviceAuthorizationService.StartAsync(resolvedClientAuthentication, scope, ct);
+        var result = await _deviceAuthorizationService.StartAsync(authentication, scope, ct);
         if (!result.IsSuccess)
+        {
+            if (string.Equals(result.ErrorCode, "invalid_client", StringComparison.Ordinal))
+                return InvalidClient();
+
             return BadRequest(new { error = result.ErrorCode, error_description = result.Error });
+        }
 
         var issuer = GetIssuer();
         var verificationUri = $"{issuer}{result.VerificationUri}";
@@ -195,17 +205,21 @@ public class OpenIdController(
             clientAssertion,
             GetEndpointAudience());
 
-        if (string.IsNullOrWhiteSpace(resolvedClientAuthentication.ClientId))
-            return Unauthorized(new { error = "invalid_client" });
+        if (!resolvedClientAuthentication.IsSuccess || resolvedClientAuthentication.Authentication is null)
+            return InvalidClient();
 
-        var authentication = await _clientService.AuthenticateClientAsync(resolvedClientAuthentication, requireClientAuthentication: true, ct);
+        var authenticationInput = resolvedClientAuthentication.Authentication;
+        if (string.IsNullOrWhiteSpace(authenticationInput.ClientId))
+            return InvalidClient();
+
+        var authentication = await _clientService.AuthenticateClientAsync(authenticationInput, requireClientAuthentication: true, ct);
         if (!authentication.IsSuccess)
-            return Unauthorized(new { error = "invalid_client" });
+            return InvalidClient();
 
         if (string.IsNullOrWhiteSpace(token))
             return BadRequest(new { error = "invalid_request", error_description = "token is required." });
 
-        var result = await _tokenService.IntrospectAsync(token, resolvedClientAuthentication.ClientId, ct);
+        var result = await _tokenService.IntrospectAsync(token, authenticationInput.ClientId, ct);
         return Ok(new
         {
             active = result.Active,
@@ -244,21 +258,25 @@ public class OpenIdController(
             clientAssertion,
             GetEndpointAudience());
 
-        if (string.IsNullOrWhiteSpace(resolvedClientAuthentication.ClientId))
-            return Unauthorized(new { error = "invalid_client" });
+        if (!resolvedClientAuthentication.IsSuccess || resolvedClientAuthentication.Authentication is null)
+            return InvalidClient();
 
-        var authentication = await _clientService.AuthenticateClientAsync(resolvedClientAuthentication, requireClientAuthentication: true, ct);
+        var authenticationInput = resolvedClientAuthentication.Authentication;
+        if (string.IsNullOrWhiteSpace(authenticationInput.ClientId))
+            return InvalidClient();
+
+        var authentication = await _clientService.AuthenticateClientAsync(authenticationInput, requireClientAuthentication: true, ct);
         if (!authentication.IsSuccess)
-            return Unauthorized(new { error = "invalid_client" });
+            return InvalidClient();
 
         if (!string.IsNullOrWhiteSpace(token))
         {
             if (string.Equals(tokenTypeHint, "refresh_token", StringComparison.OrdinalIgnoreCase))
-                await RevokeRefreshTokenForClientAsync(token, resolvedClientAuthentication.ClientId, ct);
+                await RevokeRefreshTokenForClientAsync(token, authenticationInput.ClientId, ct);
             else
             {
-                await _tokenService.RevokeAccessTokenAsync(token, resolvedClientAuthentication.ClientId, ct);
-                await RevokeRefreshTokenForClientAsync(token, resolvedClientAuthentication.ClientId, ct);
+                await _tokenService.RevokeAccessTokenAsync(token, authenticationInput.ClientId, ct);
+                await RevokeRefreshTokenForClientAsync(token, authenticationInput.ClientId, ct);
             }
         }
 
@@ -311,6 +329,12 @@ public class OpenIdController(
     {
         // 统一使用配置中的 Issuer，确保 discovery 的 issuer 与 token 的 iss 完全一致。
         return _jwtOptions.Issuer.TrimEnd('/');
+    }
+
+    private IActionResult InvalidClient()
+    {
+        Response.Headers.WWWAuthenticate = "Basic realm=\"NexusAuth\"";
+        return Unauthorized(new { error = "invalid_client" });
     }
 
     private string GetEndpointAudience()

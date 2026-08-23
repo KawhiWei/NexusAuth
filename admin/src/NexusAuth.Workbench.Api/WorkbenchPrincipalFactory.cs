@@ -18,7 +18,6 @@ internal static class WorkbenchPrincipalFactory
             [
                 new Claim(ClaimTypes.NameIdentifier, subject),
                 new Claim(ClaimTypes.Name, name),
-                new Claim("id_token", idToken),
             ],
             WorkbenchAuthenticationDefaults.CookieScheme);
 

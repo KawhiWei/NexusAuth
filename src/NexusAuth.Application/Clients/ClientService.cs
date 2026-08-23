@@ -72,6 +72,13 @@ public class ClientService(
         if (!requireClientAuthentication)
             return ClientAuthenticationResult.Success(client);
 
+        var hasAssertion = !string.IsNullOrWhiteSpace(input.ClientAssertion)
+            || !string.IsNullOrWhiteSpace(input.ClientAssertionType);
+        var hasSecret = !string.IsNullOrWhiteSpace(input.ClientSecret);
+
+        if (hasAssertion && hasSecret)
+            return ClientAuthenticationResult.Failure("invalid_client", "Multiple client authentication methods were supplied.");
+
         if (string.Equals(client.TokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal))
         {
             if (!string.Equals(input.ClientAssertionType, OAuthClient.ClientAssertionTypeJwtBearer, StringComparison.Ordinal))
@@ -130,6 +137,9 @@ public class ClientService(
             return ClientAuthenticationResult.Success(client);
         }
 
+        if (hasAssertion)
+            return ClientAuthenticationResult.Failure("invalid_client", "This client requires client secret authentication.");
+
         if (string.Equals(client.TokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretBasic, StringComparison.Ordinal)
             && !string.Equals(input.TokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretBasic, StringComparison.Ordinal))
         {
@@ -169,16 +179,41 @@ public class ClientService(
 
         if (!client.IsGrantTypeAllowed(grantType))
             return ClientValidationResult.Failure("unauthorized_client",
-                $"Client is not allowed to use {grantType} grant type.");
+                $"Client is not allowed to use {grantType} grant type.",
+                redirectUriValidated: true);
 
         if (string.Equals(grantType, "authorization_code", StringComparison.OrdinalIgnoreCase))
         {
-            if (string.IsNullOrWhiteSpace(codeChallenge))
-                return ClientValidationResult.Failure("invalid_request", "code_challenge is required for authorization_code flow.");
+            if (client.RequirePkce && string.IsNullOrWhiteSpace(codeChallenge))
+                return ClientValidationResult.Failure("invalid_request", "code_challenge is required for this client.", redirectUriValidated: true);
 
-            if (!string.Equals(codeChallengeMethod, "S256", StringComparison.Ordinal))
-                return ClientValidationResult.Failure("invalid_request", "code_challenge_method must be S256 for authorization_code flow.");
+            if (!string.IsNullOrWhiteSpace(codeChallenge)
+                && !string.Equals(codeChallengeMethod, "S256", StringComparison.Ordinal))
+            {
+                return ClientValidationResult.Failure("invalid_request", "code_challenge_method must be S256.", redirectUriValidated: true);
+            }
+
+            if (string.IsNullOrWhiteSpace(codeChallenge)
+                && !string.IsNullOrWhiteSpace(codeChallengeMethod))
+            {
+                return ClientValidationResult.Failure("invalid_request", "code_challenge_method requires code_challenge.", redirectUriValidated: true);
+            }
         }
+
+        return ClientValidationResult.Success();
+    }
+
+    public async Task<ClientValidationResult> ValidateClientRedirectUriAsync(
+        string clientId,
+        string redirectUri,
+        CancellationToken ct = default)
+    {
+        var client = await clientRepository.FindByClientIdAsync(clientId, ct);
+        if (client is null || !client.IsActive)
+            return ClientValidationResult.Failure("invalid_client", "Client not found or inactive.");
+
+        if (!client.IsValidRedirectUri(redirectUri))
+            return ClientValidationResult.Failure("invalid_request", "Invalid redirect_uri.");
 
         return ClientValidationResult.Success();
     }
@@ -565,15 +600,21 @@ public class ClientService(
             return [];
         }
 
-        return [.. clientList.Select(MapClient)];
+        var resourceIdsByClientId = await clientApiResourceRepository
+            .GetApiResourceIdsByClientIdsAsync(clientList.Select(client => client.Id), ct);
+
+        return [.. clientList.Select(client => MapClient(
+            client,
+            resourceIdsByClientId.GetValueOrDefault(client.Id, [])))];
     }
 
-    private Task<ClientDto> MapClientAsync(OAuthClient client, CancellationToken ct)
+    private async Task<ClientDto> MapClientAsync(OAuthClient client, CancellationToken ct)
     {
-        return Task.FromResult(MapClient(client));
+        var resources = await clientApiResourceRepository.GetResourcesByClientIdAsync(client.Id, ct);
+        return MapClient(client, resources.Select(resource => resource.Id));
     }
 
-    private static ClientDto MapClient(OAuthClient client)
+    private static ClientDto MapClient(OAuthClient client, IEnumerable<Guid> apiResourceIds)
     {
         return new ClientDto(
             client.Id,
@@ -590,7 +631,10 @@ public class ClientService(
             client.AllowedGrantTypes,
             client.RequirePkce,
             client.IsActive,
-            client.CreatedAt);
+            client.CreatedAt)
+        {
+            ApiResourceIds = [.. apiResourceIds],
+        };
     }
 
     private static ClientCredentialDto MapCredential(OAuthClientSecret secret)

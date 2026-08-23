@@ -82,16 +82,29 @@ public class AuthController : ControllerBase
 
         try
         {
-            var (_, idToken, expiresIn) = await _oidcService.ExchangeCodeAsync(code, flow.CodeVerifier, ct);
+            var tokenResult = await _oidcService.ExchangeCodeAsync(code, flow.CodeVerifier, ct);
+            var idToken = tokenResult.IdToken
+                ?? throw new InvalidOperationException("The authorization response did not contain an ID token.");
             var principal = WorkbenchPrincipalFactory.Create(idToken);
-            var expiresAt = DateTimeOffset.UtcNow.AddSeconds(Math.Max(60, expiresIn));
-
-            await HttpContext.SignInAsync(WorkbenchAuthenticationDefaults.CookieScheme, principal, new AuthenticationProperties
+            var now = DateTimeOffset.UtcNow;
+            var expiresAt = now.AddSeconds(tokenResult.ExpiresIn);
+            var properties = new AuthenticationProperties
             {
                 IsPersistent = true,
-                AllowRefresh = false,
-                ExpiresUtc = expiresAt,
-            });
+                AllowRefresh = true,
+                IssuedUtc = now,
+                // The Workbench session lifetime is independent from the short-lived access token.
+                ExpiresUtc = now.AddHours(24),
+            };
+            properties.StoreTokens(
+            [
+                new AuthenticationToken { Name = "access_token", Value = tokenResult.AccessToken },
+                new AuthenticationToken { Name = "refresh_token", Value = tokenResult.RefreshToken },
+                new AuthenticationToken { Name = "id_token", Value = idToken },
+                new AuthenticationToken { Name = "expires_at", Value = expiresAt.ToString("O") },
+            ]);
+
+            await HttpContext.SignInAsync(WorkbenchAuthenticationDefaults.CookieScheme, principal, properties);
 
             return Redirect($"{frontendBase}/auth/callback");
         }
@@ -124,7 +137,9 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Logout(CancellationToken ct)
     {
         var logoutUrl = string.Empty;
-        var idToken = User.FindFirstValue("id_token");
+        var idToken = await HttpContext.GetTokenAsync(
+            WorkbenchAuthenticationDefaults.CookieScheme,
+            "id_token") ?? User.FindFirstValue("id_token");
 
         if (_oidcService.SignOutProvider && !string.IsNullOrWhiteSpace(idToken))
         {

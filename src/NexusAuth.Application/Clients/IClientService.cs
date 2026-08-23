@@ -33,6 +33,11 @@ public interface IClientService : IScopedDependency
         string? codeChallengeMethod = null,
         CancellationToken ct = default);
 
+    Task<ClientValidationResult> ValidateClientRedirectUriAsync(
+        string clientId,
+        string redirectUri,
+        CancellationToken ct = default);
+
     Task<ClientAuthenticationResult> AuthenticateClientAsync(
         string clientId,
         string? rawClientSecret,
@@ -91,16 +96,30 @@ public record ClientAuthenticationInput(
     string? AssertionAudience = null,
     string? TokenEndpointAuthMethod = null);
 
-public record ClientValidationResult(
+public record ClientAuthenticationParseResult(
     bool IsSuccess,
+    ClientAuthenticationInput? Authentication,
     string? Error,
     string? ErrorCode)
 {
-    public static ClientValidationResult Success()
-        => new(true, null, null);
+    public static ClientAuthenticationParseResult Success(ClientAuthenticationInput authentication)
+        => new(true, authentication, null, null);
 
-    public static ClientValidationResult Failure(string errorCode, string error)
-        => new(false, error, errorCode);
+    public static ClientAuthenticationParseResult Failure(string error = "Invalid client authentication.")
+        => new(false, null, error, "invalid_client");
+}
+
+public record ClientValidationResult(
+    bool IsSuccess,
+    string? Error,
+    string? ErrorCode,
+    bool RedirectUriValidated = false)
+{
+    public static ClientValidationResult Success()
+        => new(true, null, null, true);
+
+    public static ClientValidationResult Failure(string errorCode, string error, bool redirectUriValidated = false)
+        => new(false, error, errorCode, redirectUriValidated);
 }
 
 public record ClientAuthenticationResult(
@@ -178,7 +197,10 @@ public record ClientDto(
     List<string> AllowedGrantTypes,
     bool RequirePkce,
     bool IsActive,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt)
+{
+    public List<Guid> ApiResourceIds { get; init; } = [];
+}
 
 public record ClientCredentialDto(
     Guid Id,

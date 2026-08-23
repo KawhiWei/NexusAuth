@@ -8,6 +8,7 @@ export type CreateClientRequest = {
   postLogoutRedirectUris?: string[];
   allowedScopes?: string[];
   allowedGrantTypes?: string[];
+  apiResourceIds?: string[];
   requirePkce: boolean;
   tokenEndpointAuthMethod?: string;
   autoGenerateJwks?: boolean;
@@ -22,6 +23,7 @@ export type UpdateClientRequest = {
   postLogoutRedirectUris?: string[];
   allowedScopes?: string[];
   allowedGrantTypes?: string[];
+  apiResourceIds?: string[];
   requirePkce?: boolean;
   tokenEndpointAuthMethod?: string;
   jwks?: string;
@@ -64,6 +66,7 @@ export type Client = {
   postLogoutRedirectUris: string[];
   allowedScopes: string[];
   allowedGrantTypes: string[];
+  apiResourceIds: string[];
   requirePkce: boolean;
   isActive: boolean;
   tokenEndpointAuthMethod: string;

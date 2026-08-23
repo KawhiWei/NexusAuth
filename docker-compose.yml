@@ -24,6 +24,7 @@ services:
       context: .
       dockerfile: src/NexusAuth.Host/Dockerfile
     environment:
+      TZ: ${TZ:-Asia/Shanghai}
       ASPNETCORE_ENVIRONMENT: ${NEXUSAUTH_SSO_ENVIRONMENT:-Development}
       ConnectionStrings__Default: Host=db;Port=5432;Database=nexusauth;Username=${POSTGRES_USER:-nexusauth};Password=${POSTGRES_PASSWORD:-nexusauth_dev_password};Search Path=nexusauth
       Jwt__Issuer: ${NEXUSAUTH_ISSUER:-http://localhost:5100}
@@ -39,6 +40,7 @@ services:
     volumes:
       - nexusauth-signing-key:/app/App_Data
       - nexusauth-sso-keys:/root/.aspnet/DataProtection-Keys
+      - ./logs/sso:/app/logs
     depends_on:
       db:
         condition: service_healthy
@@ -57,6 +59,7 @@ services:
       context: .
       dockerfile: admin/src/NexusAuth.Workbench.Api/Dockerfile
     environment:
+      TZ: ${TZ:-Asia/Shanghai}
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ConnectionStrings__Default: Host=db;Port=5432;Database=nexusauth;Username=${POSTGRES_USER:-nexusauth};Password=${POSTGRES_PASSWORD:-nexusauth_dev_password};Search Path=nexusauth
       Auth__Authority: ${NEXUSAUTH_ISSUER:-http://localhost:5100}
@@ -78,6 +81,7 @@ services:
       - "5051:8080"
     volumes:
       - nexusauth-admin-keys:/root/.aspnet/DataProtection-Keys
+      - ./logs/workbench:/app/logs
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
       interval: 5s

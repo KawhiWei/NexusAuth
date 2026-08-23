@@ -23,6 +23,8 @@
         <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.8" />
         <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.8" />
         <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.8" />
+        <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+        <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
     </ItemGroup>
 
 </Project>

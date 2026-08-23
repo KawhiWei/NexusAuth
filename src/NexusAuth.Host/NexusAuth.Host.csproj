@@ -9,6 +9,7 @@
         <ProjectReference Include="..\NexusAuth.Application\NexusAuth.Application.csproj" />
         <ProjectReference Include="..\NexusAuth.Persistence\NexusAuth.Persistence.csproj" />
         <ProjectReference Include="..\NexusAuth.Shared\NexusAuth.Shared.csproj" />
+        <ProjectReference Include="..\NexusAuth.Logging\NexusAuth.Logging.csproj" />
     </ItemGroup>
 
 </Project>

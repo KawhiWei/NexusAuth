@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Workbench.Api", "src\NexusAuth.Workbench.Api\NexusAuth.Workbench.Api.csproj", "{D98CB79B-9360-427D-AF3E-8D44335FC93A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Logging", "..\src\NexusAuth.Logging\NexusAuth.Logging.csproj", "{54BB5E9B-76BA-48B0-925D-4D5464C938B2}"
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{BB8C138D-5197-42D8-87C8-CB6B2A25AB0A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Application", "..\src\NexusAuth.Application\NexusAuth.Application.csproj", "{B455BA8F-EDCF-430D-AF35-54FE62AB66DA}"
@@ -44,8 +46,13 @@ Global
 		{A6436D3E-CC3C-431A-8A17-935B1D41B8D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A6436D3E-CC3C-431A-8A17-935B1D41B8D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A6436D3E-CC3C-431A-8A17-935B1D41B8D8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{54BB5E9B-76BA-48B0-925D-4D5464C938B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{54BB5E9B-76BA-48B0-925D-4D5464C938B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{54BB5E9B-76BA-48B0-925D-4D5464C938B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{54BB5E9B-76BA-48B0-925D-4D5464C938B2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{D98CB79B-9360-427D-AF3E-8D44335FC93A} = {BB8C138D-5197-42D8-87C8-CB6B2A25AB0A}
+		{54BB5E9B-76BA-48B0-925D-4D5464C938B2} = {BB8C138D-5197-42D8-87C8-CB6B2A25AB0A}
 	EndGlobalSection
 EndGlobal

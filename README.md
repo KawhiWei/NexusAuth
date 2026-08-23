@@ -130,6 +130,35 @@ npm run dev
 
 也可以使用两个解决方案：`NexusAuth.sln` 负责 Provider 和共享后端项目，`admin/NexusAuth.Admin.sln` 负责 Workbench。详细步骤见 [快速开始](./document/01-快速开始.md) 和 [环境准备](./document/02-环境准备.md)。
 
+### 日志记录
+
+SSO 和 Workbench API 共用 `src/NexusAuth.Logging` 中的 Serilog 配置。两个站点都会同时写控制台和文件，因此 Docker 日志仍然可以通过 `docker compose logs` 查看，文件日志则适合检索和长期保留。
+
+每条日志都保持下面的固定格式，字段为空时使用 `-`，不会改变列的位置：
+
+```text
+[时间][模块][分类][子分类][TraceId][过滤1][过滤2][日志内容]
+```
+
+实际输出示例：
+
+```text
+[2026-08-23 14:20:10.123 +08:00][NexusAuth.SSO][NexusAuth.Host.Controllers.TokenController][/connect/token][4bf92f3577b34da6a3ce929d0e0e4736][POST][200][INF Token issued]
+```
+
+其中 `模块` 固定为 `NexusAuth.SSO` 或 `NexusAuth.Workbench`；`分类` 来自 Serilog 的 `SourceContext`；请求日志的 `子分类` 是请求路径，`TraceId` 优先使用当前 Activity 的 trace id，`过滤1` 是 HTTP 方法，`过滤2` 是最终 HTTP 状态码。请求处理期间产生的普通日志会继承 trace id、路径和方法，状态码尚未确定时显示 `-`。
+
+默认文件位置为：
+
+- SSO：`logs/nexusauth-sso-YYYYMMDD.log`
+- Workbench：`logs/nexusauth-workbench-YYYYMMDD.log`
+
+文件按天滚动，单文件达到 100MB 时继续分片，每个站点保留最近 30 个文件，并启用共享写入和约 1 秒的磁盘刷新。可以在各站点的 `NexusAuthLogging` 配置节中覆盖 `FilePath`、`MinimumLevel`、`MinimumLevelOverrides`、`FileSizeLimitBytes`、`RetainedFileCountLimit`、`RollOnFileSizeLimit`、`Shared` 和 `FlushIntervalSeconds`；环境变量使用双下划线，例如 `NexusAuthLogging__MinimumLevel=Debug`、`NexusAuthLogging__MinimumLevelOverrides__Microsoft.AspNetCore=Information` 或 `NexusAuthLogging__FilePath=/var/log/nexusauth/sso-.log`。
+
+默认不会记录 `Information` 级别的 EF Core SQL 命令，避免查询参数长期落盘。确需短时间排查数据库问题时，可以把 `NexusAuthLogging__MinimumLevelOverrides__Microsoft.EntityFrameworkCore.Database.Command` 调整为 `Information`，排查结束后应立即恢复为 `Warning`。
+
+Docker Compose 会把宿主机的 `./logs/sso` 和 `./logs/workbench` 分别挂载到容器的 `/app/logs`。`logs/` 已加入 `.gitignore`，运行时文件不会提交到 Git。日志中不要写入 client secret、授权码、access token、refresh token、private key、密码或完整 Cookie；需要关联请求时使用 `TraceId`，需要排查身份时只记录脱敏后的 client id 或用户标识。
+
 ## 发现文档和最小接入
 
 Provider 启动后先读取发现文档：

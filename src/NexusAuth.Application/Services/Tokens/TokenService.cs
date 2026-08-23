@@ -442,23 +442,24 @@ public class TokenService(
             .ToArray();
 
         var resources = await apiResourceRepository.FindByAudiencesAsync(resourceScopeNames, ct);
-        var resourceMap = resources
+        var activeAudiences = resources
             .Where(resource => resource.IsActive)
-            .ToDictionary(resource => resource.Audience, resource => resource, StringComparer.Ordinal);
+            .Select(resource => resource.Audience)
+            .ToHashSet(StringComparer.Ordinal);
 
         string? resolved = null;
         foreach (var scopeName in resourceScopeNames)
         {
-            if (!resourceMap.TryGetValue(scopeName, out var resource))
+            if (!activeAudiences.Contains(scopeName))
                 continue;
 
             if (string.IsNullOrWhiteSpace(resolved))
             {
-                resolved = resource.Audience;
+                resolved = scopeName;
                 continue;
             }
 
-            if (!string.Equals(resolved, resource.Audience, StringComparison.Ordinal))
+            if (!string.Equals(resolved, scopeName, StringComparison.Ordinal))
                 throw new InvalidOperationException("Requested scopes span multiple audiences. Please request one resource audience per token.");
         }
 

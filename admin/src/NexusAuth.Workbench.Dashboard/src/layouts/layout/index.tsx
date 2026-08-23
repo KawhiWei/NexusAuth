@@ -221,9 +221,7 @@ const PublicLayout = () => {
     <Layout className="layout-container">
       {pageLoading && <GlobalLoading />}
       <Header className="layout-header">
-        <div className="layout-header-left">
-          <LogoComponent />
-        </div>
+        <div className="layout-header-left" aria-hidden="true" />
         <div className="layout-header-right">
           <PublicHeader theme={theme} onChangeTheme={handleChangeTheme} />
           <AvatarComponent />
@@ -235,8 +233,11 @@ const PublicLayout = () => {
           width={collapsed ? '64px' : '232px'}
           className={`layout-sider${collapsed ? ' is-collapsed' : ''}`}
         >
+          <div className="layout-sider-brand">
+            <LogoComponent collapse={collapsed} />
+          </div>
           <div className="layout-sider-menu">
-            <SliderMenu collapse={collapsed} theme={theme} />
+            <SliderMenu collapse={collapsed} />
           </div>
           <div className="layout-sider-trigger-bottom" onClick={handleCollapsed}>
             {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}

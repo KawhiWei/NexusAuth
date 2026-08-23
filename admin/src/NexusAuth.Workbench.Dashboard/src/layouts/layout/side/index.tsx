@@ -2,12 +2,11 @@ import MenuComponent from './menu';
 
 interface SliderMenuProps {
     collapse: boolean;
-    theme: 'light' | 'dark';
 }
 
-const SliderMenu = ({ collapse, theme }: SliderMenuProps) => {
+const SliderMenu = ({ collapse }: SliderMenuProps) => {
     return (
-        <MenuComponent collapse={collapse} theme={theme} />
+        <MenuComponent collapse={collapse} />
     )
 }
 export default SliderMenu

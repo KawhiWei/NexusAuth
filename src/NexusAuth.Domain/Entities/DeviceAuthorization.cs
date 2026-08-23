@@ -8,7 +8,11 @@ public class DeviceAuthorization : EntityWithIdentity<Guid>
 {
     private const string UserCodeAlphabet = "BCDFGHJKLMNPQRSTVWXZ";
 
-    public string DeviceCode { get; private set; } = default!;
+    /// <summary>
+    /// SHA-256 hash of the bearer device code. The raw code is returned once
+    /// from the device authorization endpoint and is never persisted.
+    /// </summary>
+    public string DeviceCodeHash { get; private set; } = default!;
 
     public string UserCode { get; private set; } = default!;
 
@@ -36,26 +40,44 @@ public class DeviceAuthorization : EntityWithIdentity<Guid>
     {
     }
 
-    public static DeviceAuthorization Create(string clientId, string scope, int intervalSeconds = 5)
+    public static DeviceAuthorizationCreationResult Create(
+        string clientId,
+        string scope,
+        TimeSpan? lifetime = null,
+        int intervalSeconds = 5)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
         ArgumentException.ThrowIfNullOrWhiteSpace(scope);
 
         var now = DateTimeOffset.UtcNow;
         var userCode = GenerateUserCode();
+        var rawDeviceCode = GenerateUrlSafeRandomString(48);
 
-        return new DeviceAuthorization(Guid.NewGuid())
+        var authorization = new DeviceAuthorization(Guid.NewGuid())
         {
-            DeviceCode = GenerateUrlSafeRandomString(48),
+            DeviceCodeHash = Hash(rawDeviceCode),
             UserCode = userCode,
             UserCodeNormalized = NormalizeUserCode(userCode),
             ClientId = clientId,
             Scope = scope,
             Status = DeviceAuthorizationStatus.Pending,
             PollingIntervalSeconds = intervalSeconds,
-            ExpiresAt = now.AddMinutes(15),
+            ExpiresAt = now.Add(lifetime ?? TimeSpan.FromMinutes(15)),
             CreatedAt = now,
         };
+
+        return new DeviceAuthorizationCreationResult(authorization, rawDeviceCode);
+    }
+
+    public static string Hash(string rawDeviceCode)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(rawDeviceCode);
+
+        var digest = SHA256.HashData(Encoding.UTF8.GetBytes(rawDeviceCode));
+        return Convert.ToBase64String(digest)
+            .Replace('+', '-')
+            .Replace('/', '_')
+            .TrimEnd('=');
     }
 
     public bool RequiresSlowDown(DateTimeOffset now)
@@ -140,3 +162,7 @@ public class DeviceAuthorization : EntityWithIdentity<Guid>
             .TrimEnd('=');
     }
 }
+
+public sealed record DeviceAuthorizationCreationResult(
+    DeviceAuthorization Entity,
+    string RawDeviceCode);

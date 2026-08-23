@@ -1,15 +1,17 @@
 import './style.less';
 
-import { Button, MessagePlugin } from 'tdesign-react';
+import { Button, MessagePlugin, Tooltip } from 'tdesign-react';
+import { MoonIcon, SunnyIcon } from 'tdesign-icons-react';
 import { useEffect, useState } from 'react';
 
 import { checkAuthenticated, setCachedAuthStatus } from '../../router/auth';
 import { startLogin } from '../../api/login';
-import { getThemeMode } from '../../theme';
+import { applyThemeMode, getThemeMode } from '../../theme';
+import BrandComponent from '../../components/brand';
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
-  const [themeMode] = useState<'light' | 'dark'>(() => getThemeMode());
+  const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => getThemeMode());
 
   useEffect(() => {
     void checkAuthStatus();
@@ -23,6 +25,12 @@ const Login = () => {
       window.location.href = '/dashboard';
     }
   }
+
+  const handleToggleTheme = () => {
+    const nextTheme = themeMode === 'light' ? 'dark' : 'light';
+    setThemeMode(nextTheme);
+    applyThemeMode(nextTheme);
+  };
 
   const handleLogin = async () => {
     try {
@@ -42,11 +50,19 @@ const Login = () => {
   return (
     <div className={`stitch-login-page stitch-login-page--${themeMode}`}>
       <div className="stitch-login-bg" />
-      <div className="stitch-login-orb stitch-login-orb-primary" />
-      <div className="stitch-login-orb stitch-login-orb-secondary" />
 
       <header className="stitch-login-header">
-        <div className="stitch-login-brand">NexusAuth Workbench</div>
+        <BrandComponent className="stitch-login-brand" />
+        <Tooltip content={themeMode === 'light' ? '切换到暗色主题' : '切换到浅色主题'}>
+          <Button
+            className="stitch-login-theme-button"
+            shape="circle"
+            variant="text"
+            aria-label={themeMode === 'light' ? '切换到暗色主题' : '切换到浅色主题'}
+            icon={themeMode === 'light' ? <MoonIcon /> : <SunnyIcon />}
+            onClick={handleToggleTheme}
+          />
+        </Tooltip>
       </header>
 
       <main className="stitch-login-main">

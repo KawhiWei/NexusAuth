@@ -205,7 +205,16 @@ public class TokenController(
         var result = await _deviceAuthorizationService.PollAsync(authentication, deviceCode, ct);
         if (!result.IsSuccess)
         {
-            if (result.ErrorCode is "authorization_pending" or "slow_down" or "access_denied" or "expired_token")
+            if (result.ErrorCode == "invalid_client")
+                return Unauthorized(new { error = "invalid_client", error_description = result.Error });
+
+            if (result.ErrorCode == "invalid_request")
+                return BadRequest(new { error = "invalid_request", error_description = result.Error });
+
+            if (result.ErrorCode is "unauthorized_client" or "access_denied")
+                return BadRequest(new { error = result.ErrorCode, error_description = result.Error });
+
+            if (result.ErrorCode is "authorization_pending" or "slow_down" or "expired_token")
                 return BadRequest(new { error = result.ErrorCode, error_description = result.Error, interval = result.Interval > 0 ? (int?)result.Interval : null });
 
             return BadRequest(new { error = "invalid_grant", error_description = result.Error });

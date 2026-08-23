@@ -15,4 +15,15 @@ public interface IUserRepository : IAggregateRootRepository<User, Guid>, IScoped
     Task<User?> FindByIdAsync(Guid id, CancellationToken ct = default);
 
     Task AddAsync(User user, CancellationToken ct = default);
+
+    Task UpdateAsync(User user, CancellationToken ct = default);
+
+    Task<User?> RegisterFailedLoginAsync(
+        Guid userId,
+        int failureLimit,
+        TimeSpan lockoutDuration,
+        DateTimeOffset now,
+        CancellationToken ct = default);
+
+    Task ResetLoginFailuresAsync(Guid userId, DateTimeOffset now, CancellationToken ct = default);
 }

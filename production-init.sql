@@ -34,6 +34,8 @@ CREATE TABLE nexusauth.users (
     gender          smallint        NOT NULL DEFAULT 0,
     ethnicity       varchar(50),
     is_active       boolean         NOT NULL DEFAULT true,
+    failed_login_attempts integer   NOT NULL DEFAULT 0,
+    locked_until    timestamptz,
     created_at      timestamptz     NOT NULL,
     updated_at      timestamptz     NOT NULL,
     CONSTRAINT pk_users PRIMARY KEY (id)
@@ -178,7 +180,8 @@ ALTER TABLE nexusauth.refresh_tokens
 -- ============================================================
 CREATE TABLE nexusauth.device_authorizations (
     id                          uuid            NOT NULL,
-    device_code                 varchar(256)    NOT NULL,
+    -- SHA-256(raw device code), encoded as unpadded Base64Url (43 characters).
+    device_code_hash            varchar(43)     NOT NULL,
     user_code                   varchar(32)     NOT NULL,
     user_code_normalized        varchar(32)     NOT NULL,
     client_id                   varchar(128)    NOT NULL,
@@ -193,10 +196,15 @@ CREATE TABLE nexusauth.device_authorizations (
     CONSTRAINT pk_device_authorizations PRIMARY KEY (id)
 );
 
-CREATE UNIQUE INDEX ix_device_authorizations_device_code ON nexusauth.device_authorizations (device_code);
+CREATE UNIQUE INDEX ix_device_authorizations_device_code_hash ON nexusauth.device_authorizations (device_code_hash);
 CREATE UNIQUE INDEX ix_device_authorizations_user_code_normalized ON nexusauth.device_authorizations (user_code_normalized);
 CREATE INDEX ix_device_authorizations_client_id ON nexusauth.device_authorizations (client_id);
 CREATE INDEX ix_device_authorizations_user_id ON nexusauth.device_authorizations (user_id);
+CREATE INDEX ix_device_authorizations_poll
+    ON nexusauth.device_authorizations (device_code_hash, client_id, status, expires_at);
+ALTER TABLE nexusauth.device_authorizations
+    ADD CONSTRAINT ck_device_authorizations_device_code_hash_base64url
+    CHECK (device_code_hash ~ '^[A-Za-z0-9_-]{43}$');
 
 -- ============================================================
 -- token_blacklist_entries

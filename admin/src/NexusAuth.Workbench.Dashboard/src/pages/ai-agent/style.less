@@ -22,7 +22,7 @@
   position: relative;
   z-index: 3;
   border: 1px solid var(--td-component-stroke);
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--td-bg-color-container);
   padding: 8px;
   box-sizing: border-box;
@@ -58,23 +58,23 @@
   height: 38px;
   flex-shrink: 0;
   border: none;
-  border-radius: 10px;
+  border-radius: 6px;
   color: #fff;
   font-weight: 600;
-  background: linear-gradient(135deg, #4f7bff 0%, #6f63ff 45%, #8c5bff 100%);
-  box-shadow: 0 8px 16px rgba(79, 123, 255, 0.25);
+  background: var(--app-accent);
+  box-shadow: none;
 
   &:hover,
   &:focus-visible {
     color: #fff;
     border: none;
-    background: linear-gradient(135deg, #5e87ff 0%, #7a6cff 48%, #9867ff 100%);
+    background: var(--app-accent-hover);
   }
 
   &:active {
     color: #fff;
     border: none;
-    background: linear-gradient(135deg, #466ff0 0%, #6556f2 48%, #8650ec 100%);
+    background: var(--app-accent);
   }
 }
 
@@ -132,7 +132,7 @@
   margin: 3px 0;
   padding: 8px 10px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: 6px;
   background: var(--td-bg-color-secondarycontainer);
   transition: border-color 0.2s ease, background 0.2s ease;
 }

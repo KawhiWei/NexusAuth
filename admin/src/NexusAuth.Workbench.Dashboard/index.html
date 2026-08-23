@@ -1,12 +1,20 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN" theme-mode="light">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>react-arco-design-template</title>
+    <meta name="theme-color" content="#f4f6f8" />
+    <link rel="icon" type="image/svg+xml" href="/brand/nexusauth-logo.svg" />
+    <title>NexusAuth Workbench</title>
     <script>
-      (function(){var t=localStorage.getItem('theme-mode');if(t==='dark')document.documentElement.setAttribute('theme-mode','dark')})();
+      (function () {
+        var stored = localStorage.getItem('theme-mode');
+        var preferred = stored === 'dark' || stored === 'light'
+          ? stored
+          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('theme-mode', preferred);
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', preferred === 'dark' ? '#101418' : '#f4f6f8');
+      })();
     </script>
   </head>
   <body>

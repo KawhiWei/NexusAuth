@@ -36,6 +36,7 @@ const PublicHeader = ({ theme, onChangeTheme }: PublicHeaderProps) => {
                   style={{
                     width: 200,
                   }}
+                  aria-label="全局搜索"
                   prefixIcon={<SearchIcon />}
                   placeholder="请输入内容查询"
                 />
@@ -45,6 +46,7 @@ const PublicHeader = ({ theme, onChangeTheme }: PublicHeaderProps) => {
                   content={`点击切换为${theme === 'light' ? '暗黑' : '亮色'}模式`}
                 >
                   <Button
+                    size="small"
                     shape="circle"
                     icon={theme === 'light' ? <MoonIcon /> : <SunnyIcon />}
                     onClick={onChangeTheme}
@@ -56,6 +58,7 @@ const PublicHeader = ({ theme, onChangeTheme }: PublicHeaderProps) => {
                   content={isFullscreen ? '退出全屏' : '全屏显示'}
                 >
                   <Button
+                    size="small"
                     shape="circle"
                     icon={isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
                     onClick={() => {

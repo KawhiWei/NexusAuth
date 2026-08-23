@@ -139,6 +139,7 @@ psql -U nexusauth -f production-init.sql
 
 ```bash
 psql -U nexusauth -d nexusauth -v ON_ERROR_STOP=1 -f database/001_token_secret_hashing.sql
+psql -U nexusauth -d nexusauth -v ON_ERROR_STOP=1 -f database/002_device_authorization_login_security.sql
 ```
 
 ## 启动服务

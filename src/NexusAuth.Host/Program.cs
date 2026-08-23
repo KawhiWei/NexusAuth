@@ -10,6 +10,7 @@ builder.Services.AddApplication<AppWebModule>();
 
 var app = builder.Build();
 
+app.UseStaticFiles();
 app.MapControllers();
 app.MapRazorPages();
 app.InitializeApplication();

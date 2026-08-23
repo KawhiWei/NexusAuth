@@ -57,11 +57,7 @@ const AvatarComponent = () => {
       onClick={handleClickMenuItem}
     >
       <Button variant="text" style={{ padding: 0 }}>
-        <Avatar
-          style={{
-            backgroundColor: '#165DFF'
-          }}
-        >
+        <Avatar className="layout-avatar">
           H
         </Avatar>
       </Button>

@@ -1,0 +1,50 @@
+.brand {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  height: 40px;
+  color: var(--app-text);
+}
+
+.brand__mark {
+  display: block;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.brand__copy {
+  display: flex;
+  min-width: 0;
+  margin-left: 10px;
+  flex-direction: column;
+}
+
+.brand__name {
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 19px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brand__product {
+  overflow: hidden;
+  color: var(--app-text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brand--compact {
+  justify-content: center;
+}
+
+.brand--compact .brand__copy {
+  display: none;
+}

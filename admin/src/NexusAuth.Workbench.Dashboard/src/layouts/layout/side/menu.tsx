@@ -10,7 +10,6 @@ const { MenuItem, SubMenu } = Menu;
 
 interface IProp {
     collapse: boolean;
-    theme: 'light' | 'dark';
 }
 
 interface MenuItemData {
@@ -187,7 +186,6 @@ const MenuComponent = (props: IProp) => {
             value={pathname}
             expanded={userExpanded}
             collapsed={props.collapse}
-            theme={props.theme}
             expandMutex={true}
             onExpand={onExpand}
             onChange={onMenuChange}>

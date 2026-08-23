@@ -82,25 +82,15 @@ public class AuthController : ControllerBase
 
         try
         {
-            string accessToken;
-            string idToken;
-            int expiresIn;
-            (accessToken, idToken, expiresIn) = await _oidcService.ExchangeCodeAsync(code, flow.CodeVerifier, ct);
-
-            var claims = new List<Claim>
-            {
-                new(ClaimTypes.NameIdentifier, idToken),
-                new(ClaimTypes.Name, idToken),
-                new("access_token", accessToken),
-                new("id_token", idToken),
-            };
-
-            var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, WorkbenchAuthenticationDefaults.CookieScheme));
+            var (_, idToken, expiresIn) = await _oidcService.ExchangeCodeAsync(code, flow.CodeVerifier, ct);
+            var principal = WorkbenchPrincipalFactory.Create(idToken);
+            var expiresAt = DateTimeOffset.UtcNow.AddSeconds(Math.Max(60, expiresIn));
 
             await HttpContext.SignInAsync(WorkbenchAuthenticationDefaults.CookieScheme, principal, new AuthenticationProperties
             {
                 IsPersistent = true,
-                ExpiresUtc = DateTimeOffset.UtcNow.AddHours(24),
+                AllowRefresh = false,
+                ExpiresUtc = expiresAt,
             });
 
             return Redirect($"{frontendBase}/auth/callback");
@@ -144,14 +134,7 @@ public class AuthController : ControllerBase
         }
 
         if (User.Identity?.IsAuthenticated == true)
-        {
-            Response.Cookies.Append(".NexusAuth.Workbench", "", new CookieOptions
-            {
-                Path = "/",
-                HttpOnly = true,
-                Expires = DateTimeOffset.UtcNow.AddDays(-1)
-            });
-        }
+            await HttpContext.SignOutAsync(WorkbenchAuthenticationDefaults.CookieScheme);
 
         return Ok(new { logoutUrl });
     }

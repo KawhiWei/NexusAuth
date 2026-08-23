@@ -20,6 +20,18 @@ public class User : AggregateRootWithIdentity<Guid>
 
     public bool IsActive { get; private set; }
 
+    /// <summary>
+    /// Number of failed password attempts since the last successful login or
+    /// completed lockout window.
+    /// </summary>
+    public int FailedLoginAttempts { get; private set; }
+
+    /// <summary>
+    /// Temporary account lockout expiry. This is persisted so a restart or a
+    /// second application instance cannot bypass the lockout.
+    /// </summary>
+    public DateTimeOffset? LockedUntil { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -55,6 +67,8 @@ public class User : AggregateRootWithIdentity<Guid>
             Gender = gender,
             Ethnicity = ethnicity,
             IsActive = true,
+            FailedLoginAttempts = 0,
+            LockedUntil = null,
             CreatedAt = now,
             UpdatedAt = now,
         };
@@ -65,5 +79,45 @@ public class User : AggregateRootWithIdentity<Guid>
     public bool VerifyPassword(string rawPassword)
     {
         return BCrypt.Net.BCrypt.Verify(rawPassword, PasswordHash);
+    }
+
+    public bool IsLoginLocked(DateTimeOffset now)
+    {
+        return LockedUntil.HasValue && LockedUntil.Value > now;
+    }
+
+    public void RegisterFailedLogin(
+        DateTimeOffset now,
+        int failureLimit,
+        TimeSpan lockoutDuration)
+    {
+        if (failureLimit <= 0)
+            throw new ArgumentOutOfRangeException(nameof(failureLimit));
+
+        if (lockoutDuration <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(lockoutDuration));
+
+        if (IsLoginLocked(now))
+            return;
+
+        // Start a fresh counter after an earlier lockout has elapsed.
+        if (LockedUntil.HasValue)
+            FailedLoginAttempts = 0;
+
+        FailedLoginAttempts++;
+        if (FailedLoginAttempts >= failureLimit)
+        {
+            LockedUntil = now.Add(lockoutDuration);
+            FailedLoginAttempts = 0;
+        }
+
+        UpdatedAt = now;
+    }
+
+    public void RegisterSuccessfulLogin(DateTimeOffset now)
+    {
+        FailedLoginAttempts = 0;
+        LockedUntil = null;
+        UpdatedAt = now;
     }
 }

@@ -8,7 +8,8 @@
 <head>
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
-    <title>登录 - React-Design-Template</title>
+    <title>NexusAuth 登录中心</title>
+    <link rel="icon" type="image/svg+xml" href="/brand/nexusauth-logo.svg" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;family=Manrope:wght@500;700&amp;display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet" />
@@ -139,8 +140,9 @@
     <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[color:var(--secondary)]/10 blur-[120px] rounded-full"></div>
 
     <header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 md:px-8 h-16 bg-transparent backdrop-blur-xl">
-        <div class="text-2xl font-bold bg-gradient-to-r from-[color:var(--primary)] to-[color:var(--primary-dim)] bg-clip-text text-transparent font-headline tracking-tight">
-            React-Design-Template
+        <div class="flex items-center gap-3" aria-label="NexusAuth 登录中心">
+            <img class="h-9 w-9" src="/brand/nexusauth-logo.svg" alt="" />
+            <span class="text-xl font-bold text-[var(--on-surface)] font-headline">NexusAuth 登录中心</span>
         </div>
         <div class="flex gap-3 items-center">
             <button id="theme-toggle" type="button" class="theme-toggle px-4 py-2 rounded-lg text-xs md:text-sm text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-colors">
@@ -201,7 +203,7 @@
                                 <input class="block w-full rounded-t-lg border-0 border-b-2 border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] py-4 pl-12 pr-4 text-[var(--on-surface)] placeholder:text-[var(--outline)]/50 focus:border-[color:var(--primary)] focus:outline-none focus:ring-0 transition-all"
                                        id="username"
                                        name="Username"
-                                       placeholder="admin@react-template.tech"
+                                       placeholder="admin@nexusauth.local"
                                        required
                                        type="text"
                                        value="@Model.Username"
@@ -302,7 +304,7 @@
 
     <footer class="fixed bottom-0 w-full z-50 flex flex-col gap-3 px-6 py-5 text-[10px] md:flex-row md:items-center md:justify-between md:px-8 md:py-6 font-body tracking-widest uppercase">
         <div class="text-slate-500">
-            © 2024 React-Design-Template. 保留所有权利。
+            © 2024 NexusAuth. 保留所有权利。
         </div>
         <div class="flex gap-6">
             <span class="text-slate-500 hover:text-blue-300 transition-colors">隐私政策</span>

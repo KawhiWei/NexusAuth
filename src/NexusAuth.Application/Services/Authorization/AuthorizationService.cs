@@ -1,3 +1,4 @@
+using NexusAuth.Application.Logging;
 using NexusAuth.Application.Clients;
 using NexusAuth.Application.Services.Security;
 using NexusAuth.Application.Services.OIDC;
@@ -7,7 +8,8 @@ namespace NexusAuth.Application.Services.Authorization;
 public class AuthorizationService(
     IAuthorizationCodeRepository codeRepository,
     IClientService clientService,
-    ISecurityPolicyService securityPolicyService) : IAuthorizationService
+    ISecurityPolicyService securityPolicyService,
+    ILogger<AuthorizationService> logger) : IAuthorizationService
 {
     /// <summary>
     /// 生成并持久化授权码（authorization code）�?
@@ -33,12 +35,23 @@ public class AuthorizationService(
     {
         var scopeValidation = await clientService.ValidateScopesAsync(clientId, scope, allowIdentityScopes: true, ct);
         if (!scopeValidation.IsSuccess)
+        {
+            LogAuthorizationFailure(clientId, "InvalidScope");
             throw new InvalidOperationException(scopeValidation.Error);
+        }
 
         if (!string.IsNullOrWhiteSpace(claimsJson))
         {
             // 中文注释：授权阶段先校验 claims JSON 格式，避免无效请求进入后续流程�?
-            ParseRequestedClaims(claimsJson);
+            try
+            {
+                ParseRequestedClaims(claimsJson);
+            }
+            catch
+            {
+                LogAuthorizationFailure(clientId, "InvalidClaims");
+                throw;
+            }
         }
 
         var code = AuthorizationCode.Create(
@@ -55,6 +68,14 @@ public class AuthorizationService(
             amr);
 
         await codeRepository.AddAsync(code.Entity, ct);
+
+        using (ApplicationLogScope.Begin(logger, "AuthorizationCode", clientId, "AuthorizationCodeIssued"))
+        {
+            logger.LogInformation(
+                "Authorization code issued. UserId={UserId} ClientId={ClientId}",
+                userId,
+                clientId);
+        }
 
         return code.RawCode;
     }
@@ -95,37 +116,45 @@ public class AuthorizationService(
         var authCode = await codeRepository.FindByCodeAsync(code, ct);
 
         if (authCode is null)
-            return AuthorizationCodeResult.Failure("Invalid authorization code.");
+            return ConsumeFailure(clientId, "AuthorizationCodeNotFound", "Invalid authorization code.");
 
         if (authCode.IsUsed)
-            return AuthorizationCodeResult.Failure("Authorization code has already been used.");
+            return ConsumeFailure(clientId, "AuthorizationCodeUsed", "Authorization code has already been used.");
 
         if (authCode.ExpiresAt <= DateTimeOffset.UtcNow)
-            return AuthorizationCodeResult.Failure("Authorization code has expired.");
+            return ConsumeFailure(clientId, "AuthorizationCodeExpired", "Authorization code has expired.");
 
         if (!string.Equals(authCode.ClientId, clientId, StringComparison.Ordinal))
-            return AuthorizationCodeResult.Failure("Authorization code does not belong to the authenticated client.");
+            return ConsumeFailure(clientId, "ClientMismatch", "Authorization code does not belong to the authenticated client.");
 
         if (authCode.RedirectUri != redirectUri)
-            return AuthorizationCodeResult.Failure("Redirect URI mismatch.");
+            return ConsumeFailure(clientId, "RedirectUriMismatch", "Redirect URI mismatch.");
 
         var clientPolicy = securityPolicyService.CheckClient(authCode.ClientId);
         if (!clientPolicy.IsSuccess)
-            return AuthorizationCodeResult.Failure(clientPolicy.Error ?? "Client is blocked by security policy.");
+            return ConsumeFailure(clientId, "ClientPolicyRejected", clientPolicy.Error ?? "Client is blocked by security policy.");
 
         // PKCE verification
         if (authCode.CodeChallenge is not null)
         {
             if (string.IsNullOrWhiteSpace(codeVerifier))
-                return AuthorizationCodeResult.Failure("Code verifier is required for PKCE.");
+                return ConsumeFailure(clientId, "MissingCodeVerifier", "Code verifier is required for PKCE.");
 
             if (!VerifyPkce(codeVerifier, authCode.CodeChallenge, authCode.CodeChallengeMethod))
-                return AuthorizationCodeResult.Failure("PKCE verification failed.");
+                return ConsumeFailure(clientId, "PkceVerificationFailed", "PKCE verification failed.");
         }
 
         var consumedCode = await codeRepository.ConsumeAsync(code, clientId, ct);
         if (consumedCode is null)
-            return AuthorizationCodeResult.Failure("Authorization code has already been used or expired.");
+            return ConsumeFailure(clientId, "AuthorizationCodeConsumeRace", "Authorization code has already been used or expired.");
+
+        using (ApplicationLogScope.Begin(logger, "AuthorizationCode", clientId, "AuthorizationCodeConsumed"))
+        {
+            logger.LogInformation(
+                "Authorization code consumed. UserId={UserId} ClientId={ClientId}",
+                consumedCode.UserId,
+                clientId);
+        }
 
         return AuthorizationCodeResult.Success(
             consumedCode.UserId,
@@ -165,6 +194,25 @@ public class AuthorizationService(
             return ClientCredentialsResult.Failure(scopeValidation.Error ?? "Invalid scope.");
 
         return ClientCredentialsResult.Success(clientId, scopeValidation.NormalizedScope!);
+    }
+
+    private AuthorizationCodeResult ConsumeFailure(
+        string? clientId,
+        string reasonCode,
+        string error)
+    {
+        LogAuthorizationFailure(clientId, reasonCode);
+        return AuthorizationCodeResult.Failure(error);
+    }
+
+    private void LogAuthorizationFailure(string? clientId, string reasonCode)
+    {
+        using (ApplicationLogScope.Begin(logger, "AuthorizationCode", clientId, reasonCode))
+        {
+            logger.LogWarning(
+                "Authorization code operation failed. Reason={ReasonCode}",
+                reasonCode);
+        }
     }
 
     private static bool VerifyPkce(string codeVerifier, string codeChallenge, string? codeChallengeMethod)

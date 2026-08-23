@@ -14,9 +14,13 @@ namespace NexusAuth.Logging;
 /// </summary>
 public static class NexusAuthLoggingExtensions
 {
-    public const string OutputTemplate =
-        "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}][{Module}][{SourceContext}][{Subcategory}][{RequestTraceId}][{Filter1}][{Filter2}][{Level:u3} {Message:lj}{Exception}]\n";
-
+    /// <summary>
+    /// Configures the bootstrap and host Serilog loggers with the shared NexusAuth sinks and enrichers.
+    /// </summary>
+    /// <param name="builder">The web application builder to configure.</param>
+    /// <param name="module">The module name written to every event from this host.</param>
+    /// <param name="defaultFilePath">The log file path used when configuration does not override it.</param>
+    /// <returns>The same builder instance for fluent startup configuration.</returns>
     public static WebApplicationBuilder UseNexusAuthSerilog(
         this WebApplicationBuilder builder,
         string module,
@@ -54,9 +58,8 @@ public static class NexusAuthLoggingExtensions
     {
         app.Use(async (context, next) =>
         {
-            using (LogContext.PushProperty("RequestTraceId", GetTraceId(context)))
-            using (LogContext.PushProperty("Subcategory", GetPath(context)))
-            using (LogContext.PushProperty("Filter1", context.Request.Method))
+            using (LogContext.PushProperty(NexusAuthLogPropertyNames.TraceId, GetTraceId(context)))
+            using (LogContext.PushProperty(NexusAuthLogPropertyNames.Filter1, context.Request.Method))
             {
                 await next();
             }
@@ -64,7 +67,7 @@ public static class NexusAuthLoggingExtensions
 
         app.UseSerilogRequestLogging(options =>
         {
-            options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+            options.MessageTemplate = NexusAuthLogTemplates.HttpRequestCompleted;
             options.GetLevel = static (context, _, exception) =>
                 exception is not null || context.Response.StatusCode >= StatusCodes.Status500InternalServerError
                     ? LogEventLevel.Error
@@ -73,11 +76,12 @@ public static class NexusAuthLoggingExtensions
                         : LogEventLevel.Information;
             options.EnrichDiagnosticContext = static (diagnosticContext, context) =>
             {
-                diagnosticContext.Set("RequestTraceId", GetTraceId(context));
-                diagnosticContext.Set("Subcategory", GetPath(context));
-                diagnosticContext.Set("Filter1", context.Request.Method);
+                diagnosticContext.Set(NexusAuthLogPropertyNames.TraceId, GetTraceId(context));
+                diagnosticContext.Set(NexusAuthLogPropertyNames.Category, "HTTP");
+                diagnosticContext.Set(NexusAuthLogPropertyNames.Subcategory, GetPath(context));
+                diagnosticContext.Set(NexusAuthLogPropertyNames.Filter1, context.Request.Method);
                 diagnosticContext.Set(
-                    "Filter2",
+                    NexusAuthLogPropertyNames.Filter2,
                     context.Response.StatusCode.ToString(CultureInfo.InvariantCulture));
             };
         });
@@ -85,11 +89,14 @@ public static class NexusAuthLoggingExtensions
         return app;
     }
 
+    /// <summary>Records an unrecoverable exception raised while the host starts or runs.</summary>
+    /// <param name="exception">The exception that caused the host to terminate.</param>
     public static void LogStartupFailure(Exception exception)
     {
         Log.Fatal(exception, "Host terminated unexpectedly during startup or execution.");
     }
 
+    /// <summary>Flushes buffered events and releases Serilog sinks during host shutdown.</summary>
     public static void CloseAndFlush()
     {
         Log.CloseAndFlush();
@@ -115,10 +122,10 @@ public static class NexusAuthLoggingExtensions
             .MinimumLevel.Is(options.MinimumLevel)
             .Enrich.FromLogContext()
             .Enrich.With(new RequiredLogPropertiesEnricher(options.Module))
-            .WriteTo.Console(outputTemplate: OutputTemplate)
+            .WriteTo.Console(outputTemplate: NexusAuthLogTemplates.Output)
             .WriteTo.File(
                 filePath,
-                outputTemplate: OutputTemplate,
+                outputTemplate: NexusAuthLogTemplates.Output,
                 rollingInterval: RollingInterval.Day,
                 rollOnFileSizeLimit: options.RollOnFileSizeLimit,
                 fileSizeLimitBytes: options.FileSizeLimitBytes,
@@ -155,44 +162,5 @@ public static class NexusAuthLoggingExtensions
     private static string GetPath(HttpContext context)
     {
         return context.Request.Path.HasValue ? context.Request.Path.Value! : "/";
-    }
-
-    private sealed class RequiredLogPropertiesEnricher(string module) : ILogEventEnricher
-    {
-        public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
-        {
-            AddIfMissing(logEvent, propertyFactory, "Module", module);
-            AddIfMissing(logEvent, propertyFactory, "SourceContext", "-");
-            AddIfMissing(logEvent, propertyFactory, "Subcategory", "-");
-            AddIfMissing(logEvent, propertyFactory, "RequestTraceId", "-");
-            AddIfMissing(logEvent, propertyFactory, "Filter1", "-");
-            AddIfMissing(logEvent, propertyFactory, "Filter2", "-");
-        }
-
-        private static void AddIfMissing(
-            LogEvent logEvent,
-            ILogEventPropertyFactory propertyFactory,
-            string name,
-            object value)
-        {
-            if (!logEvent.Properties.TryGetValue(name, out var existing)
-                || IsEmpty(existing))
-            {
-                logEvent.AddOrUpdateProperty(propertyFactory.CreateProperty(name, value));
-            }
-        }
-
-        private static bool IsEmpty(LogEventPropertyValue value)
-        {
-            return value switch
-            {
-                ScalarValue { Value: null } => true,
-                ScalarValue { Value: string text } => string.IsNullOrWhiteSpace(text),
-                SequenceValue { Elements.Count: 0 } => true,
-                DictionaryValue { Elements.Count: 0 } => true,
-                StructureValue { Properties.Count: 0 } => true,
-                _ => false,
-            };
-        }
     }
 }

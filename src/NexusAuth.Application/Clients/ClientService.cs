@@ -1,3 +1,5 @@
+using NexusAuth.Application.Logging;
+
 namespace NexusAuth.Application.Clients;
 
 public class ClientService(
@@ -5,7 +7,8 @@ public class ClientService(
     IApiResourceRepository apiResourceRepository,
     ITokenBlacklistRepository tokenBlacklistRepository,
     IOAuthClientSecretRepository clientSecretRepository,
-    IClientApiResourceRepository clientApiResourceRepository) : IClientService
+    IClientApiResourceRepository clientApiResourceRepository,
+    ILogger<ClientService> logger) : IClientService
 {
 
     #region OAuth 授权服务 (Host API 使用)
@@ -63,102 +66,102 @@ public class ClientService(
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(input.ClientId))
-            return ClientAuthenticationResult.Failure("invalid_client", "client_id is required.");
+            return AuthenticationFailure(input.ClientId, "MissingClientId", "client_id is required.");
 
         var client = await clientRepository.FindByClientIdAsync(input.ClientId, ct);
         if (client is null || !client.IsActive)
-            return ClientAuthenticationResult.Failure("invalid_client", "Client not found or inactive.");
+            return AuthenticationFailure(input.ClientId, "ClientNotFoundOrInactive", "Client not found or inactive.");
 
         if (!requireClientAuthentication)
-            return ClientAuthenticationResult.Success(client);
+            return AuthenticationSuccess(client, "AuthenticationNotRequired");
 
         var hasAssertion = !string.IsNullOrWhiteSpace(input.ClientAssertion)
             || !string.IsNullOrWhiteSpace(input.ClientAssertionType);
         var hasSecret = !string.IsNullOrWhiteSpace(input.ClientSecret);
 
         if (hasAssertion && hasSecret)
-            return ClientAuthenticationResult.Failure("invalid_client", "Multiple client authentication methods were supplied.");
+            return AuthenticationFailure(client.ClientId, "MultipleMethods", "Multiple client authentication methods were supplied.");
 
         if (string.Equals(client.TokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal))
         {
             if (!string.Equals(input.ClientAssertionType, OAuthClient.ClientAssertionTypeJwtBearer, StringComparison.Ordinal))
-                return ClientAuthenticationResult.Failure("invalid_client", "client_assertion_type is invalid for this client.");
+                return AuthenticationFailure(client.ClientId, "WrongAuthMethod", "client_assertion_type is invalid for this client.");
 
             if (string.IsNullOrWhiteSpace(input.ClientAssertion))
-                return ClientAuthenticationResult.Failure("invalid_client", "client_assertion is required.");
+                return AuthenticationFailure(client.ClientId, "MissingCredential", "client_assertion is required.");
 
             if (string.IsNullOrWhiteSpace(input.AssertionAudience))
-                return ClientAuthenticationResult.Failure("invalid_client", "assertion audience is required for private_key_jwt validation.");
+                return AuthenticationFailure(client.ClientId, "MissingAssertionAudience", "assertion audience is required for private_key_jwt validation.");
 
             var assertionValidation = ClientPrivateKeyJwtValidator.Validate(input.ClientAssertion, client, input.AssertionAudience);
             if (!assertionValidation.IsSuccess)
-                return ClientAuthenticationResult.Failure("invalid_client", assertionValidation.Error ?? "Invalid client assertion.");
+                return AuthenticationFailure(client.ClientId, "InvalidAssertion", assertionValidation.Error ?? "Invalid client assertion.");
 
             if (string.IsNullOrWhiteSpace(assertionValidation.Jti) || assertionValidation.ExpiresAt is null)
-                return ClientAuthenticationResult.Failure("invalid_client", "client_assertion metadata is incomplete.");
+                return AuthenticationFailure(client.ClientId, "IncompleteAssertion", "client_assertion metadata is incomplete.");
 
             var replayKey = BuildClientAssertionReplayKey(client.ClientId, assertionValidation.Jti);
             if (await tokenBlacklistRepository.ExistsActiveAsync(replayKey, DateTimeOffset.UtcNow, ct))
-                return ClientAuthenticationResult.Failure("invalid_client", "client_assertion has already been used.");
+                return AuthenticationFailure(client.ClientId, "AssertionReplay", "client_assertion has already been used.");
 
             await tokenBlacklistRepository.AddAsync(
                 TokenBlacklistEntry.Create(replayKey, "client_assertion", client.ClientId, assertionValidation.ExpiresAt.Value),
                 ct);
 
-            return ClientAuthenticationResult.Success(client);
+            return AuthenticationSuccess(client, "AuthenticatedPrivateKeyJwt");
         }
 
         if (string.Equals(client.TokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretJwt, StringComparison.Ordinal))
         {
             if (!string.Equals(input.ClientAssertionType, OAuthClient.ClientAssertionTypeJwtBearer, StringComparison.Ordinal))
-                return ClientAuthenticationResult.Failure("invalid_client", "client_assertion_type is invalid for this client.");
+                return AuthenticationFailure(client.ClientId, "WrongAuthMethod", "client_assertion_type is invalid for this client.");
 
             if (string.IsNullOrWhiteSpace(input.ClientAssertion))
-                return ClientAuthenticationResult.Failure("invalid_client", "client_assertion is required.");
+                return AuthenticationFailure(client.ClientId, "MissingCredential", "client_assertion is required.");
 
             if (string.IsNullOrWhiteSpace(input.AssertionAudience))
-                return ClientAuthenticationResult.Failure("invalid_client", "assertion audience is required for client_secret_jwt validation.");
+                return AuthenticationFailure(client.ClientId, "MissingAssertionAudience", "assertion audience is required for client_secret_jwt validation.");
 
             var assertionValidation = ClientSecretJwtValidator.Validate(input.ClientAssertion, client, input.AssertionAudience);
             if (!assertionValidation.IsSuccess)
-                return ClientAuthenticationResult.Failure("invalid_client", assertionValidation.Error ?? "Invalid client assertion.");
+                return AuthenticationFailure(client.ClientId, "InvalidAssertion", assertionValidation.Error ?? "Invalid client assertion.");
 
             if (string.IsNullOrWhiteSpace(assertionValidation.Jti) || assertionValidation.ExpiresAt is null)
-                return ClientAuthenticationResult.Failure("invalid_client", "client_assertion metadata is incomplete.");
+                return AuthenticationFailure(client.ClientId, "IncompleteAssertion", "client_assertion metadata is incomplete.");
 
             var replayKey = BuildClientAssertionReplayKey(client.ClientId, assertionValidation.Jti);
             if (await tokenBlacklistRepository.ExistsActiveAsync(replayKey, DateTimeOffset.UtcNow, ct))
-                return ClientAuthenticationResult.Failure("invalid_client", "client_assertion has already been used.");
+                return AuthenticationFailure(client.ClientId, "AssertionReplay", "client_assertion has already been used.");
 
             await tokenBlacklistRepository.AddAsync(
                 TokenBlacklistEntry.Create(replayKey, "client_assertion", client.ClientId, assertionValidation.ExpiresAt.Value),
                 ct);
 
-            return ClientAuthenticationResult.Success(client);
+            return AuthenticationSuccess(client, "AuthenticatedClientSecretJwt");
         }
 
         if (hasAssertion)
-            return ClientAuthenticationResult.Failure("invalid_client", "This client requires client secret authentication.");
+            return AuthenticationFailure(client.ClientId, "WrongAuthMethod", "This client requires client secret authentication.");
 
         if (string.Equals(client.TokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretBasic, StringComparison.Ordinal)
             && !string.Equals(input.TokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretBasic, StringComparison.Ordinal))
         {
-            return ClientAuthenticationResult.Failure("invalid_client", "Client must authenticate with client_secret_basic.");
+            return AuthenticationFailure(client.ClientId, "WrongAuthMethod", "Client must authenticate with client_secret_basic.");
         }
 
         if (string.Equals(client.TokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretPost, StringComparison.Ordinal)
             && !string.Equals(input.TokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodClientSecretPost, StringComparison.Ordinal))
         {
-            return ClientAuthenticationResult.Failure("invalid_client", "Client must authenticate with client_secret_post.");
+            return AuthenticationFailure(client.ClientId, "WrongAuthMethod", "Client must authenticate with client_secret_post.");
         }
 
         if (string.IsNullOrWhiteSpace(input.ClientSecret))
-            return ClientAuthenticationResult.Failure("invalid_client", "client_secret is required.");
+            return AuthenticationFailure(client.ClientId, "MissingCredential", "client_secret is required.");
 
         if (!client.VerifyClientSecret(input.ClientSecret))
-            return ClientAuthenticationResult.Failure("invalid_client", "Invalid client secret.");
+            return AuthenticationFailure(client.ClientId, "InvalidCredential", "Invalid client secret.");
 
-        return ClientAuthenticationResult.Success(client);
+        return AuthenticationSuccess(client, "AuthenticatedClientSecret");
     }
 
     public async Task<ClientValidationResult> ValidateClientForAuthorizationAsync(
@@ -471,6 +474,36 @@ public class ClientService(
     }
 
     #endregion
+
+    private ClientAuthenticationResult AuthenticationSuccess(
+        OAuthClient client,
+        string outcome)
+    {
+        using (ApplicationLogScope.Begin(logger, "ClientAuthentication", client.ClientId, outcome))
+        {
+            logger.LogInformation(
+                "Client authentication succeeded. ClientId={ClientId} Outcome={Outcome}",
+                client.ClientId,
+                outcome);
+        }
+
+        return ClientAuthenticationResult.Success(client);
+    }
+
+    private ClientAuthenticationResult AuthenticationFailure(
+        string? clientId,
+        string reasonCode,
+        string error)
+    {
+        using (ApplicationLogScope.Begin(logger, "ClientAuthentication", clientId, reasonCode))
+        {
+            logger.LogWarning(
+                "Client authentication failed. Reason={ReasonCode}",
+                reasonCode);
+        }
+
+        return ClientAuthenticationResult.Failure("invalid_client", error);
+    }
 
     private static bool IsIdentityScope(string scope)
     {

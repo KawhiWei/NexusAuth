@@ -1,10 +1,12 @@
+using NexusAuth.Application.Logging;
 using NexusAuth.Application.Services.Security;
 
 namespace NexusAuth.Application.Users;
 
 public class UserService(
     IUserRepository userRepository,
-    IOptions<NexusAuthSecurityOptions> securityOptions) : IUserService
+    IOptions<NexusAuthSecurityOptions> securityOptions,
+    ILogger<UserService> logger) : IUserService
 {
     private const string DummyPasswordHash = "$2a$12$pw856E1CHH3FfcshE0NwCeETGR5hyYaeudBqZfQYCpXdbBuvOpuuy";
     private readonly NexusAuthSecurityOptions _securityOptions = securityOptions.Value;
@@ -40,6 +42,11 @@ public class UserService(
         var user = User.Create(username, rawPassword, nickname, email, phoneNumber, gender, ethnicity);
         await userRepository.AddAsync(user, ct);
 
+        using (ApplicationLogScope.Begin(logger, "Authentication", user.Id.ToString(), "RegistrationSucceeded"))
+        {
+            logger.LogInformation("User registration succeeded. UserId={UserId}", user.Id);
+        }
+
         return user.Id;
     }
 
@@ -60,6 +67,12 @@ public class UserService(
             // Keep unknown/inactive accounts on the same expensive password
             // verification path so response timing does not reveal usernames.
             BCrypt.Net.BCrypt.Verify(rawPassword, DummyPasswordHash);
+
+            using (ApplicationLogScope.Begin(logger, "Authentication", filter2: "UserNotFoundOrInactive"))
+            {
+                logger.LogWarning("User authentication failed. Reason={ReasonCode}", "UserNotFoundOrInactive");
+            }
+
             return null;
         }
 
@@ -67,6 +80,12 @@ public class UserService(
         if (user.IsLoginLocked(now))
         {
             BCrypt.Net.BCrypt.Verify(rawPassword, DummyPasswordHash);
+
+            using (ApplicationLogScope.Begin(logger, "Authentication", user.Id.ToString(), "UserLocked"))
+            {
+                logger.LogWarning("User authentication failed. UserId={UserId} Reason={ReasonCode}", user.Id, "UserLocked");
+            }
+
             return null;
         }
 
@@ -78,10 +97,22 @@ public class UserService(
                 TimeSpan.FromMinutes(Math.Max(1, _securityOptions.LoginLockoutMinutes)),
                 now,
                 ct);
+
+            using (ApplicationLogScope.Begin(logger, "Authentication", user.Id.ToString(), "InvalidPassword"))
+            {
+                logger.LogWarning("User authentication failed. UserId={UserId} Reason={ReasonCode}", user.Id, "InvalidPassword");
+            }
+
             return null;
         }
 
         await userRepository.ResetLoginFailuresAsync(user.Id, now, ct);
+
+        using (ApplicationLogScope.Begin(logger, "Authentication", user.Id.ToString(), "LoginSucceeded"))
+        {
+            logger.LogInformation("User authentication succeeded. UserId={UserId}", user.Id);
+        }
+
         return user;
     }
 

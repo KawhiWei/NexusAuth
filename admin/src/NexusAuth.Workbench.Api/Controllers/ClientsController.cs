@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Luck.AspNetCore.ApiResults;
+using Luck.Framework.Exceptions;
 using NexusAuth.Application;
 using NexusAuth.Application.Clients;
 
@@ -7,6 +9,7 @@ namespace NexusAuth.Workbench.Api.Controllers;
 
 [Authorize]
 [ApiController]
+[ApiResultWrap]
 [Route("api/[controller]")]
 public class ClientsController : ControllerBase
 {
@@ -38,11 +41,11 @@ public class ClientsController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<ClientDto>> GetById(Guid id, CancellationToken ct = default)
+    public async Task<ClientDto> GetById(Guid id, CancellationToken ct = default)
     {
         var client = await _clientService.GetByIdAsync(id, ct);
         if (client is null)
-            return NotFound();
+            throw new NotFoundException($"Client with id '{id}' was not found.");
 
         return client;
     }

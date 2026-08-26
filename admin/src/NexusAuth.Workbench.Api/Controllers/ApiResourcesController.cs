@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Luck.AspNetCore.ApiResults;
+using Luck.Framework.Exceptions;
 using NexusAuth.Application;
 using NexusAuth.Application.Services.ApiResources;
 
@@ -7,6 +9,7 @@ namespace NexusAuth.Workbench.Api.Controllers;
 
 [Authorize]
 [ApiController]
+[ApiResultWrap]
 [Route("api/api-resources")]
 public class ApiResourcesController : ControllerBase
 {
@@ -38,17 +41,19 @@ public class ApiResourcesController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<ApiResourceDto>> GetById(Guid id, CancellationToken ct = default)
+    public async Task<ApiResourceDto> GetById(Guid id, CancellationToken ct = default)
     {
         var resource = await _apiResourceService.GetByIdAsync(id, ct);
         if (resource is null)
-            return NotFound();
+            throw new NotFoundException($"API resource with id '{id}' was not found.");
 
         return resource;
     }
 
     [HttpPost]
-    public async Task<ApiResourceDto> Create([FromBody] CreateApiResourceRequest request, CancellationToken ct = default)
+    public async Task<ApiResourceDto> Create(
+        [FromBody] CreateApiResourceRequest request,
+        CancellationToken ct = default)
     {
         return await _apiResourceService.CreateAsync(request, ct);
     }
@@ -56,6 +61,9 @@ public class ApiResourcesController : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<ApiResourceDto> Update(Guid id, [FromBody] UpdateApiResourceRequest request, CancellationToken ct = default)
     {
+        if (await _apiResourceService.GetByIdAsync(id, ct) is null)
+            throw new NotFoundException($"API resource with id '{id}' was not found.");
+
         return await _apiResourceService.UpdateAsync(id, request, ct);
     }
 

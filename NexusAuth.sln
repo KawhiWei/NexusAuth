@@ -8,8 +8,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Persistence", "sr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Application", "src\NexusAuth.Application\NexusAuth.Application.csproj", "{C9E13B48-5F76-4F80-A832-863F0309D441}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Logging", "src\NexusAuth.Logging\NexusAuth.Logging.csproj", "{F6921592-1BC8-43FA-9875-8414925C5B30}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "0.Solution Items", "0.Solution Items", "{6ED40E3D-207A-4DE8-ACD5-AB297382B865}"
 	ProjectSection(SolutionItems) = preProject
 		Directory.Packages.props = Directory.Packages.props
@@ -84,18 +82,6 @@ Global
 		{C9E13B48-5F76-4F80-A832-863F0309D441}.Release|x64.Build.0 = Release|Any CPU
 		{C9E13B48-5F76-4F80-A832-863F0309D441}.Release|x86.ActiveCfg = Release|Any CPU
 		{C9E13B48-5F76-4F80-A832-863F0309D441}.Release|x86.Build.0 = Release|Any CPU
-		{F6921592-1BC8-43FA-9875-8414925C5B30}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{F6921592-1BC8-43FA-9875-8414925C5B30}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{F6921592-1BC8-43FA-9875-8414925C5B30}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{F6921592-1BC8-43FA-9875-8414925C5B30}.Debug|x64.Build.0 = Debug|Any CPU
-		{F6921592-1BC8-43FA-9875-8414925C5B30}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{F6921592-1BC8-43FA-9875-8414925C5B30}.Debug|x86.Build.0 = Debug|Any CPU
-		{F6921592-1BC8-43FA-9875-8414925C5B30}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{F6921592-1BC8-43FA-9875-8414925C5B30}.Release|Any CPU.Build.0 = Release|Any CPU
-		{F6921592-1BC8-43FA-9875-8414925C5B30}.Release|x64.ActiveCfg = Release|Any CPU
-		{F6921592-1BC8-43FA-9875-8414925C5B30}.Release|x64.Build.0 = Release|Any CPU
-		{F6921592-1BC8-43FA-9875-8414925C5B30}.Release|x86.ActiveCfg = Release|Any CPU
-		{F6921592-1BC8-43FA-9875-8414925C5B30}.Release|x86.Build.0 = Release|Any CPU
 		{F758C060-689F-445D-BD0A-7CE7C78B4467}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{F758C060-689F-445D-BD0A-7CE7C78B4467}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F758C060-689F-445D-BD0A-7CE7C78B4467}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -114,6 +100,5 @@ Global
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{F758C060-689F-445D-BD0A-7CE7C78B4467} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
-		{F6921592-1BC8-43FA-9875-8414925C5B30} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

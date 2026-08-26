@@ -1,8 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
     <ItemGroup>
-        <PackageReference Include="Luck.Framework" />
-        <PackageReference Include="Luck.AutoDependencyInjection" />
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
     </ItemGroup>
 
 </Project>

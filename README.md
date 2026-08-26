@@ -132,7 +132,16 @@ npm run dev
 
 ### 日志记录
 
-SSO 和 Workbench API 共用 `src/NexusAuth.Logging` 中的 Serilog 配置。两个站点都会同时写控制台和文件，因此 Docker 日志仍然可以通过 `docker compose logs` 查看，文件日志则适合检索和长期保留。
+SSO 和 Workbench API 共用 `Luck.Logging.Serilog` 提供的 Serilog 配置。站点入口使用最新的 `AddLuckSerilog()` 扩展：
+
+```csharp
+using Luck.Logging.Serilog;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.AddLuckSerilog();
+```
+
+该包负责注册 Serilog、配置 console/file sinks，并提供结构化字段的默认值。应用在它之上注册共享的请求日志上下文：认证完成后，每个 HTTP 请求都会建立一个覆盖完整请求生命周期的 `ILogger.BeginScope`，并填充 `RequestTraceId`、`Filter1`、`Filter2`、`Category` 和 `Subcategory`。请求结束只记录一条包含成功/失败、状态码和耗时的标准日志。两个站点都会同时写控制台和文件，因此 Docker 日志仍然可以通过 `docker compose logs` 查看，文件日志则适合检索和长期保留。
 
 每条日志都保持下面的固定格式，字段为空时使用 `-`，不会改变列的位置：
 
@@ -143,15 +152,16 @@ SSO 和 Workbench API 共用 `src/NexusAuth.Logging` 中的 Serilog 配置。两
 实际输出示例：
 
 ```text
-[2026-08-23 14:20:10.123 +08:00][INF][NexusAuth.SSO][Authentication][UserService][4bf92f3577b34da6a3ce929d0e0e4736][8f4b...91a2][LoginSucceeded][User authentication succeeded]
-[2026-08-23 14:20:10.124 +08:00][INF][NexusAuth.SSO][HTTP][/connect/token][4bf92f3577b34da6a3ce929d0e0e4736][POST][200][HTTP POST /connect/token responded 200]
+[2026-08-23 14:20:10.123 +08:00][INF][NexusAuth.SSO][Authentication][UserService][c4b2...93a1][7f8d...11e0][user-1024][User authentication succeeded]
 ```
 
 其中 `级别` 是独立的 `TRC`、`DBG`、`INF`、`WRN`、`ERR` 或 `FTL` 字段，不再拼在日志内容里。`模块` 固定为 `NexusAuth.SSO` 或 `NexusAuth.Workbench`。
 
-`分类` 表示业务流程，由应用层通过 `ApplicationLogScope.Begin(logger, category, filter1, filter2)` 显式设置，例如 `Authentication`、`ClientAuthentication`、`AuthorizationCode` 和 `Token`。`子分类` 默认从记录日志的类名提取，例如 `UserService`、`ClientService` 和 `TokenService`；HTTP 请求完成日志会显式使用请求路径。显式设置的子分类优先级更高，因此请求日志仍然可以使用 `/connect/token` 这样的路径。应用层的 scope 只负责写入 `Category`、`Filter1` 和 `Filter2`，不会覆盖类名子分类。
+请求日志的 `Module` 来自各站点的 `LuckLogging.Module`；MVC 请求使用控制器名作为 `Category`、Action 名作为 `Subcategory`，Razor Page 和其他端点使用稳定的页面/HTTP 回退值。业务日志仍可通过 `ApplicationLogScope.Begin(logger, category, businessId, outcome)` 把分类切换为 `Authentication`、`ClientAuthentication`、`AuthorizationCode` 或 `Token` 等业务流程。
 
-`TraceId` 优先使用当前 Activity 的 trace id，并在请求内的普通业务日志中保持不变。`Filter1` 和 `Filter2` 用于稳定、可检索的标识和结果码：例如 client id 或 user id，以及 `LoginSucceeded`、`InvalidPassword`、`RefreshTokenRotated` 等原因/结果。HTTP 完成日志固定使用 `Category=HTTP`、`Subcategory=请求路径`、`Filter1=HTTP 方法`、`Filter2=状态码`。所有缺失字段都显示为 `-`。
+`RequestTraceId` 是独立的 W3C 分布式追踪标识，优先取 `Activity.Current.TraceId`，由标准 `traceparent` 在服务间传播。`Filter1` 在每个服务的请求入口直接生成一次，并在该请求内保持不变。`Filter2` 在认证完成后从当前用户的 `NameIdentifier` 或 `sub` Claim 获取；匿名请求没有用户 ID 时显示为 `-`。`Filter1` 和 `Filter2` 不再使用自定义 HTTP Header 传播。
+
+业务层通过 `ApplicationLogScope.Begin(logger, category, businessId, outcome)` 建立嵌套 scope：`Filter1` 始终继承请求入口的唯一 ID；业务代码明确掌握用户、客户端或其他业务主键时，可以用 `businessId` 补充当前业务日志的 `Filter2`；`outcome` 记录 `LoginSucceeded`、`InvalidPassword` 或 `RefreshTokenRotated` 等业务结果。未传入业务 ID 时继承请求级用户 ID。
 
 这种格式借鉴了 SkyEye 日志的字段职责，但没有照搬完整 HTTP body、header、Cookie 或 SQL 内容。认证日志可能包含敏感上下文，默认只记录排查所需的稳定标识和结果码，绝不记录 password、client secret、authorization code、access token、refresh token、private key、assertion、verifier 或完整 claims/scope。需要查看请求细节时，应结合 TraceId 到受控的网关或审计系统中排查。
 
@@ -160,13 +170,13 @@ SSO 和 Workbench API 共用 `src/NexusAuth.Logging` 中的 Serilog 配置。两
 - SSO：`logs/nexusauth-sso-YYYYMMDD.log`
 - Workbench：`logs/nexusauth-workbench-YYYYMMDD.log`
 
-文件按天滚动，单文件达到 100MB 时继续分片，每个站点保留最近 30 个文件，并启用共享写入和约 1 秒的磁盘刷新。默认最低级别为 `Trace`，因此 NexusAuth 自定义日志的 `Trace`、`Debug`、`Information`、`Warning`、`Error` 和 `Fatal` 都会记录。可以在各站点的 `NexusAuthLogging` 配置节中覆盖 `FilePath`、`MinimumLevel`、`MinimumLevelOverrides`、`FileSizeLimitBytes`、`RetainedFileCountLimit`、`RollOnFileSizeLimit`、`Shared` 和 `FlushIntervalSeconds`；环境变量使用双下划线，例如 `NexusAuthLogging__MinimumLevel=Information`、`NexusAuthLogging__MinimumLevelOverrides__Microsoft.AspNetCore=Information` 或 `NexusAuthLogging__FilePath=/var/log/nexusauth/sso-.log`。
+文件按天滚动，单文件达到 100MB 时继续分片，每个站点保留最近 30 个文件，并启用共享写入和约 1 秒的磁盘刷新。默认最低级别为 `Trace`，因此 NexusAuth 自定义日志的 `Trace`、`Debug`、`Information`、`Warning`、`Error` 和 `Fatal` 都会记录。可以在各站点的 `LuckLogging` 配置节中覆盖 `Module`、`FilePath`、`MinimumLevel`、`MinimumLevelOverrides`、`FileSizeLimitBytes`、`RetainedFileCountLimit`、`RollOnFileSizeLimit`、`Shared` 和 `FlushIntervalSeconds`；环境变量使用双下划线，例如 `LuckLogging__MinimumLevel=Information`、`LuckLogging__MinimumLevelOverrides__Microsoft.AspNetCore=Information` 或 `LuckLogging__FilePath=/var/log/nexusauth/sso-.log`。
 
-默认不会记录 `Information` 级别的 EF Core SQL 命令，避免查询参数长期落盘。确需短时间排查数据库问题时，可以把 `NexusAuthLogging__MinimumLevelOverrides__Microsoft.EntityFrameworkCore.Database.Command` 调整为 `Information`，排查结束后应立即恢复为 `Warning`。
+默认不会记录 `Information` 级别的 EF Core SQL 命令，避免查询参数长期落盘。确需短时间排查数据库问题时，可以把 `LuckLogging__MinimumLevelOverrides__Microsoft.EntityFrameworkCore.Database.Command` 调整为 `Information`，排查结束后应立即恢复为 `Warning`。
 
-默认过滤规则把 `Microsoft`、`System` 和 `Npgsql` 的日志门槛设为 `Warning`，其中所有 `Microsoft.*` 分类只有 `Warning`、`Error` 和 `Fatal` 会被记录。Serilog 的请求日志来源是 `Serilog.AspNetCore.RequestLoggingMiddleware`，不属于 `Microsoft` 分类，因此成功请求仍会以 `Information` 记录；NexusAuth 自定义分类不设置额外门槛，可以记录全部级别。业务日志覆盖注册、登录结果、客户端认证结果、授权码签发与消费、令牌签发、refresh token 轮换和撤销等高价值事件。
+默认过滤规则把 `Microsoft`、`System` 和 `Npgsql` 的日志门槛设为 `Warning`，其中所有 `Microsoft.*` 分类只有 `Warning`、`Error` 和 `Fatal` 会被记录；NexusAuth 自定义分类不设置额外门槛，可以记录全部级别。业务日志覆盖注册、登录结果、客户端认证结果、授权码签发与消费、令牌签发、refresh token 轮换和撤销等高价值事件。
 
-Docker Compose 会把宿主机的 `./logs/sso` 和 `./logs/workbench` 分别挂载到容器的 `/app/logs`。`logs/` 已加入 `.gitignore`，运行时文件不会提交到 Git。日志中不要写入 client secret、授权码、access token、refresh token、private key、密码或完整 Cookie；需要关联请求时使用 `TraceId`，需要排查身份时只记录脱敏后的 client id 或用户标识。
+Docker Compose 会把宿主机的 `./logs/sso` 和 `./logs/workbench` 分别挂载到容器的 `/app/logs`。`logs/` 已加入 `.gitignore`，运行时文件不会提交到 Git。日志中不要写入 client secret、授权码、access token、refresh token、private key、密码或完整 Cookie；应用显式提供 `TraceId` 时可用它关联请求，需要排查身份时只记录脱敏后的 client id 或用户标识。
 
 ## 发现文档和最小接入
 

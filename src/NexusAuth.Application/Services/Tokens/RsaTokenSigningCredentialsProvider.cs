@@ -172,8 +172,7 @@ public class RsaTokenSigningCredentialsProvider : ITokenSigningCredentialsProvid
         {
             certificate = X509CertificateLoader.LoadPkcs12FromFile(
                 certificatePath,
-                certificatePassword,
-                X509KeyStorageFlags.EphemeralKeySet);
+                certificatePassword);
 
             if (!certificate.HasPrivateKey)
                 throw new InvalidOperationException("JWT signing certificate does not contain a private key.");

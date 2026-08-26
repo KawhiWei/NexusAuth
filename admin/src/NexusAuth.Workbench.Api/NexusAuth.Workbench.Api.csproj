@@ -10,6 +10,7 @@
         <PackageReference Include="Luck.AutoDependencyInjection" />
         <PackageReference Include="Luck.AspNetCore" />
         <PackageReference Include="Luck.AppModule" />
+        <PackageReference Include="Luck.Logging.Serilog" />
         <PackageReference Include="Swashbuckle.AspNetCore" />
     </ItemGroup>
 
@@ -18,7 +19,6 @@
         <ProjectReference Include="..\NexusAuth.Extension\NexusAuth.Extension.csproj" />
         <ProjectReference Include="..\..\..\src\NexusAuth.Persistence\NexusAuth.Persistence.csproj" />
         <ProjectReference Include="..\..\..\src\NexusAuth.Shared\NexusAuth.Shared.csproj" />
-        <ProjectReference Include="..\..\..\src\NexusAuth.Logging\NexusAuth.Logging.csproj" />
     </ItemGroup>
 
 </Project>

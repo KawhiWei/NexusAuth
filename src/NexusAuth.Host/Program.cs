@@ -1,9 +1,10 @@
 using Luck.AutoDependencyInjection;
+using Luck.Logging.Serilog;
 using NexusAuth.Host;
-using NexusAuth.Logging;
+using NexusAuth.Shared.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.UseNexusAuthSerilog("NexusAuth.SSO", "logs/nexusauth-sso-.log");
+builder.AddLuckSerilog();
 
 try
 {
@@ -14,20 +15,20 @@ try
 
     var app = builder.Build();
 
-    app.UseNexusAuthRequestLogging();
     app.UseStaticFiles();
+    app.InitializeApplication();
+    app.UseNexusAuthRequestLogContext();
     app.MapControllers();
     app.MapRazorPages();
-    app.InitializeApplication();
 
     app.Run();
 }
 catch (Exception exception)
 {
-    NexusAuthLoggingExtensions.LogStartupFailure(exception);
+    LoggingExtensions.LogStartupFailure(exception);
     throw;
 }
 finally
 {
-    NexusAuthLoggingExtensions.CloseAndFlush();
+    LoggingExtensions.CloseAndFlush();
 }

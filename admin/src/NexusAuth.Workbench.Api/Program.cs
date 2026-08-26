@@ -1,14 +1,17 @@
 using Luck.AutoDependencyInjection;
 using Luck.AspNetCore.Extensions;
-using NexusAuth.Logging;
+using Luck.Logging.Serilog;
 using NexusAuth.Persistence;
+using NexusAuth.Shared.Logging;
 using NexusAuth.Workbench.Api;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.UseNexusAuthSerilog("NexusAuth.Workbench", "logs/nexusauth-workbench-.log");
+builder.AddLuckSerilog();
 
 try
 {
+    builder.Services.AddApiResult();
+
     builder.Services.AddControllers()
         .AddJsonOptions(options =>
         {
@@ -26,21 +29,21 @@ try
 
     var app = builder.Build();
 
-    app.UseNexusAuthRequestLogging();
+    app.InitializeApplication();
+    app.UseNexusAuthRequestLogContext();
     app.UseSwagger();
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "NexusAuth Workbench API v1"));
 
     app.MapControllers();
-    app.InitializeApplication();
 
     app.Run();
 }
 catch (Exception exception)
 {
-    NexusAuthLoggingExtensions.LogStartupFailure(exception);
+    LoggingExtensions.LogStartupFailure(exception);
     throw;
 }
 finally
 {
-    NexusAuthLoggingExtensions.CloseAndFlush();
+    LoggingExtensions.CloseAndFlush();
 }

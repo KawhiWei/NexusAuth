@@ -7,24 +7,37 @@ namespace NexusAuth.Application.Logging;
 public static class ApplicationLogScope
 {
     /// <summary>
-    /// Adds a business category and two stable filter values to the current log scope.
+    /// Adds a business category, identifier, and outcome to the current log scope.
     /// The subcategory is intentionally left to the shared logger enricher, which derives
-    /// it from the logger's declaring class unless a request event supplies an explicit value.
+    /// it from the logger's declaring class.
     /// </summary>
     public static IDisposable Begin(
         ILogger logger,
         string category,
-        string? filter1 = null,
-        string? filter2 = null)
+        string? businessId = null,
+        string? outcome = null)
     {
         ArgumentNullException.ThrowIfNull(logger);
 
-        return logger.BeginScope(new Dictionary<string, object?>
+        var properties = new Dictionary<string, object?>
         {
             ["Category"] = Normalize(category),
-            ["Filter1"] = Normalize(filter1),
-            ["Filter2"] = Normalize(filter2),
-        }) ?? NoopScope.Instance;
+        };
+
+        // Filter1 belongs to the request/message entry scope and must remain stable.
+        AddIfPresent(properties, "Filter2", businessId);
+        AddIfPresent(properties, "Outcome", outcome);
+
+        return logger.BeginScope(properties) ?? NoopScope.Instance;
+    }
+
+    private static void AddIfPresent(
+        IDictionary<string, object?> properties,
+        string name,
+        string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+            properties[name] = Normalize(value);
     }
 
     private static string Normalize(string? value)

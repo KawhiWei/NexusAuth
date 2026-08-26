@@ -68,7 +68,7 @@ public class UserService(
             // verification path so response timing does not reveal usernames.
             BCrypt.Net.BCrypt.Verify(rawPassword, DummyPasswordHash);
 
-            using (ApplicationLogScope.Begin(logger, "Authentication", filter2: "UserNotFoundOrInactive"))
+            using (ApplicationLogScope.Begin(logger, "Authentication", outcome: "UserNotFoundOrInactive"))
             {
                 logger.LogWarning("User authentication failed. Reason={ReasonCode}", "UserNotFoundOrInactive");
             }

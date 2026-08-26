@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AxiosError } from 'axios';
-import { Button, Drawer, Form, Input, MessagePlugin, Pagination, Select, Space, Switch, Table, Tag, Textarea, Tooltip, type TableProps } from 'tdesign-react';
-import { ErrorCircleFilledIcon } from 'tdesign-icons-react';
+import { Button, DialogPlugin, Drawer, Form, Input, MessagePlugin, Pagination, Select, Space, Switch, Table, Tag, Textarea, Tooltip, type TableProps } from 'tdesign-react';
+import { AddIcon, CheckCircleFilledIcon, CloseCircleFilledIcon, DeleteIcon, EditIcon, ErrorCircleFilledIcon, RefreshIcon, SearchIcon, ViewListIcon } from 'tdesign-icons-react';
 import {
   createApiResource,
   deleteApiResource,
   getApiResource,
   getApiResources,
+  getAllApiResources,
   updateApiResource,
   type ApiResource,
   type CreateApiResourceRequest,
   type UpdateApiResourceRequest,
 } from '../../api/api-resource';
+import './style.less';
 
 type FilterState = {
   keyword: string;
@@ -35,6 +37,12 @@ type DialogFormData = {
   audience: string;
   description: string;
   isActive: boolean;
+};
+
+type ResourceOverview = {
+  total: number;
+  active: number;
+  inactive: number;
 };
 
 const defaultFormData: DialogFormData = {
@@ -70,14 +78,18 @@ const ApiResourceManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [sourceData, setSourceData] = useState<ApiResource[]>([]);
   const [total, setTotal] = useState(0);
+  const [overview, setOverview] = useState<ResourceOverview>({ total: 0, active: 0, inactive: 0 });
+  const [overviewLoading, setOverviewLoading] = useState(false);
   const [tableMaxHeight, setTableMaxHeight] = useState(() => Math.max(window.innerHeight - 200, 260));
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [editingResource, setEditingResource] = useState<ApiResource | null>(null);
   const [formData, setFormData] = useState<DialogFormData>(defaultFormData);
   const [submitting, setSubmitting] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const formRef = useRef<any>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detailMode, setDetailMode] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -96,9 +108,29 @@ const ApiResourceManagementPage = () => {
     }
   };
 
+  const fetchOverview = async () => {
+    try {
+      setOverviewLoading(true);
+      const resources = await getAllApiResources();
+      setOverview({
+        total: resources.length,
+        active: resources.filter((resource) => resource.isActive).length,
+        inactive: resources.filter((resource) => !resource.isActive).length,
+      });
+    } catch (error) {
+      console.error('Failed to fetch api resource overview:', error);
+    } finally {
+      setOverviewLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, [appliedFilters, current, pageSize]);
+
+  useEffect(() => {
+    fetchOverview();
+  }, []);
 
   useEffect(() => {
     if (!dialogVisible || loadingDetail) {
@@ -154,12 +186,14 @@ const ApiResourceManagementPage = () => {
   const showDialog = () => {
     setEditingResource(null);
     setFormData(defaultFormData);
+    setDetailMode(false);
     setDialogVisible(true);
   };
 
-  const handleEdit = async (row: ApiResource) => {
+  const loadResourceDetail = async (row: ApiResource, readOnly: boolean) => {
     try {
       setLoadingDetail(true);
+      setDetailMode(readOnly);
       const detail = await getApiResource(row.id);
       const nextFormData = {
         name: detail.name,
@@ -179,6 +213,14 @@ const ApiResourceManagementPage = () => {
     }
   };
 
+  const handleView = (row: ApiResource) => {
+    void loadResourceDetail(row, true);
+  };
+
+  const handleEdit = (row: ApiResource) => {
+    void loadResourceDetail(row, false);
+  };
+
   useEffect(() => {
     if (!loadingDetail && editingResource) {
       setDialogVisible(true);
@@ -186,23 +228,41 @@ const ApiResourceManagementPage = () => {
   }, [loadingDetail, editingResource]);
 
   const handleDelete = async (row: ApiResource) => {
-    const confirmed = window.confirm(`确定要删除 API 资源 "${row.displayName || row.name}" 吗？`);
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await deleteApiResource(row.id);
-      MessagePlugin.success('删除成功');
-      await fetchData();
-    } catch (error) {
-      console.error('Failed to delete api resource:', error);
-      MessagePlugin.error(getRequestErrorMessage(error, '删除 API 资源失败'));
-    }
+    let dialogInstance: ReturnType<typeof DialogPlugin.confirm> | undefined;
+    dialogInstance = DialogPlugin.confirm({
+      header: '删除服务资源',
+      body: (
+        <div className="api-resource-confirm-body">
+          <p>确定删除这个服务资源吗？</p>
+          <div className="api-resource-confirm-name">{row.displayName || row.name}</div>
+          <div className="api-resource-confirm-hint">删除后，已关联的客户端授权关系也会被移除。</div>
+        </div>
+      ),
+      theme: 'danger',
+      width: 420,
+      confirmBtn: { content: '删除', theme: 'danger' },
+      cancelBtn: '取消',
+      onConfirm: () => {
+        dialogInstance?.setConfirmLoading(true);
+        void (async () => {
+          try {
+            await deleteApiResource(row.id);
+            MessagePlugin.success('删除成功');
+            dialogInstance?.hide();
+            await Promise.all([fetchData(), fetchOverview()]);
+          } catch (error) {
+            console.error('Failed to delete api resource:', error);
+            MessagePlugin.error(getRequestErrorMessage(error, '删除 API 资源失败'));
+            dialogInstance?.setConfirmLoading(false);
+          }
+        })();
+      },
+    });
   };
 
   const handleToggleActive = async (row: ApiResource) => {
     try {
+      setTogglingId(row.id);
       const request: UpdateApiResourceRequest = {
         displayName: row.displayName,
         audience: row.audience,
@@ -211,10 +271,12 @@ const ApiResourceManagementPage = () => {
       };
       await updateApiResource(row.id, request);
       MessagePlugin.success(row.isActive ? '已禁用 API 资源' : '已启用 API 资源');
-      await fetchData();
+      await Promise.all([fetchData(), fetchOverview()]);
     } catch (error) {
       console.error('Failed to toggle api resource status:', error);
       MessagePlugin.error(getRequestErrorMessage(error, '更新 API 资源状态失败'));
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -222,10 +284,7 @@ const ApiResourceManagementPage = () => {
     setDialogVisible(false);
     setEditingResource(null);
     setFormData(defaultFormData);
-    const form = formRef.current;
-    if (form) {
-      form.reset();
-    }
+    setDetailMode(false);
   };
 
   const handleSubmit = async () => {
@@ -245,6 +304,8 @@ const ApiResourceManagementPage = () => {
     const normalizedDescription = formData.description.trim();
     const isActive = Boolean(form.getFieldValue('isActive'));
 
+    const isEditing = Boolean(editingResource);
+
     try {
       setSubmitting(true);
 
@@ -256,7 +317,6 @@ const ApiResourceManagementPage = () => {
           isActive,
         };
         await updateApiResource(editingResource.id, request);
-        MessagePlugin.success('更新成功');
       } else {
         const request: CreateApiResourceRequest = {
           name: normalizedName,
@@ -265,90 +325,170 @@ const ApiResourceManagementPage = () => {
           description: normalizedDescription || undefined,
         };
         await createApiResource(request);
-        MessagePlugin.success('创建成功');
       }
-
-      handleCloseDialog();
-      await fetchData();
     } catch (error) {
       console.error('Failed to create api resource:', error);
-      MessagePlugin.error(getRequestErrorMessage(error, editingResource ? '更新 API 资源失败' : '创建 API 资源失败'));
-    } finally {
+      MessagePlugin.error(getRequestErrorMessage(error, isEditing ? '更新 API 资源失败' : '创建 API 资源失败'));
       setSubmitting(false);
+      return;
+    }
+
+    setSubmitting(false);
+    handleCloseDialog();
+
+    try {
+      await Promise.all([fetchData(), fetchOverview()]);
+      MessagePlugin.success(isEditing ? '更新成功' : '创建成功');
+    } catch (error) {
+      console.error('Failed to refresh api resources after save:', error);
+      MessagePlugin.warning('保存成功，但列表刷新失败，请手动刷新');
     }
   };
 
   const columns: TableProps<ApiResource>['columns'] = useMemo(
     () => [
-      { colKey: 'name', title: '名称', width: 180 },
-      { colKey: 'displayName', title: '显示名称', minWidth: 150, ellipsis: true },
-      { colKey: 'audience', title: 'Audience', width: 180 },
+      {
+        colKey: 'name',
+        title: '服务唯一标识',
+        minWidth: 210,
+        cell: ({ row }) => <code className="api-resource-code" title={row.name}>{row.name}</code>,
+      },
+      {
+        colKey: 'displayName',
+        title: '显示名称',
+        minWidth: 180,
+        ellipsis: true,
+        cell: ({ row }) => <span className="api-resource-display-name" title={row.displayName}>{row.displayName}</span>,
+      },
+      {
+        colKey: 'audience',
+        title: 'Audience',
+        minWidth: 190,
+        cell: ({ row }) => <code className="api-resource-code" title={row.audience}>{row.audience}</code>,
+      },
       {
         colKey: 'isActive',
         title: '状态',
-        width: 100,
-        cell: ({ row }) => <Tag theme={row.isActive ? 'success' : 'default'}>{row.isActive ? '启用' : '禁用'}</Tag>,
+        width: 125,
+        cell: ({ row }) => (
+          <Tag theme={row.isActive ? 'success' : 'default'} variant="light">
+            {row.isActive ? '启用' : '禁用'}
+          </Tag>
+        ),
       },
       { colKey: 'description', title: '描述', minWidth: 220, ellipsis: true, cell: ({ row }) => row.description || '-' },
       { colKey: 'createdAt', title: '创建时间', width: 180 },
       {
         colKey: 'action',
         title: '操作',
-        width: 220,
+        width: 270,
+        fixed: 'right',
         cell: ({ row }) => (
-          <Space>
-            <Switch value={row.isActive} size="small" onChange={() => handleToggleActive(row)} />
-            <Button size="small" variant="text" theme="warning" onClick={() => handleEdit(row)}>
+          <Space size="small">
+            <Switch
+              value={row.isActive}
+              size="small"
+              loading={togglingId === row.id}
+              label={({ value }) => value ? '启用' : '禁用'}
+              onChange={() => void handleToggleActive(row)}
+            />
+            <Button size="small" variant="text" theme="primary" icon={<ViewListIcon />} onClick={() => handleView(row)}>
+              详情
+            </Button>
+            <Button size="small" variant="text" theme="primary" icon={<EditIcon />} onClick={() => handleEdit(row)}>
               编辑
             </Button>
-            <Button size="small" variant="text" theme="danger" onClick={() => handleDelete(row)}>
+            <Button size="small" variant="text" theme="danger" icon={<DeleteIcon />} onClick={() => void handleDelete(row)}>
               删除
             </Button>
           </Space>
         ),
       },
     ],
-    []
+    [togglingId]
   );
 
   return (
-    <div>
+    <div className="api-resource-page">
+      <header className="api-resource-page__header">
+        <div>
+          <div className="api-resource-page__eyebrow">OAuth 资源服务器</div>
+          <h1 className="api-resource-page__title">服务资源</h1>
+          <p className="api-resource-page__description">维护 access token 面向的 API 资源及 Audience，控制客户端可申请的服务范围。</p>
+        </div>
+        <Button theme="primary" icon={<AddIcon />} onClick={showDialog}>新增资源</Button>
+      </header>
+
+      <section className="api-resource-overview" aria-label="服务资源概览">
+        <div className="api-resource-overview__item">
+          <span className="api-resource-overview__label">资源总数</span>
+          <strong className="api-resource-overview__value">{overviewLoading ? '...' : overview.total}</strong>
+          <span className="api-resource-overview__hint">全部注册资源</span>
+        </div>
+        <div className="api-resource-overview__item">
+          <span className="api-resource-overview__label"><CheckCircleFilledIcon />已启用</span>
+          <strong className="api-resource-overview__value api-resource-overview__value--success">{overviewLoading ? '...' : overview.active}</strong>
+          <span className="api-resource-overview__hint">可被客户端授权</span>
+        </div>
+        <div className="api-resource-overview__item">
+          <span className="api-resource-overview__label"><CloseCircleFilledIcon />已禁用</span>
+          <strong className="api-resource-overview__value api-resource-overview__value--muted">{overviewLoading ? '...' : overview.inactive}</strong>
+          <span className="api-resource-overview__hint">暂不可申请</span>
+        </div>
+      </section>
+
       <Drawer
         visible={dialogVisible}
-        header={editingResource ? '编辑 API 资源' : '新增 API 资源'}
+        className="api-resource-drawer"
+        header={detailMode ? '服务资源详情' : editingResource ? '编辑服务资源' : '新增服务资源'}
         onClose={handleCloseDialog}
         footer={false}
-        size="85%"
+        size="min(520px, 100vw)"
       >
         <Form
+          className="api-resource-form"
           key={editingResource?.id ?? 'new-api-resource'}
           ref={formRef}
           layout="vertical"
-          labelAlign="right"
-          labelWidth={160}
+          labelAlign="top"
           colon
           initialData={formData}
         >
-          <Form.FormItem label="名称 (Name)" name="name" rules={[{ required: true, message: '请输入名称', type: 'error' }]}>
+          <Form.FormItem
+            label="服务唯一标识 (Name)"
+            name="name"
+            help="服务的稳定唯一标识，创建后不可修改；它不是数据库内部 GUID。"
+            rules={[{ required: true, message: '请输入服务唯一标识', type: 'error' }]}
+          >
             <Input
               value={formData.name}
               placeholder="如: my-api"
-              disabled={Boolean(editingResource)}
+              disabled={Boolean(editingResource) || detailMode}
               onChange={(value) => setFormData((prev) => ({ ...prev, name: value }))}
             />
           </Form.FormItem>
-          <Form.FormItem label="显示名称" name="displayName" rules={[{ required: true, message: '请输入显示名称', type: 'error' }]}>
+          <Form.FormItem
+            label="显示名称"
+            name="displayName"
+            rules={[{ required: true, message: '请输入显示名称', type: 'error' }]}
+          >
             <Input
               value={formData.displayName}
               placeholder="如: 我的 API"
+              disabled={detailMode}
               onChange={(value) => setFormData((prev) => ({ ...prev, displayName: value }))}
             />
           </Form.FormItem>
-          <Form.FormItem label={audienceLabel} name="audience" rules={[{ required: true, message: '请输入 Audience', type: 'error' }]}> 
+          <Form.FormItem
+            label={audienceLabel}
+            name="audience"
+            help="令牌中的 aud 值，用于 API 校验访问令牌面向的资源。"
+            rules={[{ required: true, message: '请输入 Audience', type: 'error' }]}
+          >
             <Input
               value={formData.audience}
               placeholder="如: my-api"
-              disabled={Boolean(editingResource)}
+              disabled={detailMode}
               onChange={(value) => setFormData((prev) => ({ ...prev, audience: value }))}
             />
           </Form.FormItem>
@@ -356,34 +496,43 @@ const ApiResourceManagementPage = () => {
             <Switch
               key={`api-resource-active-${editingResource?.id ?? 'new'}-${String(formData.isActive)}`}
               value={Boolean(formData.isActive)}
-              onChange={(value) => setFormData((prev) => ({ ...prev, isActive: value }))}
+              label={({ value }) => value ? '启用' : '禁用'}
+              disabled={detailMode}
+              onChange={(value) => setFormData((prev) => ({ ...prev, isActive: Boolean(value) }))}
             />
           </Form.FormItem>
-          <Form.FormItem label="描述">
+          <Form.FormItem label="描述" name="description">
             <Textarea
               value={formData.description}
               placeholder="请输入描述"
+              disabled={detailMode}
               onChange={(value) => setFormData((prev) => ({ ...prev, description: value }))}
             />
           </Form.FormItem>
         </Form>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
+        <div className="api-resource-drawer__footer">
           <Button variant="base" onClick={handleCloseDialog} disabled={submitting || loadingDetail}>
             取消
           </Button>
-          <Button theme="primary" loading={submitting} disabled={loadingDetail} onClick={handleSubmit}>
-            {editingResource ? '保存' : '创建'}
-          </Button>
+          {detailMode ? (
+            <Button theme="primary" icon={<EditIcon />} disabled={loadingDetail} onClick={() => setDetailMode(false)}>编辑</Button>
+          ) : (
+            <Button theme="primary" loading={submitting} disabled={loadingDetail} onClick={handleSubmit}>
+              {editingResource ? '保存' : '创建'}
+            </Button>
+          )}
         </div>
       </Drawer>
 
       <div className="page-filter-bar">
-        <Form layout="inline">
+        <Form layout="inline" className="api-resource-filter-form">
           <Form.FormItem label="关键词">
             <Input
               clearable
               value={filters.keyword}
-              placeholder="请输入名称或显示名称"
+              prefixIcon={<SearchIcon />}
+              placeholder="名称、显示名称或 Audience"
+              style={{ width: 280 }}
               onChange={(value) => setFilters((prev) => ({ ...prev, keyword: value }))}
             />
           </Form.FormItem>
@@ -402,14 +551,11 @@ const ApiResourceManagementPage = () => {
           </Form.FormItem>
           <Form.FormItem>
             <Space>
-              <Button theme="primary" onClick={handleQuery}>
+              <Button theme="primary" icon={<SearchIcon />} onClick={handleQuery}>
                 查询
               </Button>
-              <Button variant="base" onClick={handleReset}>
+              <Button variant="base" icon={<RefreshIcon />} onClick={handleReset}>
                 重置
-              </Button>
-              <Button theme="primary" onClick={showDialog}>
-                新增
               </Button>
             </Space>
           </Form.FormItem>

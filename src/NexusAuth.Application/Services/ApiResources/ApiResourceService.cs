@@ -44,7 +44,7 @@ public class ApiResourceService(
     {
         var existing = await apiResourceRepository.FindByNameAsync(name, ct);
         if (existing is not null)
-            throw new InvalidOperationException($"API resource with name '{name}' already exists.");
+            throw new ApiResourceAlreadyExistsException(name);
 
         var resource = ApiResource.Create(name, displayName, audience, description);
         await apiResourceRepository.AddAsync(resource, ct);

@@ -67,6 +67,18 @@ public class ApiResourcesController : ControllerBase
         return await _apiResourceService.UpdateAsync(id, request, ct);
     }
 
+    [HttpPatch("{id:guid}/status")]
+    public async Task<ApiResourceDto> UpdateStatus(
+        Guid id,
+        [FromBody] UpdateApiResourceStatusRequest request,
+        CancellationToken ct = default)
+    {
+        if (await _apiResourceService.GetByIdAsync(id, ct) is null)
+            throw new NotFoundException($"API resource with id '{id}' was not found.");
+
+        return await _apiResourceService.UpdateStatusAsync(id, request.IsActive, ct);
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task Delete(Guid id, CancellationToken ct = default)
     {

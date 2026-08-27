@@ -65,6 +65,15 @@ public class ApiResourceRepository : EfCoreAggregateRootRepository<ApiResource, 
         return await FindAsync(id);
     }
 
+    public async Task<IReadOnlyList<ApiResource>> FindByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
+    {
+        var idSet = ids.Distinct().ToArray();
+        if (idSet.Length == 0)
+            return [];
+
+        return await FindAll(resource => idSet.Contains(resource.Id)).ToListAsync(ct);
+    }
+
     public async Task<(List<ApiResource> Items, int Total)> GetPagedAsync(
         string? keyword,
         bool? isActive,

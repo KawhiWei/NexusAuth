@@ -1,7 +1,6 @@
 using Luck.AutoDependencyInjection;
 using Luck.Logging.Serilog;
 using NexusAuth.Host;
-using NexusAuth.Shared.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddLuckSerilog();
@@ -17,7 +16,7 @@ try
 
     app.UseStaticFiles();
     app.InitializeApplication();
-    app.UseNexusAuthRequestLogContext();
+    app.UseLuckRequestLogContext();
     app.MapControllers();
     app.MapRazorPages();
 

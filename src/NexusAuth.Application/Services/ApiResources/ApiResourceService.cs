@@ -79,6 +79,16 @@ public class ApiResourceService(
         return MapDto(resource);
     }
 
+    public async Task<ApiResourceDto> UpdateStatusAsync(Guid id, bool isActive, CancellationToken ct = default)
+    {
+        var resource = await apiResourceRepository.FindByIdAsync(id, ct)
+            ?? throw new InvalidOperationException($"Api resource with id {id} not found.");
+
+        resource.Update(isActive: isActive);
+        await apiResourceRepository.UpdateAsync(resource, ct);
+        return MapDto(resource);
+    }
+
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
         var resource = await apiResourceRepository.FindByIdAsync(id, ct);

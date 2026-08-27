@@ -2,6 +2,7 @@ services:
   db:
     image: postgres:16-alpine
     environment:
+      TZ: Asia/Shanghai
       POSTGRES_USER: ${POSTGRES_USER:-nexusauth}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexusauth_dev_password}
       POSTGRES_DB: postgres
@@ -24,7 +25,7 @@ services:
       context: .
       dockerfile: src/NexusAuth.Host/Dockerfile
     environment:
-      TZ: ${TZ:-Asia/Shanghai}
+      TZ: Asia/Shanghai
       ASPNETCORE_ENVIRONMENT: ${NEXUSAUTH_SSO_ENVIRONMENT:-Development}
       ConnectionStrings__Default: Host=db;Port=5432;Database=nexusauth;Username=${POSTGRES_USER:-nexusauth};Password=${POSTGRES_PASSWORD:-nexusauth_dev_password};Search Path=nexusauth
       Jwt__Issuer: ${NEXUSAUTH_ISSUER:-http://localhost:5100}
@@ -59,7 +60,7 @@ services:
       context: .
       dockerfile: admin/src/NexusAuth.Workbench.Api/Dockerfile
     environment:
-      TZ: ${TZ:-Asia/Shanghai}
+      TZ: Asia/Shanghai
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ConnectionStrings__Default: Host=db;Port=5432;Database=nexusauth;Username=${POSTGRES_USER:-nexusauth};Password=${POSTGRES_PASSWORD:-nexusauth_dev_password};Search Path=nexusauth
       Auth__Authority: ${NEXUSAUTH_ISSUER:-http://localhost:5100}
@@ -96,6 +97,8 @@ services:
       dockerfile: admin/src/NexusAuth.Workbench.Dashboard/Dockerfile
       args:
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+    environment:
+      TZ: Asia/Shanghai
     depends_on:
       admin-api:
         condition: service_healthy

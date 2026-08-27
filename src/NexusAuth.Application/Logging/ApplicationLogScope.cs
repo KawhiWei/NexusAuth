@@ -7,24 +7,20 @@ namespace NexusAuth.Application.Logging;
 public static class ApplicationLogScope
 {
     /// <summary>
-    /// Adds a business category, identifier, and outcome to the current log scope.
-    /// The subcategory is intentionally left to the shared logger enricher, which derives
-    /// it from the logger's declaring class.
+    /// Adds an optional business subcategory, identifier, and outcome to the current log scope.
     /// </summary>
     public static IDisposable Begin(
         ILogger logger,
-        string category,
+        string? subcategory = null,
         string? businessId = null,
         string? outcome = null)
     {
         ArgumentNullException.ThrowIfNull(logger);
 
-        var properties = new Dictionary<string, object?>
-        {
-            ["Category"] = Normalize(category),
-        };
+        var properties = new Dictionary<string, object?>();
 
         // Filter1 belongs to the request/message entry scope and must remain stable.
+        AddIfPresent(properties, "Subcategory", subcategory);
         AddIfPresent(properties, "Filter2", businessId);
         AddIfPresent(properties, "Outcome", outcome);
 

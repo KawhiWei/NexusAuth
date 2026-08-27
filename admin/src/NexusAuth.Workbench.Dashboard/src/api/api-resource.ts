@@ -68,6 +68,10 @@ export const updateApiResource = (id: string, data: UpdateApiResourceRequest): P
   return request.put<ApiResource>(`/api-resources/${id}`, data);
 };
 
+export const updateApiResourceStatus = (id: string, isActive: boolean): Promise<ApiResource> => {
+  return request.patch<ApiResource>(`/api-resources/${id}/status`, { isActive });
+};
+
 export const deleteApiResource = (id: string): Promise<void> => {
   return request.delete<void>(`/api-resources/${id}`);
 };

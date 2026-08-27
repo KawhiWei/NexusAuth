@@ -322,6 +322,8 @@ public class ClientService(
     public async Task<ClientMutationResultDto> CreateAsync(CreateClientRequest request, CancellationToken ct = default)
     {
         var clientId = Guid.NewGuid();
+        var apiResourceIds = NormalizeApiResourceIds(request.ApiResourceIds);
+        var allowedScopes = await MergeAllowedScopesAsync(request.AllowedScopes, apiResourceIds, ct);
         var tokenEndpointAuthMethod = ResolveTokenEndpointAuthMethod(request.TokenEndpointAuthMethod);
         GeneratedCredential? generatedCredential = null;
         var requiresGeneratedJwks = string.Equals(tokenEndpointAuthMethod, OAuthClient.TokenEndpointAuthMethodPrivateKeyJwt, StringComparison.Ordinal)
@@ -336,7 +338,7 @@ public class ClientService(
             request.Description,
             request.RedirectUris,
             request.PostLogoutRedirectUris,
-            request.AllowedScopes,
+            allowedScopes,
             request.AllowedGrantTypes,
             request.RequirePkce,
             tokenEndpointAuthMethod,
@@ -359,13 +361,10 @@ public class ClientService(
         if (generatedCredential?.Secret is not null)
             await clientSecretRepository.AddAsync(generatedCredential.Secret, ct);
 
-        if (request.ApiResourceIds?.Count > 0)
+        foreach (var apiResourceId in apiResourceIds)
         {
-            foreach (var apiResourceId in request.ApiResourceIds)
-            {
-                var association = ClientApiResource.Create(client.Id, apiResourceId);
-                await clientApiResourceRepository.AddAsync(association, ct);
-            }
+            var association = ClientApiResource.Create(client.Id, apiResourceId);
+            await clientApiResourceRepository.AddAsync(association, ct);
         }
 
         return new ClientMutationResultDto(
@@ -376,6 +375,21 @@ public class ClientService(
     public async Task<ClientDto> UpdateAsync(Guid id, UpdateClientRequest request, CancellationToken ct = default)
     {
         var client = await clientRepository.GetByIdAsync(id, ct) ?? throw new InvalidOperationException($"Client with id {id} not found.");
+        var apiResourceIds = request.ApiResourceIds is null
+            ? null
+            : NormalizeApiResourceIds(request.ApiResourceIds);
+        var allowedScopes = request.AllowedScopes;
+        IReadOnlyList<ApiResource>? existingResources = null;
+        if (apiResourceIds is not null || request.AllowedScopes is not null)
+        {
+            existingResources = await clientApiResourceRepository.GetResourcesByClientIdAsync(id, ct);
+            var targetApiResourceIds = apiResourceIds ?? existingResources.Select(resource => resource.Id).ToList();
+            var standardScopes = request.AllowedScopes
+                ?? client.AllowedScopes.Except(existingResources.Select(resource => resource.Audience), StringComparer.Ordinal);
+
+            allowedScopes = await MergeAllowedScopesAsync(standardScopes, targetApiResourceIds, ct);
+        }
+
         var tokenEndpointAuthMethod = request.TokenEndpointAuthMethod is null
             ? client.TokenEndpointAuthMethod
             : ResolveTokenEndpointAuthMethod(request.TokenEndpointAuthMethod);
@@ -385,7 +399,7 @@ public class ClientService(
             request.Description,
             request.RedirectUris,
             request.PostLogoutRedirectUris,
-            request.AllowedScopes,
+            allowedScopes,
             request.AllowedGrantTypes,
             request.RequirePkce,
             request.IsActive,
@@ -395,19 +409,18 @@ public class ClientService(
 
         await clientRepository.UpdateAsync(client, ct);
 
-        if (request.ApiResourceIds is not null)
+        if (apiResourceIds is not null)
         {
-            var existing = await clientApiResourceRepository.GetResourcesByClientIdAsync(id, ct);
-            var existingIds = existing.Select(r => r.Id).ToHashSet();
+            var existingIds = (existingResources ?? []).Select(resource => resource.Id).ToHashSet();
 
-            var toAdd = request.ApiResourceIds.Except(existingIds);
+            var toAdd = apiResourceIds.Except(existingIds);
             foreach (var apiResourceId in toAdd)
             {
                 var association = ClientApiResource.Create(client.Id, apiResourceId);
                 await clientApiResourceRepository.AddAsync(association, ct);
             }
 
-            var toRemove = existingIds.Except(request.ApiResourceIds);
+            var toRemove = existingIds.Except(apiResourceIds);
             foreach (var apiResourceId in toRemove)
             {
                 await clientApiResourceRepository.RemoveAsync(client.Id, apiResourceId, ct);
@@ -623,6 +636,32 @@ public class ClientService(
     private static int NormalizePageSize(int pageSize)
     {
         return pageSize <= 0 ? 10 : Math.Min(pageSize, 100);
+    }
+
+    private static List<Guid> NormalizeApiResourceIds(IEnumerable<Guid>? apiResourceIds)
+    {
+        return apiResourceIds?.Distinct().ToList() ?? [];
+    }
+
+    private async Task<List<string>> MergeAllowedScopesAsync(
+        IEnumerable<string>? standardScopes,
+        IReadOnlyCollection<Guid> apiResourceIds,
+        CancellationToken ct)
+    {
+        var allowedScopes = standardScopes?
+            .Where(scope => !string.IsNullOrWhiteSpace(scope))
+            .Select(scope => scope.Trim())
+            .ToList() ?? [];
+
+        var resources = await apiResourceRepository.FindByIdsAsync(apiResourceIds, ct);
+        var foundResourceIds = resources.Select(resource => resource.Id).ToHashSet();
+        var missingResourceIds = apiResourceIds.Where(apiResourceId => !foundResourceIds.Contains(apiResourceId)).ToList();
+        if (missingResourceIds.Count > 0)
+            throw new InvalidOperationException($"Api resource with id {missingResourceIds[0]} not found.");
+
+        allowedScopes.AddRange(resources.Select(resource => resource.Audience));
+
+        return [.. allowedScopes.Distinct(StringComparer.Ordinal)];
     }
 
     private async Task<List<ClientDto>> MapClientsAsync(IEnumerable<OAuthClient> clients, CancellationToken ct)

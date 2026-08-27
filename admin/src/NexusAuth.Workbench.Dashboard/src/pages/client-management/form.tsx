@@ -68,12 +68,16 @@ const grantTypeOptions: FormOption[] = [
   { label: 'refresh_token', value: 'refresh_token' },
 ];
 
-const scopeOptions: FormOption[] = [
+const oauthStandardScopeOptions: FormOption[] = [
   { label: 'openid', value: 'openid' },
   { label: 'profile', value: 'profile' },
   { label: 'email', value: 'email' },
+  { label: 'phone', value: 'phone' },
+  { label: 'address', value: 'address' },
   { label: 'offline_access', value: 'offline_access' },
 ];
+
+const oauthStandardScopeValues = new Set(oauthStandardScopeOptions.map((scope) => scope.value));
 
 const defaultFormData: ClientFormData = {
   clientId: '',
@@ -136,7 +140,7 @@ const toFormData = (client: Client): ClientFormData => ({
   postLogoutRedirectUris: client.postLogoutRedirectUris?.length
     ? client.postLogoutRedirectUris.map((uri, index) => ({ id: String(index + 1), value: uri }))
     : [{ id: '1', value: '' }],
-  allowedScopes: client.allowedScopes ?? ['openid'],
+  allowedScopes: (client.allowedScopes ?? ['openid']).filter((scope) => oauthStandardScopeValues.has(scope)),
   allowedGrantTypes: client.allowedGrantTypes ?? ['authorization_code'],
   apiResourceIds: client.apiResourceIds ?? [],
   requirePkce: client.requirePkce,
@@ -176,19 +180,14 @@ const ClientFormPage = ({ mode }: ClientFormPageProps) => {
     [clientMetadata.grantTypes, formData.allowedGrantTypes],
   );
 
-  const scopeSelectOptions = useMemo(() => {
-    const resourceScopes = apiResources.map((resource) => ({
-      label: resource.displayName ? `${resource.displayName} (${resource.audience})` : resource.audience,
-      value: resource.audience,
-      description: resource.description,
-    }));
-    return mergeOptions(
-      scopeOptions,
+  const scopeSelectOptions = useMemo(
+    () => mergeOptions(
+      oauthStandardScopeOptions,
       clientMetadata.scopes,
-      resourceScopes,
       formData.allowedScopes.map((value) => ({ label: value, value })),
-    );
-  }, [apiResources, clientMetadata.scopes, formData.allowedScopes]);
+    ),
+    [clientMetadata.scopes, formData.allowedScopes],
+  );
 
   const apiResourceSelectOptions = useMemo(() => {
     const resourceOptions = apiResources.map((resource) => ({

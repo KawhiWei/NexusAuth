@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AxiosError } from 'axios';
-import { Button, DialogPlugin, Drawer, Form, Input, MessagePlugin, Pagination, Select, Space, Switch, Table, Tag, Textarea, Tooltip, type TableProps } from 'tdesign-react';
-import { AddIcon, CheckCircleFilledIcon, CloseCircleFilledIcon, DeleteIcon, EditIcon, ErrorCircleFilledIcon, RefreshIcon, SearchIcon, ViewListIcon } from 'tdesign-icons-react';
+import { Button, Dialog, Drawer, Form, Input, MessagePlugin, Pagination, Select, Space, Switch, Table, Textarea, Tooltip, type TableProps } from 'tdesign-react';
+import { AddIcon, DeleteIcon, EditIcon, ErrorCircleFilledIcon, RefreshIcon, SearchIcon, ViewListIcon } from 'tdesign-icons-react';
 import {
   createApiResource,
   deleteApiResource,
   getApiResource,
   getApiResources,
-  getAllApiResources,
   updateApiResource,
+  updateApiResourceStatus,
   type ApiResource,
   type CreateApiResourceRequest,
   type UpdateApiResourceRequest,
@@ -37,12 +37,6 @@ type DialogFormData = {
   audience: string;
   description: string;
   isActive: boolean;
-};
-
-type ResourceOverview = {
-  total: number;
-  active: number;
-  inactive: number;
 };
 
 const defaultFormData: DialogFormData = {
@@ -78,8 +72,6 @@ const ApiResourceManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [sourceData, setSourceData] = useState<ApiResource[]>([]);
   const [total, setTotal] = useState(0);
-  const [overview, setOverview] = useState<ResourceOverview>({ total: 0, active: 0, inactive: 0 });
-  const [overviewLoading, setOverviewLoading] = useState(false);
   const [tableMaxHeight, setTableMaxHeight] = useState(() => Math.max(window.innerHeight - 200, 260));
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
   const [dialogVisible, setDialogVisible] = useState(false);
@@ -87,6 +79,8 @@ const ApiResourceManagementPage = () => {
   const [formData, setFormData] = useState<DialogFormData>(defaultFormData);
   const [submitting, setSubmitting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ApiResource | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const formRef = useRef<any>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailMode, setDetailMode] = useState(false);
@@ -108,29 +102,18 @@ const ApiResourceManagementPage = () => {
     }
   };
 
-  const fetchOverview = async () => {
-    try {
-      setOverviewLoading(true);
-      const resources = await getAllApiResources();
-      setOverview({
-        total: resources.length,
-        active: resources.filter((resource) => resource.isActive).length,
-        inactive: resources.filter((resource) => !resource.isActive).length,
-      });
-    } catch (error) {
-      console.error('Failed to fetch api resource overview:', error);
-    } finally {
-      setOverviewLoading(false);
+  const refreshAfterDelete = async () => {
+    if (sourceData.length === 1 && current > 1) {
+      setCurrent((page) => page - 1);
+      return;
     }
+
+    await fetchData();
   };
 
   useEffect(() => {
     fetchData();
   }, [appliedFilters, current, pageSize]);
-
-  useEffect(() => {
-    fetchOverview();
-  }, []);
 
   useEffect(() => {
     if (!dialogVisible || loadingDetail) {
@@ -227,51 +210,35 @@ const ApiResourceManagementPage = () => {
     }
   }, [loadingDetail, editingResource]);
 
-  const handleDelete = async (row: ApiResource) => {
-    let dialogInstance: ReturnType<typeof DialogPlugin.confirm> | undefined;
-    dialogInstance = DialogPlugin.confirm({
-      header: '删除服务资源',
-      body: (
-        <div className="api-resource-confirm-body">
-          <p>确定删除这个服务资源吗？</p>
-          <div className="api-resource-confirm-name">{row.displayName || row.name}</div>
-          <div className="api-resource-confirm-hint">删除后，已关联的客户端授权关系也会被移除。</div>
-        </div>
-      ),
-      theme: 'danger',
-      width: 420,
-      confirmBtn: { content: '删除', theme: 'danger' },
-      cancelBtn: '取消',
-      onConfirm: () => {
-        dialogInstance?.setConfirmLoading(true);
-        void (async () => {
-          try {
-            await deleteApiResource(row.id);
-            MessagePlugin.success('删除成功');
-            dialogInstance?.hide();
-            await Promise.all([fetchData(), fetchOverview()]);
-          } catch (error) {
-            console.error('Failed to delete api resource:', error);
-            MessagePlugin.error(getRequestErrorMessage(error, '删除 API 资源失败'));
-            dialogInstance?.setConfirmLoading(false);
-          }
-        })();
-      },
-    });
+  const handleDelete = (row: ApiResource) => {
+    setDeleteTarget(row);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) {
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      await deleteApiResource(deleteTarget.id);
+      setDeleteTarget(null);
+      await refreshAfterDelete();
+      MessagePlugin.success('删除成功');
+    } catch (error) {
+      console.error('Failed to delete api resource:', error);
+      MessagePlugin.error(getRequestErrorMessage(error, '删除 API 资源失败'));
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleToggleActive = async (row: ApiResource) => {
     try {
       setTogglingId(row.id);
-      const request: UpdateApiResourceRequest = {
-        displayName: row.displayName,
-        audience: row.audience,
-        description: row.description,
-        isActive: !row.isActive,
-      };
-      await updateApiResource(row.id, request);
+      await updateApiResourceStatus(row.id, !row.isActive);
+      await fetchData();
       MessagePlugin.success(row.isActive ? '已禁用 API 资源' : '已启用 API 资源');
-      await Promise.all([fetchData(), fetchOverview()]);
     } catch (error) {
       console.error('Failed to toggle api resource status:', error);
       MessagePlugin.error(getRequestErrorMessage(error, '更新 API 资源状态失败'));
@@ -337,7 +304,7 @@ const ApiResourceManagementPage = () => {
     handleCloseDialog();
 
     try {
-      await Promise.all([fetchData(), fetchOverview()]);
+      await fetchData();
       MessagePlugin.success(isEditing ? '更新成功' : '创建成功');
     } catch (error) {
       console.error('Failed to refresh api resources after save:', error);
@@ -371,27 +338,23 @@ const ApiResourceManagementPage = () => {
         title: '状态',
         width: 125,
         cell: ({ row }) => (
-          <Tag theme={row.isActive ? 'success' : 'default'} variant="light">
-            {row.isActive ? '启用' : '禁用'}
-          </Tag>
+          <Switch
+            value={row.isActive}
+            size="small"
+            loading={togglingId === row.id}
+            label={({ value }) => value ? '启用' : '禁用'}
+            onChange={() => void handleToggleActive(row)}
+          />
         ),
       },
       { colKey: 'description', title: '描述', minWidth: 220, ellipsis: true, cell: ({ row }) => row.description || '-' },
-      { colKey: 'createdAt', title: '创建时间', width: 180 },
       {
         colKey: 'action',
         title: '操作',
-        width: 270,
+        width: 210,
         fixed: 'right',
         cell: ({ row }) => (
           <Space size="small">
-            <Switch
-              value={row.isActive}
-              size="small"
-              loading={togglingId === row.id}
-              label={({ value }) => value ? '启用' : '禁用'}
-              onChange={() => void handleToggleActive(row)}
-            />
             <Button size="small" variant="text" theme="primary" icon={<ViewListIcon />} onClick={() => handleView(row)}>
               详情
             </Button>
@@ -410,32 +373,26 @@ const ApiResourceManagementPage = () => {
 
   return (
     <div className="api-resource-page">
-      <header className="api-resource-page__header">
-        <div>
-          <div className="api-resource-page__eyebrow">OAuth 资源服务器</div>
-          <h1 className="api-resource-page__title">服务资源</h1>
-          <p className="api-resource-page__description">维护 access token 面向的 API 资源及 Audience，控制客户端可申请的服务范围。</p>
+      <Dialog
+        visible={Boolean(deleteTarget)}
+        header="删除服务资源"
+        theme="danger"
+        confirmBtn={{ content: '删除', theme: 'danger' }}
+        cancelBtn="取消"
+        confirmLoading={deleting}
+        onClose={() => {
+          if (!deleting) {
+            setDeleteTarget(null);
+          }
+        }}
+        onConfirm={() => void confirmDelete()}
+      >
+        <div className="api-resource-confirm-body">
+          <p>确定删除这个服务资源吗？</p>
+          <div className="api-resource-confirm-name">{deleteTarget?.displayName || deleteTarget?.name}</div>
+          <div className="api-resource-confirm-hint">删除后，已关联的客户端授权关系也会被移除。</div>
         </div>
-        <Button theme="primary" icon={<AddIcon />} onClick={showDialog}>新增资源</Button>
-      </header>
-
-      <section className="api-resource-overview" aria-label="服务资源概览">
-        <div className="api-resource-overview__item">
-          <span className="api-resource-overview__label">资源总数</span>
-          <strong className="api-resource-overview__value">{overviewLoading ? '...' : overview.total}</strong>
-          <span className="api-resource-overview__hint">全部注册资源</span>
-        </div>
-        <div className="api-resource-overview__item">
-          <span className="api-resource-overview__label"><CheckCircleFilledIcon />已启用</span>
-          <strong className="api-resource-overview__value api-resource-overview__value--success">{overviewLoading ? '...' : overview.active}</strong>
-          <span className="api-resource-overview__hint">可被客户端授权</span>
-        </div>
-        <div className="api-resource-overview__item">
-          <span className="api-resource-overview__label"><CloseCircleFilledIcon />已禁用</span>
-          <strong className="api-resource-overview__value api-resource-overview__value--muted">{overviewLoading ? '...' : overview.inactive}</strong>
-          <span className="api-resource-overview__hint">暂不可申请</span>
-        </div>
-      </section>
+      </Dialog>
 
       <Drawer
         visible={dialogVisible}
@@ -556,6 +513,9 @@ const ApiResourceManagementPage = () => {
               </Button>
               <Button variant="base" icon={<RefreshIcon />} onClick={handleReset}>
                 重置
+              </Button>
+              <Button theme="primary" icon={<AddIcon />} onClick={showDialog}>
+                新增资源
               </Button>
             </Space>
           </Form.FormItem>

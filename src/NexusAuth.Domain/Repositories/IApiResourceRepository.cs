@@ -16,6 +16,8 @@ public interface IApiResourceRepository : IAggregateRootRepository<ApiResource, 
 
     Task<ApiResource?> FindByIdAsync(Guid id, CancellationToken ct = default);
 
+    Task<IReadOnlyList<ApiResource>> FindByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default);
+
     Task<(List<ApiResource> Items, int Total)> GetPagedAsync(
         string? keyword,
         bool? isActive,

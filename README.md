@@ -139,11 +139,15 @@ using Luck.Logging.Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddLuckSerilog();
+
+var app = builder.Build();
+app.UseLuckRequestLogContext();
+app.MapControllers();
 ```
 
-该包负责注册 Serilog、配置 console/file sinks，并提供结构化字段的默认值。应用在它之上注册共享的请求日志上下文：认证完成后，每个 HTTP 请求都会建立一个覆盖完整请求生命周期的 `ILogger.BeginScope`，并填充 `RequestTraceId`、`Filter1`、`Filter2`、`Category` 和 `Subcategory`。请求结束只记录一条包含成功/失败、状态码和耗时的标准日志。两个站点都会同时写控制台和文件，因此 Docker 日志仍然可以通过 `docker compose logs` 查看，文件日志则适合检索和长期保留。
+该包负责注册 Serilog、配置 console/file sinks，并提供结构化字段的默认值。`UseLuckRequestLogContext()` 为每个 HTTP 请求建立覆盖完整请求生命周期的日志 scope，填充 `RequestTraceId`、`Filter1`、`Filter2`、`Module` 和 `Category`；`Subcategory` 按业务需要补充。请求结束由组件记录一次状态码、耗时、HTTP 方法和路径，未处理异常记录为 Error 后继续抛出。两个站点都会同时写控制台和文件，因此 Docker 日志仍然可以通过 `docker compose logs` 查看，文件日志则适合检索和长期保留。
 
-每条日志都保持下面的固定格式，字段为空时使用 `-`，不会改变列的位置：
+每条日志都保持下面的固定格式。缺失字段保留为空列，不会改变列的位置：
 
 ```text
 [时间][级别][模块][分类][子分类][TraceId][过滤1][过滤2][日志内容]
@@ -152,16 +156,16 @@ builder.AddLuckSerilog();
 实际输出示例：
 
 ```text
-[2026-08-23 14:20:10.123 +08:00][INF][NexusAuth.SSO][Authentication][UserService][c4b2...93a1][7f8d...11e0][user-1024][User authentication succeeded]
+[2026-08-23 14:20:10.123][INF][Authorize][Authorize][][c4b2...93a1][7f8d...11e0][user-1024][Request completed. StatusCode=200 ElapsedMs=18 Method=GET Path=/connect/authorize]
 ```
 
-其中 `级别` 是独立的 `TRC`、`DBG`、`INF`、`WRN`、`ERR` 或 `FTL` 字段，不再拼在日志内容里。`模块` 固定为 `NexusAuth.SSO` 或 `NexusAuth.Workbench`。
+其中 `级别` 是独立的 `TRC`、`DBG`、`INF`、`WRN`、`ERR` 或 `FTL` 字段，不再拼在日志内容里。
 
-请求日志的 `Module` 来自各站点的 `LuckLogging.Module`；MVC 请求使用控制器名作为 `Category`、Action 名作为 `Subcategory`，Razor Page 和其他端点使用稳定的页面/HTTP 回退值。业务日志仍可通过 `ApplicationLogScope.Begin(logger, category, businessId, outcome)` 把分类切换为 `Authentication`、`ClientAuthentication`、`AuthorizationCode` 或 `Token` 等业务流程。
+MVC 请求使用控制器名作为 `Module`、Action 名作为 `Category`；`Subcategory` 是可选业务分类，请求完成日志中为空。业务日志可通过 `ApplicationLogScope.Begin(logger, subcategory, businessId, outcome)` 写入 `Authentication`、`ClientAuthentication`、`AuthorizationCode` 或 `Token` 等子分类。非 MVC Controller 端点使用 `HTTP` 作为模块，并以 Endpoint DisplayName 作为分类。站点启动日志没有控制器上下文，仍使用各站点的 `LuckLogging.Module`。
 
-`RequestTraceId` 是独立的 W3C 分布式追踪标识，优先取 `Activity.Current.TraceId`，由标准 `traceparent` 在服务间传播。`Filter1` 在每个服务的请求入口直接生成一次，并在该请求内保持不变。`Filter2` 在认证完成后从当前用户的 `NameIdentifier` 或 `sub` Claim 获取；匿名请求没有用户 ID 时显示为 `-`。`Filter1` 和 `Filter2` 不再使用自定义 HTTP Header 传播。
+`RequestTraceId` 是独立的 W3C 分布式追踪标识，优先取 `Activity.Current.TraceId`，由标准 `traceparent` 在服务间传播。`Filter1` 在每个服务的请求入口直接生成一次，并在该请求内保持不变。`Filter2` 优先从当前用户的 `NameIdentifier` 或 `sub` Claim 获取；匿名请求没有用户 ID 时由组件生成请求级 GUID。`Filter1` 和 `Filter2` 不使用自定义 HTTP Header 传播。
 
-业务层通过 `ApplicationLogScope.Begin(logger, category, businessId, outcome)` 建立嵌套 scope：`Filter1` 始终继承请求入口的唯一 ID；业务代码明确掌握用户、客户端或其他业务主键时，可以用 `businessId` 补充当前业务日志的 `Filter2`；`outcome` 记录 `LoginSucceeded`、`InvalidPassword` 或 `RefreshTokenRotated` 等业务结果。未传入业务 ID 时继承请求级用户 ID。
+业务层通过 `ApplicationLogScope.Begin(logger, subcategory, businessId, outcome)` 建立嵌套 scope：`Filter1` 始终继承请求入口的唯一 ID；业务代码明确掌握用户、客户端或其他业务主键时，可以用 `businessId` 补充当前业务日志的 `Filter2`；`outcome` 记录 `LoginSucceeded`、`InvalidPassword` 或 `RefreshTokenRotated` 等业务结果。未传入业务 ID 时继承请求级用户 ID。
 
 这种格式借鉴了 SkyEye 日志的字段职责，但没有照搬完整 HTTP body、header、Cookie 或 SQL 内容。认证日志可能包含敏感上下文，默认只记录排查所需的稳定标识和结果码，绝不记录 password、client secret、authorization code、access token、refresh token、private key、assertion、verifier 或完整 claims/scope。需要查看请求细节时，应结合 TraceId 到受控的网关或审计系统中排查。
 
@@ -170,7 +174,7 @@ builder.AddLuckSerilog();
 - SSO：`logs/nexusauth-sso-YYYYMMDD.log`
 - Workbench：`logs/nexusauth-workbench-YYYYMMDD.log`
 
-文件按天滚动，单文件达到 100MB 时继续分片，每个站点保留最近 30 个文件，并启用共享写入和约 1 秒的磁盘刷新。默认最低级别为 `Trace`，因此 NexusAuth 自定义日志的 `Trace`、`Debug`、`Information`、`Warning`、`Error` 和 `Fatal` 都会记录。可以在各站点的 `LuckLogging` 配置节中覆盖 `Module`、`FilePath`、`MinimumLevel`、`MinimumLevelOverrides`、`FileSizeLimitBytes`、`RetainedFileCountLimit`、`RollOnFileSizeLimit`、`Shared` 和 `FlushIntervalSeconds`；环境变量使用双下划线，例如 `LuckLogging__MinimumLevel=Information`、`LuckLogging__MinimumLevelOverrides__Microsoft.AspNetCore=Information` 或 `LuckLogging__FilePath=/var/log/nexusauth/sso-.log`。
+文件按天滚动，单文件达到 100MB 时继续分片，每个站点保留最近 30 个文件，并启用共享写入和约 1 秒的磁盘刷新。默认最低级别为 `Information`。可以在各站点的 `LuckLogging` 配置节中覆盖 `Module`、`FilePath`、`MinimumLevel`、`MinimumLevelOverrides`、`FileSizeLimitBytes`、`RetainedFileCountLimit`、`RollOnFileSizeLimit`、`Shared` 和 `FlushIntervalSeconds`；环境变量使用双下划线，例如 `LuckLogging__MinimumLevel=Information`、`LuckLogging__MinimumLevelOverrides__Microsoft.AspNetCore=Information` 或 `LuckLogging__FilePath=/var/log/nexusauth/sso-.log`。
 
 默认不会记录 `Information` 级别的 EF Core SQL 命令，避免查询参数长期落盘。确需短时间排查数据库问题时，可以把 `LuckLogging__MinimumLevelOverrides__Microsoft.EntityFrameworkCore.Database.Command` 调整为 `Information`，排查结束后应立即恢复为 `Warning`。
 

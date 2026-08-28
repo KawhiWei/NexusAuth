@@ -76,6 +76,7 @@ public class AppWebModule : LuckAppModule
                     }
                 };
             });
+        services.AddAuthorization();
 
         base.ConfigureServices(context);
     }

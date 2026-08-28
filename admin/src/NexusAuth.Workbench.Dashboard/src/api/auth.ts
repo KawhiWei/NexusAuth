@@ -58,6 +58,17 @@ export const getMenuList = () => {
                     children: [],
                 },
                 {
+                    id: 'oauth-scim-credential',
+                    route: '/oauth/scim-credential-management',
+                    componentPath: '/scim-credential-management/index.tsx',
+                    name: 'SCIM 凭证',
+                    show: true,
+                    iconName: null,
+                    parentId: 'oauth',
+                    parentPaths: Array<string>,
+                    children: [],
+                },
+                {
                     id: 'oauth-user',
                     route: '/oauth/user-management',
                     componentPath: '/user-management/index.tsx',

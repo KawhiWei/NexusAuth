@@ -27,13 +27,26 @@ SET search_path TO nexusauth;
 CREATE TABLE nexusauth.users (
     id              uuid            NOT NULL,
     username        varchar(100)    NOT NULL,
+    external_id     varchar(256),
     password_hash   varchar(256)    NOT NULL,
     email           varchar(256),
     phone_number    varchar(20),
     nickname        varchar(100)    NOT NULL,
+    given_name      varchar(100),
+    family_name     varchar(100),
+    middle_name     varchar(100),
+    honorific_prefix varchar(50),
+    honorific_suffix varchar(50),
+    profile_url     varchar(2048),
+    title           varchar(256),
+    user_type       varchar(100),
+    preferred_language varchar(35),
+    locale          varchar(35),
+    timezone        varchar(100),
     gender          smallint        NOT NULL DEFAULT 0,
     ethnicity       varchar(50),
     is_active       boolean         NOT NULL DEFAULT true,
+    is_system_account boolean       NOT NULL DEFAULT false,
     failed_login_attempts integer   NOT NULL DEFAULT 0,
     locked_until    timestamptz,
     created_at      timestamptz     NOT NULL,
@@ -42,6 +55,7 @@ CREATE TABLE nexusauth.users (
 );
 
 CREATE UNIQUE INDEX ix_users_username ON nexusauth.users (username);
+CREATE UNIQUE INDEX ix_users_external_id ON nexusauth.users (external_id) WHERE external_id IS NOT NULL;
 CREATE UNIQUE INDEX ix_users_email ON nexusauth.users (email) WHERE email IS NOT NULL;
 CREATE UNIQUE INDEX ix_users_phone_number ON nexusauth.users (phone_number) WHERE phone_number IS NOT NULL;
 
@@ -220,3 +234,27 @@ CREATE TABLE nexusauth.token_blacklist_entries (
 );
 
 CREATE UNIQUE INDEX ix_token_blacklist_entries_jti ON nexusauth.token_blacklist_entries (jti);
+
+-- ============================================================
+-- scim_service_principal_credentials
+-- ============================================================
+CREATE TABLE nexusauth.scim_service_principal_credentials (
+    id          uuid            NOT NULL,
+    name        varchar(128)    NOT NULL,
+    -- SHA-256(raw bearer token), encoded as unpadded Base64Url.
+    token_hash  varchar(43)     NOT NULL,
+    scopes      jsonb           NOT NULL,
+    is_active   boolean         NOT NULL DEFAULT true,
+    expires_at  timestamptz,
+    last_used_at timestamptz,
+    created_at  timestamptz     NOT NULL,
+    revoked_at  timestamptz,
+    CONSTRAINT pk_scim_service_principal_credentials PRIMARY KEY (id),
+    CONSTRAINT ck_scim_service_principal_credentials_token_hash_base64url
+        CHECK (token_hash ~ '^[A-Za-z0-9_-]{43}$')
+);
+
+CREATE UNIQUE INDEX ix_scim_service_principal_credentials_name
+    ON nexusauth.scim_service_principal_credentials (name);
+CREATE UNIQUE INDEX ix_scim_service_principal_credentials_token_hash
+    ON nexusauth.scim_service_principal_credentials (token_hash);

@@ -19,3 +19,4 @@ global using ISecurityPolicyService = NexusAuth.Application.Services.Security.IS
 global using NexusAuthSecurityOptions = NexusAuth.Application.Services.Security.NexusAuthSecurityOptions;
 global using ApiResourceService = NexusAuth.Application.Services.ApiResources.ApiResourceService;
 global using IApiResourceService = NexusAuth.Application.Services.ApiResources.IApiResourceService;
+global using IScimCredentialService = NexusAuth.Application.Services.Scim.IScimCredentialService;

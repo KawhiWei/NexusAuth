@@ -23,6 +23,12 @@ public class UserRepository : EfCoreAggregateRootRepository<User, Guid>, IUserRe
         return await FindAll(u => u.Username == username).FirstOrDefaultAsync(ct);
     }
 
+    public async Task<User?> FindByExternalIdAsync(string externalId, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(externalId);
+        return await FindAll(u => u.ExternalId == externalId.Trim()).FirstOrDefaultAsync(ct);
+    }
+
     public async Task<User?> FindByEmailAsync(string email, CancellationToken ct = default)
     {
         var normalizedEmail = email.ToLowerInvariant();
@@ -39,6 +45,60 @@ public class UserRepository : EfCoreAggregateRootRepository<User, Guid>, IUserRe
         return await FindAsync(id);
     }
 
+    public async Task<(IReadOnlyList<User> Items, int Total)> GetScimPagedAsync(
+        string? userName,
+        string? externalId,
+        bool? isActive,
+        string? email,
+        int startIndex,
+        int count,
+        CancellationToken ct = default)
+    {
+        var query = FindAll();
+        if (!string.IsNullOrWhiteSpace(userName))
+            query = query.Where(user => user.Username == userName);
+        if (!string.IsNullOrWhiteSpace(externalId))
+            query = query.Where(user => user.ExternalId == externalId);
+        if (isActive.HasValue)
+            query = query.Where(user => user.IsActive == isActive.Value);
+        if (!string.IsNullOrWhiteSpace(email))
+            query = query.Where(user => user.Email == email.ToLowerInvariant());
+
+        var total = await query.CountAsync(ct);
+        var items = await query.OrderBy(user => user.Id)
+            .Skip(startIndex - 1)
+            .Take(count)
+            .ToListAsync(ct);
+        return (items, total);
+    }
+
+    public async Task<(IReadOnlyList<User> Items, int Total)> GetAdminPagedAsync(
+        string? keyword,
+        bool? isActive,
+        int page,
+        int pageSize,
+        CancellationToken ct = default)
+    {
+        var query = FindAll();
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            var value = keyword.Trim();
+            query = query.Where(user => user.Username.Contains(value)
+                || user.Nickname.Contains(value)
+                || (user.Email != null && user.Email.Contains(value))
+                || (user.ExternalId != null && user.ExternalId.Contains(value)));
+        }
+        if (isActive.HasValue)
+            query = query.Where(user => user.IsActive == isActive.Value);
+
+        var total = await query.CountAsync(ct);
+        var items = await query.OrderByDescending(user => user.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+        return (items, total);
+    }
+
     public async Task AddAsync(User user, CancellationToken ct = default)
     {
         Add(user);
@@ -48,6 +108,12 @@ public class UserRepository : EfCoreAggregateRootRepository<User, Guid>, IUserRe
     public async Task UpdateAsync(User user, CancellationToken ct = default)
     {
         Update(user);
+        await _unitOfWork.CommitAsync(ct);
+    }
+
+    public async Task DeleteAsync(User user, CancellationToken ct = default)
+    {
+        Remove(user);
         await _unitOfWork.CommitAsync(ct);
     }
 

@@ -1,0 +1,89 @@
+.scim-credential-page {
+  min-width: 0;
+  color: var(--app-text);
+}
+
+.scim-credential-name {
+  overflow: hidden;
+  color: var(--app-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scim-credential-drawer .t-drawer__content-wrapper {
+  max-width: 100vw;
+}
+
+.scim-credential-drawer .t-drawer__header {
+  color: var(--app-text);
+  font-weight: 650;
+}
+
+.scim-credential-drawer .t-drawer__body {
+  color: var(--app-text);
+}
+
+.scim-credential-form .t-form__item {
+  margin-bottom: 20px;
+}
+
+.scim-credential-form .t-form__label {
+  color: var(--app-text);
+  font-weight: 600;
+}
+
+.scim-credential-form .t-form__help {
+  color: var(--app-text-muted);
+  line-height: 1.5;
+}
+
+.scim-credential-drawer__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--app-border);
+}
+
+.scim-credential-confirm-body p {
+  margin: 0 0 10px;
+  color: var(--app-text);
+  line-height: 1.7;
+}
+
+.scim-credential-confirm-body strong {
+  overflow-wrap: anywhere;
+  color: var(--app-text);
+}
+
+.scim-credential-token-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scim-credential-token-body__title {
+  color: var(--app-text);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.scim-credential-token-body__hint {
+  color: var(--td-warning-color);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.scim-credential-token-body .t-textarea__inner {
+  color: var(--app-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+  .scim-credential-drawer .t-drawer__body {
+    padding: 16px;
+  }
+}

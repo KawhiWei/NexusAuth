@@ -47,3 +47,5 @@ finally
 {
     LoggingExtensions.CloseAndFlush();
 }
+
+public partial class Program;

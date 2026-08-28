@@ -27,6 +27,9 @@ public class DbContext(DbContextOptions options) : LuckDbContextBase(options)
 
     public DbSet<TokenBlacklistEntry> TokenBlacklistEntries => Set<TokenBlacklistEntry>();
 
+    public DbSet<ScimServicePrincipalCredential> ScimServicePrincipalCredentials =>
+        Set<ScimServicePrincipalCredential>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

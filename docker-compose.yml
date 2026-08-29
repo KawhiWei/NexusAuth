@@ -10,7 +10,6 @@ services:
       - nexusauth-db-data:/var/lib/postgresql/data
       - ./docker/postgres-init.sh:/docker-entrypoint-initdb.d/000-postgres-init.sh:ro
       - ./production-init.sql:/opt/nexusauth-init/production-init.sql:ro
-      - ./demo/seed.sql:/opt/nexusauth-init/demo-seed.sql:ro
       - ./admin/src/NexusAuth.Workbench.Api/seed.sql:/opt/nexusauth-init/admin-seed.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
@@ -38,6 +37,10 @@ services:
       Jwt__SigningKeyPath: ${NEXUSAUTH_SIGNING_KEY_PATH:-}
       Jwt__AccessTokenLifetimeMinutes: ${NEXUSAUTH_ACCESS_TOKEN_LIFETIME_MINUTES:-60}
       Jwt__RefreshTokenLifetimeMinutes: ${NEXUSAUTH_REFRESH_TOKEN_LIFETIME_MINUTES:-43200}
+      BootstrapAdmin__Username: ${NEXUSAUTH_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      BootstrapAdmin__Password: ${NEXUSAUTH_BOOTSTRAP_ADMIN_PASSWORD:-wzw0126..}
+      BootstrapAdmin__Nickname: ${NEXUSAUTH_BOOTSTRAP_ADMIN_NICKNAME:-NexusAdmin}
+      BootstrapAdmin__Email: ${NEXUSAUTH_BOOTSTRAP_ADMIN_EMAIL:-admin@163.com}
     volumes:
       - nexusauth-signing-key:/app/App_Data
       - nexusauth-sso-keys:/root/.aspnet/DataProtection-Keys
@@ -65,7 +68,7 @@ services:
       ConnectionStrings__Default: Host=db;Port=5432;Database=nexusauth;Username=${POSTGRES_USER:-nexusauth};Password=${POSTGRES_PASSWORD:-nexusauth_dev_password};Search Path=nexusauth
       Auth__Authority: ${NEXUSAUTH_ISSUER:-http://localhost:5100}
       Auth__BackchannelAuthority: http://sso:8080
-      Auth__ClientId: NexusAuth.Workbench
+      Auth__ClientId: nexusauth.workbench
       Auth__ClientSecret: ${WORKBENCH_CLIENT_SECRET:-c57cf0e110c54ad2ac5591b99801b852}
       Auth__RedirectUri: http://localhost:5051/signin-oidc
       Auth__PostLogoutRedirectUri: http://localhost:5273/

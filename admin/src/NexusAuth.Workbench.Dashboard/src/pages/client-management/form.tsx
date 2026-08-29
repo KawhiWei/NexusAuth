@@ -504,7 +504,6 @@ const ClientFormPage = ({ mode }: ClientFormPageProps) => {
               type="button"
               variant="outline"
               shape="square"
-              size="small"
               className="client-uri-action"
               aria-label={index === 0 ? '新增地址' : '删除地址'}
               icon={index === 0 ? <AddIcon /> : <DeleteIcon />}

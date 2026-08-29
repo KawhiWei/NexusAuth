@@ -323,7 +323,6 @@ const UserManagementPage = () => {
         cell: ({ row }) => (
           <Switch
             value={row.isActive}
-            size="small"
             loading={togglingId === row.id}
             disabled={row.isSystemAccount}
             label={({ value }) => value ? '启用' : '禁用'}
@@ -343,18 +342,20 @@ const UserManagementPage = () => {
       {
         colKey: 'operation',
         title: '操作',
-        width: 180,
+        width: 160,
         fixed: 'right',
-        cell: ({ row }) => (
-          <Space size="small">
-            <Button size="small" variant="text" theme="primary" icon={<EditIcon />} disabled={row.isSystemAccount} onClick={() => handleEdit(row)}>
-              编辑
-            </Button>
-            <Button size="small" variant="text" theme="primary" icon={<KeyIcon />} disabled={row.isSystemAccount} onClick={() => handleShowResetPassword(row)}>
-              重置密码
-            </Button>
-          </Space>
-        ),
+        cell: ({ row }) => row.isSystemAccount
+          ? <Tag theme="default" variant="light-outline">系统账号受保护</Tag>
+          : (
+            <Space direction="vertical" size={4} style={{ alignItems: 'flex-start' }}>
+              <Button variant="text" theme="primary" icon={<EditIcon />} onClick={() => handleEdit(row)}>
+                编辑
+              </Button>
+              <Button variant="text" theme="danger" icon={<KeyIcon />} onClick={() => handleShowResetPassword(row)}>
+                重置密码
+              </Button>
+            </Space>
+          ),
       },
     ],
     [togglingId],

@@ -27,6 +27,18 @@ html[theme-mode='light'] {
   --app-warning: #b76711;
   --app-danger: #c43c4b;
 
+  /* Workbench favors readable, medium-density controls over TDesign's compact defaults. */
+  --td-font-size-body-small: 13px;
+  --td-font-size-body-medium: 15px;
+  --td-font-size-body-large: 17px;
+  --td-line-height-body-small: 21px;
+  --td-line-height-body-medium: 23px;
+  --td-line-height-body-large: 25px;
+  --td-comp-size-xs: 28px;
+  --td-comp-size-s: 32px;
+  --td-comp-size-m: 36px;
+  --td-comp-size-l: 40px;
+
   --td-bg-color-page: var(--app-page);
   --td-bg-color-container: var(--app-surface);
   --td-bg-color-container-hover: var(--app-surface-subtle);
@@ -165,7 +177,7 @@ body {
   color: var(--app-text);
   background: var(--app-page);
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   transition: background-color 160ms ease, color 160ms ease;
@@ -235,19 +247,22 @@ select {
 .t-date-picker,
 .t-range-input {
   border-radius: 6px;
+  font-size: var(--td-font-size-body-medium);
 }
 
 .t-button {
   border-radius: 6px;
+  font-size: var(--td-font-size-body-medium);
   font-weight: 500;
 }
 
 .t-table {
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid var(--app-border);
   border-radius: 8px;
   color: var(--app-text);
   background: var(--app-table-bg);
+  font-size: var(--td-font-size-body-medium);
 }
 
 .t-table table,
@@ -268,6 +283,9 @@ select {
 .t-table td,
 .t-table th {
   border-color: var(--app-border);
+  line-height: var(--td-line-height-body-medium);
+  padding-top: 12px;
+  padding-bottom: 12px;
 }
 
 .t-table tbody tr {
@@ -336,6 +354,7 @@ select {
 .t-pagination {
   color: var(--app-text-secondary);
   background: transparent;
+  font-size: var(--td-font-size-body-medium);
 }
 
 .t-pagination__number,
@@ -371,10 +390,22 @@ select {
 
 .t-tag {
   border-radius: 4px;
+  font-size: var(--td-font-size-body-small);
 }
 
 .t-tabs__nav-item {
+  font-size: var(--td-font-size-body-medium);
   font-weight: 500;
+}
+
+.t-form__label,
+.t-form__controls-content,
+.t-select__single,
+.t-select__placeholder,
+.t-dropdown__item,
+.t-dialog,
+.t-drawer {
+  font-size: var(--td-font-size-body-medium);
 }
 
 .t-menu {

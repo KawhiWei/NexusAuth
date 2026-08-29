@@ -10,8 +10,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../admin/src/NexusAuth.Workbench.Api/NexusAuth.Workbench.Api.csproj" />
-    <ProjectReference Include="../../src/NexusAuth.Application/NexusAuth.Application.csproj" />
     <ProjectReference Include="../../src/NexusAuth.Host/NexusAuth.Host.csproj" />
   </ItemGroup>
 </Project>

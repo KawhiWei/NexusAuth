@@ -104,7 +104,18 @@ docker compose up --build
 - Workbench API：<http://localhost:5051>
 - NexusAuth Provider：<http://localhost:5100>
 
-Workbench 会跳转到 Provider 登录页，登录成功后回到 Dashboard。空数据库首次启动会执行初始化脚本和开发 seed；示例账号仅用于本地开发，不要带入生产环境。
+Workbench 会跳转到 Provider 登录页，登录成功后回到 Dashboard。空数据库首次启动时，SQL 只创建数据库结构并登记 Workbench 默认客户端；SSO 随后根据环境变量幂等创建初始管理员，不会在重复启动时覆盖已有密码。
+
+Compose 的本地默认管理员是 `admin / Pass@123`。部署前应显式配置以下变量，尤其不能在生产环境保留默认密码：
+
+```bash
+NEXUSAUTH_BOOTSTRAP_ADMIN_USERNAME=admin
+NEXUSAUTH_BOOTSTRAP_ADMIN_PASSWORD=REPLACE_WITH_A_STRONG_PASSWORD
+NEXUSAUTH_BOOTSTRAP_ADMIN_NICKNAME="System Admin"
+NEXUSAUTH_BOOTSTRAP_ADMIN_EMAIL=admin@example.com
+```
+
+`demo/seed.sql` 不再由 Compose 自动执行。需要演示客户端与示例用户时，可以在本地开发数据库中手动执行该脚本。
 
 本地 Compose 默认使用 Development 环境自动生成并持久化开发签名证书。生产环境必须设置 `NEXUSAUTH_SSO_ENVIRONMENT=Production`，挂载由证书管理系统提供的 PFX，并通过 `NEXUSAUTH_SIGNING_CERTIFICATE_PATH` 和 Secret 配置证书密码。生产环境不会自动生成开发证书。
 

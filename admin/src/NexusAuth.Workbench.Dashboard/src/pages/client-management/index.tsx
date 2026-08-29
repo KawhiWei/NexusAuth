@@ -205,14 +205,15 @@ const ClientManagementPage = () => {
     {
       colKey: 'action',
       title: '操作',
-      width: 140,
+      width: 160,
+      fixed: 'right',
       cell: ({ row }) => (
         <Space direction="vertical" size={4} style={{ alignItems: 'flex-start' }}>
-          <Button size="small" variant="text" theme="warning" type="button" onClick={() => handleEdit(row)}>编辑</Button>
+          <Button variant="text" theme="primary" type="button" onClick={() => handleEdit(row)}>编辑</Button>
           {getResettableAuthMethod(row) && (
-            <Button size="small" variant="text" theme="primary" type="button" loading={submitting} onClick={() => handleResetCredential(row)}>重置 Secret</Button>
+            <Button variant="text" theme="primary" type="button" loading={submitting} onClick={() => handleResetCredential(row)}>重置 Secret</Button>
           )}
-          <Button size="small" variant="text" theme="danger" type="button" onClick={() => handleDelete(row)}>删除</Button>
+          <Button variant="text" theme="danger" type="button" onClick={() => handleDelete(row)}>删除</Button>
         </Space>
       ),
     },

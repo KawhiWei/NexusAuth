@@ -67,11 +67,11 @@ const columns: TableProps<SaleRefIdMappingItem>['columns'] = [
     width: 160,
     fixed: 'right',
     cell: () => (
-      <Space size="small">
-        <Button variant="text" theme="primary" size="small">
+      <Space direction="vertical" size={4} style={{ alignItems: 'flex-start' }}>
+        <Button variant="text" theme="primary">
           编辑
         </Button>
-        <Button variant="text" theme="danger" size="small">
+        <Button variant="text" theme="danger">
           删除
         </Button>
       </Space>

@@ -38,6 +38,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Workbench.Api", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Extension", "admin\src\NexusAuth.Extension\NexusAuth.Extension.csproj", "{29821D51-4060-4D74-9816-DEC5DC51614C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NexusAuth.Host.IntegrationTests", "tests\NexusAuth.Host.IntegrationTests\NexusAuth.Host.IntegrationTests.csproj", "{A092C0E7-3D38-4C8A-A6CB-8860A6186953}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -156,6 +158,18 @@ Global
 		{29821D51-4060-4D74-9816-DEC5DC51614C}.Release|x64.Build.0 = Release|Any CPU
 		{29821D51-4060-4D74-9816-DEC5DC51614C}.Release|x86.ActiveCfg = Release|Any CPU
 		{29821D51-4060-4D74-9816-DEC5DC51614C}.Release|x86.Build.0 = Release|Any CPU
+		{A092C0E7-3D38-4C8A-A6CB-8860A6186953}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A092C0E7-3D38-4C8A-A6CB-8860A6186953}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A092C0E7-3D38-4C8A-A6CB-8860A6186953}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A092C0E7-3D38-4C8A-A6CB-8860A6186953}.Debug|x64.Build.0 = Debug|Any CPU
+		{A092C0E7-3D38-4C8A-A6CB-8860A6186953}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A092C0E7-3D38-4C8A-A6CB-8860A6186953}.Debug|x86.Build.0 = Debug|Any CPU
+		{A092C0E7-3D38-4C8A-A6CB-8860A6186953}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A092C0E7-3D38-4C8A-A6CB-8860A6186953}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A092C0E7-3D38-4C8A-A6CB-8860A6186953}.Release|x64.ActiveCfg = Release|Any CPU
+		{A092C0E7-3D38-4C8A-A6CB-8860A6186953}.Release|x64.Build.0 = Release|Any CPU
+		{A092C0E7-3D38-4C8A-A6CB-8860A6186953}.Release|x86.ActiveCfg = Release|Any CPU
+		{A092C0E7-3D38-4C8A-A6CB-8860A6186953}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -167,5 +181,6 @@ Global
 		{E08579B4-756D-743E-8E2E-7BC2241D154D} = {08363F22-23A7-70B7-557A-C076A2D48378}
 		{ABBD18E0-77CD-41AA-956F-8365EEFC23D8} = {E08579B4-756D-743E-8E2E-7BC2241D154D}
 		{29821D51-4060-4D74-9816-DEC5DC51614C} = {E08579B4-756D-743E-8E2E-7BC2241D154D}
+		{A092C0E7-3D38-4C8A-A6CB-8860A6186953} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

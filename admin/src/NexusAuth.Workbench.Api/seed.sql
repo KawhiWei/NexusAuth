@@ -19,12 +19,12 @@ ON CONFLICT (name) DO UPDATE SET
     description = EXCLUDED.description;
 
 -- ============================================================
--- OAuth Client: NexusAuth.Workbench (参考 demo-bff-secret 格式)
+-- OAuth Client: nexusauth.workbench (参考 demo-bff-secret 格式)
 -- ============================================================
 INSERT INTO oauth_clients (id, client_id, token_endpoint_auth_method, jwks, jwks_uri, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
 VALUES (
     'a9846c33-0147-44a8-b0be-fc2ddfccd732',
-    'NexusAuth.Workbench',
+    'nexusauth.workbench',
     'client_secret_basic',
     NULL,
     NULL,

@@ -232,7 +232,7 @@ const PublicLayout = () => {
 
       <Layout className="layout-body">
         <Aside
-          width={collapsed ? '64px' : '232px'}
+          width={collapsed ? '64px' : '240px'}
           className={`layout-sider${collapsed ? ' is-collapsed' : ''}`}
         >
           <div className="layout-sider-menu">

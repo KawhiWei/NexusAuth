@@ -28,6 +28,8 @@ public class AppWebModule : LuckAppModule
 
         services.AddNexusAuthTokenSigning(configuration);
         services.Configure<NexusAuthSecurityOptions>(configuration.GetSection("Security"));
+        services.Configure<BootstrapAdminOptions>(configuration.GetSection("BootstrapAdmin"));
+        services.AddHostedService<BootstrapAdminHostedService>();
 
         // Keep abuse controls at the host boundary so every sensitive
         // endpoint, including Razor login/device pages, shares one policy.

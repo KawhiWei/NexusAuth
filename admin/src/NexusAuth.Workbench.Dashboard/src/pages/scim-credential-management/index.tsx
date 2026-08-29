@@ -278,14 +278,14 @@ const ScimCredentialManagementPage = () => {
       {
         colKey: 'operation',
         title: '操作',
-        width: 185,
+        width: 160,
         fixed: 'right',
         cell: ({ row }) => (
-          <Space size="small">
-            <Button size="small" variant="text" theme="primary" icon={<EditIcon />} disabled={Boolean(row.revokedAt)} onClick={() => handleShowEdit(row)}>
+          <Space direction="vertical" size={4} style={{ alignItems: 'flex-start' }}>
+            <Button variant="text" theme="primary" icon={<EditIcon />} disabled={Boolean(row.revokedAt)} onClick={() => handleShowEdit(row)}>
               编辑
             </Button>
-            <Button size="small" variant="text" theme="danger" icon={<DeleteIcon />} disabled={Boolean(row.revokedAt)} onClick={() => setRevokeTarget(row)}>
+            <Button variant="text" theme="danger" icon={<DeleteIcon />} disabled={Boolean(row.revokedAt)} onClick={() => setRevokeTarget(row)}>
               吊销
             </Button>
           </Space>

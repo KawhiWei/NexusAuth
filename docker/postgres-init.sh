@@ -12,10 +12,9 @@ psql_args=(
 psql "${psql_args[@]}" --dbname=postgres \
   --file=/opt/nexusauth-init/production-init.sql
 
-# The seed files use unqualified table names. Set the application's schema for
-# the whole session before including both seed files.
+# Register only the Workbench client required to administer a fresh instance.
+# Demo clients and users are intentionally excluded from runtime initialization.
 psql "${psql_args[@]}" --dbname=nexusauth <<'SQL'
 SET search_path TO nexusauth;
-\i /opt/nexusauth-init/demo-seed.sql
 \i /opt/nexusauth-init/admin-seed.sql
 SQL

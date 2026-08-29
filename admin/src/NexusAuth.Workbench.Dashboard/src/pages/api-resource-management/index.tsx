@@ -340,7 +340,6 @@ const ApiResourceManagementPage = () => {
         cell: ({ row }) => (
           <Switch
             value={row.isActive}
-            size="small"
             loading={togglingId === row.id}
             label={({ value }) => value ? '启用' : '禁用'}
             onChange={() => void handleToggleActive(row)}
@@ -351,17 +350,17 @@ const ApiResourceManagementPage = () => {
       {
         colKey: 'action',
         title: '操作',
-        width: 210,
+        width: 160,
         fixed: 'right',
         cell: ({ row }) => (
-          <Space size="small">
-            <Button size="small" variant="text" theme="primary" icon={<ViewListIcon />} onClick={() => handleView(row)}>
+          <Space direction="vertical" size={4} style={{ alignItems: 'flex-start' }}>
+            <Button variant="text" theme="primary" icon={<ViewListIcon />} onClick={() => handleView(row)}>
               详情
             </Button>
-            <Button size="small" variant="text" theme="primary" icon={<EditIcon />} onClick={() => handleEdit(row)}>
+            <Button variant="text" theme="primary" icon={<EditIcon />} onClick={() => handleEdit(row)}>
               编辑
             </Button>
-            <Button size="small" variant="text" theme="danger" icon={<DeleteIcon />} onClick={() => void handleDelete(row)}>
+            <Button variant="text" theme="danger" icon={<DeleteIcon />} onClick={() => void handleDelete(row)}>
               删除
             </Button>
           </Space>

@@ -3,6 +3,7 @@
 -- 说明：
 -- 1) Workbench API 作为 OAuth 客户端使用 authorization_code + PKCE
 -- 2) 认证方式：client_secret_basic
+-- 3) 执行前必须通过 psql 变量 workbench_client_secret 提供客户端密钥
 -- ============================================================
 
 -- ============================================================
@@ -54,9 +55,9 @@ VALUES (
     'a8dc73d9-253c-4945-b096-8933e8d557ec',
     'a9846c33-0147-44a8-b0be-fc2ddfccd732',
     'shared_secret',
-    '$2a$12$vOC8fSO5ti5eIJ1Hl5in.OjL3ZxP99yUf5nVHWBwN26aaa9/P7nm2',
+    crypt(:'workbench_client_secret', gen_salt('bf', 12)),
     NULL,
-    'Client secret (c57cf0e110c54ad2ac5591b99801b852)',
+    'Managed by WORKBENCH_CLIENT_SECRET',
     true,
     NOW()
 )

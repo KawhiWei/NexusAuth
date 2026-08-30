@@ -26,7 +26,7 @@ dotnet run
     }
   },
   "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Port=5432;Database=nexusauth;Username=nexusauth;Password=your-password"
+    "Default": "Host=localhost;Port=5432;Database=nexusauth;Username=nexusauth;Password=your-password"
   },
   "AllowedHosts": "*",
   "Jwt": {

@@ -11,6 +11,12 @@ NexusAuth 是一个基于 ASP.NET Core 和 .NET 10 的 OAuth 2.0 / OpenID Connec
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
 </p>
 
+## 文档与手册
+
+- [使用手册（中文）](./document/12-使用手册.md)：部署、管理台、OAuth/OIDC、SCIM 2.0 和生产运维的完整操作指引。
+- [User Guide (English)](./docs/en/user-guide.md)：对应的英文使用手册。
+- [专题文档目录](./document/README.md)：快速开始、数据库、客户端接入、配置、Demo 和协议设计。
+
 ## 能力概览
 
 ### OAuth 2.0 流程
@@ -106,16 +112,26 @@ docker compose up --build
 
 Workbench 会跳转到 Provider 登录页，登录成功后回到 Dashboard。空数据库首次启动时，SQL 只创建数据库结构并登记 Workbench 默认客户端；SSO 随后根据环境变量幂等创建初始管理员，不会在重复启动时覆盖已有密码。
 
-Compose 的本地默认管理员是 `admin / Pass@123`。部署前应显式配置以下变量，尤其不能在生产环境保留默认密码：
+Compose 的本地默认管理员来自环境变量回退值：`admin / wzw0126..`。这仅用于本地开发；部署前必须显式配置以下变量，生产环境不得保留回退密码：
 
 ```bash
 NEXUSAUTH_BOOTSTRAP_ADMIN_USERNAME=admin
 NEXUSAUTH_BOOTSTRAP_ADMIN_PASSWORD=REPLACE_WITH_A_STRONG_PASSWORD
 NEXUSAUTH_BOOTSTRAP_ADMIN_NICKNAME="System Admin"
 NEXUSAUTH_BOOTSTRAP_ADMIN_EMAIL=admin@example.com
+WORKBENCH_CLIENT_SECRET=REPLACE_WITH_A_LONG_RANDOM_SECRET
 ```
 
+`WORKBENCH_CLIENT_SECRET` 是 `nexusauth.workbench` 系统 OAuth 客户端的唯一密钥来源。首次初始化数据库时会以该值生成 BCrypt 哈希，Workbench API 运行时也使用同一值认证；生产环境必须显式设置它。Compose 中的回退值仅用于本地开发，不能用于生产。
+
 `demo/seed.sql` 不再由 Compose 自动执行。需要演示客户端与示例用户时，可以在本地开发数据库中手动执行该脚本。
+
+### 数据库脚本职责
+
+- [production-init.sql](./production-init.sql)：仅用于全新、空的 `nexusauth` 数据库，定义当前最终 schema；不删库、不含 `ALTER TABLE`，也不创建用户。
+- `database/001_*.sql` 至 `database/005_*.sql`：仅用于将历史库按版本升级到当前结构，不能用于新库初始化。
+- `admin/src/NexusAuth.Workbench.Api/seed.sql`：登记 Workbench 所需的 scope 和 OAuth 客户端；通过 psql 变量 `workbench_client_secret` 写入 `WORKBENCH_CLIENT_SECRET` 的 BCrypt 哈希。
+- `demo/seed.sql`：只用于本地演示客户端和示例用户，禁止用于生产。
 
 本地 Compose 默认使用 Development 环境自动生成并持久化开发签名证书。生产环境必须设置 `NEXUSAUTH_SSO_ENVIRONMENT=Production`，挂载由证书管理系统提供的 PFX，并通过 `NEXUSAUTH_SIGNING_CERTIFICATE_PATH` 和 Secret 配置证书密码。生产环境不会自动生成开发证书。
 

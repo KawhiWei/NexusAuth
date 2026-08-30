@@ -6,6 +6,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-nexusauth}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexusauth_dev_password}
       POSTGRES_DB: postgres
+      # Development-only fallback. Production must explicitly set this value.
+      WORKBENCH_CLIENT_SECRET: ${WORKBENCH_CLIENT_SECRET:-c57cf0e110c54ad2ac5591b99801b852}
     volumes:
       - nexusauth-db-data:/var/lib/postgresql/data
       - ./docker/postgres-init.sh:/docker-entrypoint-initdb.d/000-postgres-init.sh:ro

@@ -34,6 +34,7 @@ public class WorkbenchApiModule : LuckAppModule
         var requiredAuthConfiguration = RequireAuthConfiguration(
             authority,
             clientId,
+            clientSecret,
             redirectUri,
             postLogoutRedirectUri,
             scope);
@@ -45,7 +46,7 @@ public class WorkbenchApiModule : LuckAppModule
                 ? null
                 : backchannelAuthority;
             options.ClientId = requiredAuthConfiguration.ClientId;
-            options.ClientSecret = clientSecret;
+            options.ClientSecret = requiredAuthConfiguration.ClientSecret;
             options.RedirectUri = requiredAuthConfiguration.RedirectUri;
             options.PostLogoutRedirectUri = requiredAuthConfiguration.PostLogoutRedirectUri;
             options.Scope = requiredAuthConfiguration.Scope;
@@ -119,6 +120,7 @@ public class WorkbenchApiModule : LuckAppModule
             });
 
         services.AddAuthorization();
+        services.AddHostedService<WorkbenchClientCredentialHostedService>();
 
         base.ConfigureServices(context);
     }
@@ -126,6 +128,7 @@ public class WorkbenchApiModule : LuckAppModule
     private static RequiredAuthConfiguration RequireAuthConfiguration(
         string? authority,
         string? clientId,
+        string? clientSecret,
         string? redirectUri,
         string? postLogoutRedirectUri,
         string? scope)
@@ -135,6 +138,8 @@ public class WorkbenchApiModule : LuckAppModule
             errors.Add("Authority is required.");
         if (string.IsNullOrWhiteSpace(clientId))
             errors.Add("ClientId is required.");
+        if (string.IsNullOrWhiteSpace(clientSecret))
+            errors.Add("ClientSecret is required.");
         if (string.IsNullOrWhiteSpace(redirectUri))
             errors.Add("RedirectUri is required.");
         if (string.IsNullOrWhiteSpace(postLogoutRedirectUri))
@@ -148,6 +153,7 @@ public class WorkbenchApiModule : LuckAppModule
         return new RequiredAuthConfiguration(
             authority ?? throw new InvalidOperationException("Authority is required."),
             clientId ?? throw new InvalidOperationException("ClientId is required."),
+            clientSecret ?? throw new InvalidOperationException("ClientSecret is required."),
             redirectUri ?? throw new InvalidOperationException("RedirectUri is required."),
             postLogoutRedirectUri ?? throw new InvalidOperationException("PostLogoutRedirectUri is required."),
             scope ?? throw new InvalidOperationException("Scope is required."));
@@ -156,6 +162,7 @@ public class WorkbenchApiModule : LuckAppModule
     private sealed record RequiredAuthConfiguration(
         string Authority,
         string ClientId,
+        string ClientSecret,
         string RedirectUri,
         string PostLogoutRedirectUri,
         string Scope);

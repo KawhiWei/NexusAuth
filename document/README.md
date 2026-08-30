@@ -4,6 +4,11 @@ NexusAuth 是一个 .NET 10 OAuth 2.0 / OpenID Connect Provider。它提供统�
 
 本文档以“能接入、能排错、知道边界”为目标。示例中的域名、客户端 ID 和密钥都是占位值，生产环境必须替换为自己的配置，并通过 Secret 管理密钥。
 
+## 主手册
+
+- [NexusAuth 使用手册（中文）](./12-使用手册.md)：从部署、初始管理员、管理台、OAuth/OIDC 接入、SCIM 2.0 到生产运维和排错的一体化手册。
+- [NexusAuth User Guide (English)](../docs/en/user-guide.md)：与中文主手册章节对应的英文版。
+
 ## 当前能力
 
 - `authorization_code`：Web/BFF 推荐流程；PKCE 是否必需由客户端 `require_pkce` 控制，但实际使用只接受 `S256`。
@@ -27,6 +32,7 @@ PAR、JAR、JARM、DPoP、OAuth mTLS/证书绑定令牌、动态客户端注册�
 
 | 文档 | 说明 |
 |------|------|
+| [12 使用手册](./12-使用手册.md) | 管理员、应用接入方和运维人员的完整主手册。 |
 | [01 快速开始](./01-快速开始.md) | 启动 Provider、数据库和 Workbench |
 | [02 环境准备](./02-环境准备.md) | .NET、Node.js、PostgreSQL 和 Docker |
 | [03 数据库配置](./03-数据库配置.md) | 初始化数据库和升级已有数据 |

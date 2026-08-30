@@ -80,6 +80,17 @@ export const getMenuList = () => {
                     children: [],
                 },
                 {
+                    id: 'oauth-login-audit',
+                    route: '/oauth/login-audit-management',
+                    componentPath: '/login-audit-management/index.tsx',
+                    name: '登录记录',
+                    show: true,
+                    iconName: null,
+                    parentId: 'oauth',
+                    parentPaths: Array<string>,
+                    children: [],
+                },
+                {
                     id: 'oauth-api-resource',
                     route: '/oauth/api-resource-management',
                     componentPath: '/api-resource-management/index.tsx',

@@ -3,10 +3,15 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using NexusAuth.Application.Services;
+using NexusAuth.Application.Services.LoginAudits;
 
 namespace NexusAuth.Host.Pages.Account;
 
-public class LoginModel(IUserService userService, IClientService clientService, ISsoSessionService sessionService) : PageModel
+public class LoginModel(
+    IUserService userService,
+    IClientService clientService,
+    ISsoSessionService sessionService,
+    ILoginAuditService loginAuditService) : PageModel
 {
     private const string AuthTimeClaimType = "auth_time";
     private const string AmrClaimType = "amr";
@@ -15,6 +20,7 @@ public class LoginModel(IUserService userService, IClientService clientService, 
     private readonly IUserService _userService = userService;
     private readonly IClientService _clientService = clientService;
     private readonly ISsoSessionService _sessionService = sessionService;
+    private readonly ILoginAuditService _loginAuditService = loginAuditService;
 
     [BindProperty(SupportsGet = true)]
     public string? ReturnUrl { get; set; }
@@ -40,7 +46,7 @@ public class LoginModel(IUserService userService, IClientService clientService, 
             if (!string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl))
                 return Redirect(ReturnUrl);
 
-            return Redirect("/");
+            return Redirect("/account");
         }
 
         // Try to extract client_id from returnUrl to show client name
@@ -56,6 +62,7 @@ public class LoginModel(IUserService userService, IClientService clientService, 
     {
         if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password))
         {
+            await RecordLoginAsync(null, false, "MissingCredentials");
             ErrorMessage = "Username and password are required.";
             await TryExtractClientNameAsync();
             return Page();
@@ -64,12 +71,14 @@ public class LoginModel(IUserService userService, IClientService clientService, 
         var user = await _userService.ValidateCredentialsAsync(Username, Password);
         if (user is null)
         {
+            await RecordLoginAsync(null, false, "InvalidCredentials");
             ErrorMessage = "Invalid username or password.";
             await TryExtractClientNameAsync();
             return Page();
         }
 
         var sessionId = await _sessionService.CreateAsync(user.Id, HttpContext.RequestAborted);
+        await RecordLoginAsync(user.Id, true, null);
 
         // Build claims and sign in
         var claims = new List<Claim>
@@ -101,7 +110,7 @@ public class LoginModel(IUserService userService, IClientService clientService, 
         if (!string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl))
             return Redirect(ReturnUrl);
 
-        return Redirect("/");
+        return Redirect("/account");
     }
 
     private async Task TryExtractClientNameAsync()
@@ -136,6 +145,36 @@ public class LoginModel(IUserService userService, IClientService clientService, 
         catch
         {
             // Ignore parsing errors — client name is cosmetic
+        }
+    }
+
+    private Task RecordLoginAsync(Guid? userId, bool isSuccessful, string? failureReason)
+    {
+        var clientId = TryExtractClientId();
+        return _loginAuditService.RecordAsync(new LoginAuditRecord(
+            Username,
+            userId,
+            clientId,
+            isSuccessful,
+            failureReason,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            HttpContext.Request.Headers.UserAgent.ToString()), HttpContext.RequestAborted);
+    }
+
+    private string? TryExtractClientId()
+    {
+        if (string.IsNullOrWhiteSpace(ReturnUrl))
+            return null;
+
+        try
+        {
+            var uri = new Uri(new Uri("http://localhost"), ReturnUrl);
+            var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+            return query.TryGetValue("client_id", out var clientId) ? clientId.ToString() : null;
+        }
+        catch (UriFormatException)
+        {
+            return null;
         }
     }
 }

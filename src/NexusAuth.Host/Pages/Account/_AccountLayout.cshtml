@@ -1,0 +1,83 @@
+@{
+    var path = Context.Request.Path.Value ?? string.Empty;
+    var displayName = string.IsNullOrWhiteSpace(User.Identity?.Name) ? "NexusAuth 用户" : User.Identity.Name;
+}
+<!DOCTYPE html>
+<html class="dark" lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - NexusAuth</title>
+    <link rel="icon" type="image/svg+xml" href="/brand/nexusauth-logo.svg" />
+    <style>
+        :root { --page:#f4f6f9; --surface:#fff; --soft:#f7f9fc; --control:#fff; --text:#171a25; --muted:#73798b; --subtle:#a4a9b5; --line:#e6e9f0; --primary:#2468f2; --primary-soft:#edf3ff; --success:#25a45a; --success-soft:#effaf3; --shadow:0 8px 28px rgba(24,34,58,.06); color-scheme:light; }
+        html.dark { --page:#090d25; --surface:#111735; --soft:#171e40; --control:#0c122e; --text:#eef0ff; --muted:#a6acc7; --subtle:#777f9e; --line:#293158; --primary:#7ca3ff; --primary-soft:#172752; --success:#65d48f; --success-soft:#14352c; --shadow:0 12px 36px rgba(0,0,0,.18); color-scheme:dark; }
+        * { box-sizing:border-box; }
+        html,body { min-height:100%; }
+        body { min-width:320px; margin:0; background:var(--page); color:var(--text); font:14px/1.5 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+        button,input { font:inherit; } button { cursor:pointer; } a { color:inherit; }
+        .topbar { height:64px; border-bottom:1px solid var(--line); background:var(--surface); }
+        .topbar-inner { display:flex; max-width:1440px; height:100%; align-items:center; justify-content:space-between; gap:24px; margin:auto; padding:0 28px; }
+        .brand { display:flex; align-items:center; gap:12px; text-decoration:none; }
+        .brand img { width:34px; height:34px; } .brand strong { font-size:18px; }
+        .brand span { padding-left:12px; border-left:1px solid var(--line); color:var(--muted); }
+        .quiet-button { display:inline-flex; min-height:36px; align-items:center; justify-content:center; padding:0 13px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--muted); }
+        .quiet-button:hover { border-color:var(--primary); color:var(--primary); }
+        .account-layout { display:grid; grid-template-columns:216px minmax(440px,1fr) 300px; gap:20px; max-width:1440px; margin:auto; padding:28px; }
+        .panel { border:1px solid color-mix(in srgb,var(--line) 82%,transparent); border-radius:8px; background:var(--surface); box-shadow:var(--shadow); }
+        .sidebar { align-self:start; overflow:hidden; } .nav-title { padding:20px 20px 10px; color:var(--subtle); font-size:12px; font-weight:600; }
+        .nav-list { margin:0; padding:0 10px 14px; list-style:none; }
+        .nav-item { display:flex; min-height:48px; align-items:center; justify-content:space-between; gap:12px; padding:0 12px; color:var(--muted); text-decoration:none; }
+        .nav-item + .nav-item { border-top:1px solid color-mix(in srgb,var(--line) 60%,transparent); }
+        .nav-item:hover { color:var(--text); }
+        .nav-item.active { margin:4px 0; border-top:0; border-radius:6px; background:var(--primary-soft); color:var(--primary); font-weight:600; }
+        .nav-arrow { color:var(--subtle); font-size:18px; }
+        .account-content { min-width:0; }
+        .home { min-height:520px; padding:34px; } .home h1 { margin:0 0 8px; font-size:26px; } .home > p { margin:0; color:var(--muted); }
+        .actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:30px; }
+        .action { display:block; padding:20px; border:1px solid var(--line); border-radius:7px; background:var(--soft); color:inherit; text-decoration:none; }
+        .action:hover { border-color:var(--primary); } .action strong { display:block; margin-bottom:6px; font-size:16px; } .action span { color:var(--muted); font-size:13px; }
+        .security-summary { display:grid; grid-template-columns:74px 1fr auto; min-height:112px; align-items:center; gap:18px; padding:22px 24px; color:#fff; background:linear-gradient(105deg,#2369ed,#39b9e8); }
+        .score { display:grid; width:58px; height:58px; place-items:center; border:2px solid rgba(255,255,255,.72); border-radius:50%; font-size:28px; font-weight:700; line-height:1; }
+        .summary-copy strong { display:block; margin-bottom:6px; font-size:17px; } .summary-copy span { color:rgba(255,255,255,.82); font-size:13px; }
+        .summary-badge { padding:8px 15px; border:1px solid rgba(255,255,255,.42); border-radius:999px; background:rgba(255,255,255,.14); font-size:13px; }
+        .password-panel { margin-top:20px; padding:30px; } .section-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding-bottom:22px; border-bottom:1px solid var(--line); }
+        .section-heading h1 { margin:0 0 7px; font-size:22px; } .section-heading p { margin:0; color:var(--muted); }
+        .status-chip { display:inline-flex; flex:none; align-items:center; gap:7px; padding:6px 10px; border-radius:999px; background:var(--success-soft); color:var(--success); font-size:12px; font-weight:600; } .status-dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
+        .password-notice { margin:22px 0 0; padding:12px 14px; border:1px solid color-mix(in srgb,var(--primary) 28%,transparent); border-radius:6px; background:var(--primary-soft); color:var(--muted); font-size:13px; line-height:1.6; }
+        .message { margin:22px 0 0; padding:12px 14px; border-radius:6px; line-height:1.55; } .message.error { background:#3b1d29; color:#ffaaa2; } .message.success { background:var(--success-soft); color:var(--success); }
+        .password-form { display:grid; max-width:620px; gap:22px; padding-top:26px; } .field { display:grid; grid-template-columns:126px minmax(0,1fr); align-items:start; gap:18px; } .field-label { padding-top:12px; font-weight:600; } .field-content { min-width:0; }
+        .password-wrap { position:relative; } .password-input { width:100%; height:46px; padding:0 48px 0 13px; border:1px solid var(--line); border-radius:6px; outline:none; background:var(--control); color:var(--text); } .password-input:focus { border-color:var(--primary); box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 18%,transparent); }
+        .password-toggle { position:absolute; top:5px; right:5px; display:grid; width:36px; height:36px; place-items:center; border:0; border-radius:5px; background:transparent; color:var(--muted); } .password-toggle:hover { background:var(--soft); color:var(--primary); } .field-help { margin:7px 0 0; color:var(--muted); font-size:12px; }
+        .form-actions { display:flex; align-items:center; gap:14px; padding-top:4px; padding-left:144px; } .primary-button { min-width:132px; min-height:44px; border:0; border-radius:6px; background:var(--primary); color:#fff; font-weight:600; } .action-note { color:var(--muted); font-size:12px; }
+        .history-header { padding:28px 30px 22px; border-bottom:1px solid var(--line); } .history-header h1 { margin:0 0 7px; font-size:22px; } .history-header p { margin:0; color:var(--muted); }
+        .history-table { width:100%; border-collapse:collapse; } .history-table th,.history-table td { padding:14px 20px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; } .history-table th { color:var(--muted); font-size:12px; font-weight:600; } .result { display:inline-flex; min-width:42px; justify-content:center; padding:3px 7px; border-radius:999px; background:var(--success-soft); color:var(--success); font-size:12px; font-weight:600; } .empty { padding:30px; color:var(--muted); }
+        .aside { align-self:start; padding:28px 24px; }
+        .profile { text-align:center; }
+        .avatar { display:grid; width:76px; height:76px; place-items:center; margin:0 auto 16px; border:6px solid var(--primary-soft); border-radius:50%; background:linear-gradient(145deg,var(--primary),#48bfe9); color:#fff; font-size:26px; font-weight:700; }
+        .profile h2 { margin:0; font-size:20px; } .profile p { margin:7px 0 0; color:var(--muted); font-size:13px; }
+        .security-icons { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:24px 0; }
+        .security-icons div { padding:12px 4px; border-radius:6px; background:var(--soft); color:var(--muted); font-size:11px; text-align:center; }
+        .security-icons strong { display:block; margin-bottom:5px; color:var(--success); font-size:17px; }
+        .help { padding-top:22px; border-top:1px solid var(--line); } .help h3 { margin:0 0 14px; font-size:16px; }
+        .help-list { display:grid; gap:10px; margin:0; padding:0; list-style:none; }
+        .help-list li { padding:10px 12px; border-radius:6px; background:var(--soft); color:var(--muted); font-size:12px; }
+        .footer { padding:0 28px 26px; color:var(--subtle); font-size:12px; text-align:center; }
+        .quiet-button:focus-visible,.nav-item:focus-visible { outline:3px solid color-mix(in srgb,var(--primary) 34%,transparent); outline-offset:2px; }
+        @@media (max-width:1080px) { .account-layout { grid-template-columns:190px minmax(0,1fr); } .aside { grid-column:1/-1; display:grid; grid-template-columns:230px 1fr; gap:28px; } .security-icons { margin-bottom:0; } }
+        @@media (max-width:760px) { .topbar-inner { padding:0 16px; } .brand span { display:none; } .account-layout { display:block; padding:16px; } .sidebar { margin-bottom:14px; } .nav-title { display:none; } .nav-list { display:flex; gap:6px; overflow-x:auto; padding:8px; } .nav-item { flex:none; min-height:38px; padding:0 12px; } .nav-item + .nav-item { border:0; } .nav-arrow { display:none; } .aside { display:block; margin-top:14px; padding:22px 18px; } .security-icons { margin:20px 0; } .home { min-height:0; padding:24px 18px; } .actions { grid-template-columns:1fr; } .security-summary { grid-template-columns:64px 1fr; min-height:98px; padding:18px; } .score { width:50px; height:50px; font-size:24px; } .summary-badge { display:none; } .password-panel { padding:22px 18px; } .field { grid-template-columns:1fr; gap:7px; } .field-label { padding-top:0; } .form-actions { align-items:flex-start; flex-direction:column; padding-left:0; } .primary-button { width:100%; } .history-header { padding:22px 18px; } .history-table { display:block; overflow-x:auto; } .history-table th,.history-table td { padding:12px 14px; } }
+    </style>
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body>
+    <header class="topbar"><div class="topbar-inner"><a class="brand" href="/account"><img src="/brand/nexusauth-logo.svg" alt="" /><strong>NexusAuth</strong><span>账号设置</span></a><button class="quiet-button" id="theme-toggle" type="button">亮色模式</button></div></header>
+    <div class="account-layout">
+        <nav class="panel sidebar" aria-label="账号设置导航"><div class="nav-title">我的账号</div><ul class="nav-list"><li><a class="nav-item @(path == "/account" ? "active" : null)" href="/account" aria-current="@(path == "/account" ? "page" : null)"><span>账号主页</span><span class="nav-arrow">›</span></a></li><li><a class="nav-item @(path == "/account/change-password" ? "active" : null)" href="/account/change-password" aria-current="@(path == "/account/change-password" ? "page" : null)"><span>登录密码</span><span class="nav-arrow">›</span></a></li><li><a class="nav-item @(path == "/account/login-history" ? "active" : null)" href="/account/login-history" aria-current="@(path == "/account/login-history" ? "page" : null)"><span>登录记录</span><span class="nav-arrow">›</span></a></li></ul></nav>
+        <main class="account-content">@RenderBody()</main>
+        <aside class="panel aside"><section class="profile"><div class="avatar" aria-hidden="true">@displayName![..1].ToUpperInvariant()</div><h2>Hi，@displayName</h2><p>统一身份账号</p></section><div class="security-icons" aria-label="安全能力"><div><strong>✓</strong>身份认证</div><div><strong>✓</strong>密码保护</div><div><strong>✓</strong>安全会话</div></div><section class="help"><h3>安全提示</h3><ul class="help-list"><li>不要在多个系统重复使用同一密码。</li><li>发现异常登录后，请立即更新密码。</li><li>修改后若会话失效，请重新登录应用。</li></ul></section></aside>
+    </div>
+    <footer class="footer">© 2026 NexusAuth · 统一账号安全中心</footer>
+    <script>(function(){var root=document.documentElement,toggle=document.getElementById('theme-toggle'),key='nexusauth-login-theme';function apply(theme){root.classList.remove('light','dark');root.classList.add(theme);toggle.textContent=theme==='dark'?'亮色模式':'暗色模式';}apply(window.localStorage.getItem(key)||(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));toggle.addEventListener('click',function(){var next=root.classList.contains('dark')?'light':'dark';window.localStorage.setItem(key,next);apply(next);});document.querySelectorAll('[data-password-toggle]').forEach(function(button){button.addEventListener('click',function(){var input=document.getElementById(button.getAttribute('data-password-toggle'));var showing=input.type==='text';input.type=showing?'password':'text';button.textContent=showing?'◉':'◌';button.setAttribute('aria-label',showing?'显示密码':'隐藏密码');});});})();</script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

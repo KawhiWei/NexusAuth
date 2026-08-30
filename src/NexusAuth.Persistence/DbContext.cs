@@ -29,6 +29,8 @@ public class DbContext(DbContextOptions options) : LuckDbContextBase(options)
 
     public DbSet<SsoSession> SsoSessions => Set<SsoSession>();
 
+    public DbSet<LoginAuditLog> LoginAuditLogs => Set<LoginAuditLog>();
+
     public DbSet<ScimServicePrincipalCredential> ScimServicePrincipalCredentials =>
         Set<ScimServicePrincipalCredential>();
 

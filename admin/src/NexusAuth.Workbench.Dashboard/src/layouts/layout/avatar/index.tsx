@@ -48,7 +48,7 @@ const AvatarComponent = () => {
 
       try {
         const config = await getConfig();
-        const accountUrl = `${config.authority.replace(/\/$/, '')}/account/change-password`;
+        const accountUrl = `${config.authority.replace(/\/$/, '')}/account`;
 
         if (accountWindow) {
           accountWindow.opener = null;

@@ -1,0 +1,25 @@
+@page "/account/login-history"
+@model NexusAuth.Host.Pages.Account.LoginHistoryModel
+@{
+    Layout = "_AccountLayout";
+    ViewData["Title"] = "登录记录";
+}
+<section class="panel history-panel" aria-labelledby="history-title">
+    <div class="history-header"><h1 id="history-title">登录记录</h1><p>仅显示当前账号最近 20 次成功登录。</p></div>
+    @if (Model.LoginAudits.Count == 0)
+    {
+        <p class="empty">暂无可显示的登录记录。</p>
+    }
+    else
+    {
+        <table class="history-table">
+            <thead><tr><th>结果</th><th>来源应用</th><th>IP 地址</th><th>登录时间</th></tr></thead>
+            <tbody>
+            @foreach (var audit in Model.LoginAudits)
+            {
+                <tr><td><span class="result">成功</span></td><td>@(audit.ClientId ?? "直接登录")</td><td>@(audit.IpAddress ?? "-")</td><td>@audit.OccurredAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</td></tr>
+            }
+            </tbody>
+        </table>
+    }
+</section>

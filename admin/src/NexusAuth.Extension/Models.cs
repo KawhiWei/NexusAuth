@@ -28,6 +28,9 @@ public class DiscoveryDocument
     [JsonPropertyName("revocation_endpoint")]
     public string RevocationEndpoint { get; set; } = string.Empty;
 
+    [JsonPropertyName("introspection_endpoint")]
+    public string IntrospectionEndpoint { get; set; } = string.Empty;
+
     [JsonPropertyName("end_session_endpoint")]
     public string EndSessionEndpoint { get; set; } = string.Empty;
 }

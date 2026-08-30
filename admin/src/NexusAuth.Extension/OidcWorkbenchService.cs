@@ -120,6 +120,38 @@ public class OidcWorkbenchService(
         return ParseTokenResponse(json, requireIdToken: false);
     }
 
+    /// <summary>
+    /// Validates an access token with the Provider using this BFF's confidential client credentials.
+    /// </summary>
+    public async Task<AccessTokenIntrospectionResult> IntrospectAccessTokenAsync(string accessToken, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accessToken);
+
+        var discovery = await FetchDiscoveryAsync(ct);
+        if (string.IsNullOrWhiteSpace(discovery.IntrospectionEndpoint))
+            throw new InvalidOperationException("The Provider discovery document does not contain an introspection endpoint.");
+
+        var client = httpClientFactory.CreateClient();
+        await ApplyClientAuthenticationAsync(client);
+        var response = await client.PostAsync(
+            ResolveBackchannelEndpoint(discovery.IntrospectionEndpoint),
+            new FormUrlEncodedContent(new Dictionary<string, string> { ["token"] = accessToken }),
+            ct);
+        response.EnsureSuccessStatusCode();
+
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+        var payload = document.RootElement;
+        var active = payload.TryGetProperty("active", out var activeProperty) && activeProperty.ValueKind == JsonValueKind.True;
+        var subject = payload.TryGetProperty("sub", out var subjectProperty) && subjectProperty.ValueKind == JsonValueKind.String
+            ? subjectProperty.GetString()
+            : null;
+        var clientId = payload.TryGetProperty("client_id", out var clientIdProperty) && clientIdProperty.ValueKind == JsonValueKind.String
+            ? clientIdProperty.GetString()
+            : null;
+
+        return new AccessTokenIntrospectionResult(active, subject, clientId);
+    }
+
     private static WorkbenchTokenResult ParseTokenResponse(string json, bool requireIdToken)
     {
         using var doc = JsonDocument.Parse(json);

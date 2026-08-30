@@ -30,6 +30,7 @@ public class AppWebModule : LuckAppModule
         services.Configure<NexusAuthSecurityOptions>(configuration.GetSection("Security"));
         services.Configure<BootstrapAdminOptions>(configuration.GetSection("BootstrapAdmin"));
         services.AddHostedService<BootstrapAdminHostedService>();
+        services.AddScoped<SsoCookieAuthenticationEvents>();
 
         // Keep abuse controls at the host boundary so every sensitive
         // endpoint, including Razor login/device pages, shares one policy.
@@ -67,16 +68,7 @@ public class AppWebModule : LuckAppModule
                 options.LoginPath = "/account/login";
                 options.SlidingExpiration = true;
                 options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
-                options.Events = new CookieAuthenticationEvents
-                {
-                    OnSigningIn = context =>
-                    {
-                        // Enforce absolute expiration of 24 hours
-                        context.Properties.IssuedUtc = DateTimeOffset.UtcNow;
-                        context.Properties.ExpiresUtc = DateTimeOffset.UtcNow.AddHours(24);
-                        return Task.CompletedTask;
-                    }
-                };
+                options.EventsType = typeof(SsoCookieAuthenticationEvents);
             });
         services.AddAuthorization();
 

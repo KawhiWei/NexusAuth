@@ -80,6 +80,9 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.LockedUntil)
             .HasColumnName("locked_until");
 
+        builder.Property(u => u.TokenInvalidBefore)
+            .HasColumnName("token_invalid_before");
+
         builder.Property(u => u.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

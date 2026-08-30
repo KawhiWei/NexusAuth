@@ -10,10 +10,17 @@ namespace NexusAuth.Workbench.Api;
 public sealed class WorkbenchClientCredentialHostedService(
     IServiceScopeFactory scopeFactory,
     IConfiguration configuration,
+    IHostEnvironment environment,
     ILogger<WorkbenchClientCredentialHostedService> logger) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        if (environment.IsEnvironment("Testing"))
+        {
+            logger.LogDebug("Workbench OAuth client credential synchronization is skipped in the test host.");
+            return;
+        }
+
         var clientId = configuration["Auth:ClientId"]?.Trim();
         var clientSecret = configuration["Auth:ClientSecret"];
         if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))

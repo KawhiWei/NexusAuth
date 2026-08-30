@@ -1,12 +1,14 @@
 using NexusAuth.Application.Logging;
 using NexusAuth.Application.Services.Security;
 using NexusAuth.Application.Services.Tokens;
+using NexusAuth.Application.Services.Sessions;
 
 namespace NexusAuth.Application.Users;
 
 public class UserService(
     IUserRepository userRepository,
     ITokenService tokenService,
+    ISsoSessionService sessionService,
     IOptions<NexusAuthSecurityOptions> securityOptions,
     ILogger<UserService> logger) : IUserService
 {
@@ -152,8 +154,10 @@ public class UserService(
             throw new InvalidOperationException("New password must differ from the current password.");
 
         user.ChangePassword(newPassword);
+        user.InvalidateTokens(DateTimeOffset.UtcNow);
         await userRepository.UpdateAsync(user, ct);
         await tokenService.RevokeAllUserTokensAsync(user.Id, ct);
+        await sessionService.RevokeAllForUserAsync(user.Id, ct);
 
         using (ApplicationLogScope.Begin(logger, "Authentication", user.Id.ToString(), "PasswordChanged"))
         {

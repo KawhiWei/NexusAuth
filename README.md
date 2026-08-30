@@ -129,7 +129,7 @@ WORKBENCH_CLIENT_SECRET=REPLACE_WITH_A_LONG_RANDOM_SECRET
 ### 数据库脚本职责
 
 - [production-init.sql](./production-init.sql)：仅用于全新、空的 `nexusauth` 数据库，定义当前最终 schema；不删库、不含 `ALTER TABLE`，也不创建用户。
-- `database/001_*.sql` 至 `database/005_*.sql`：仅用于将历史库按版本升级到当前结构，不能用于新库初始化。
+- `database/001_*.sql` 至 `database/006_*.sql`：仅用于将历史库按版本升级到当前结构，不能用于新库初始化。
 - `admin/src/NexusAuth.Workbench.Api/seed.sql`：登记 Workbench 所需的 scope 和 OAuth 客户端；通过 psql 变量 `workbench_client_secret` 写入 `WORKBENCH_CLIENT_SECRET` 的 BCrypt 哈希。
 - `demo/seed.sql`：只用于本地演示客户端和示例用户，禁止用于生产。
 

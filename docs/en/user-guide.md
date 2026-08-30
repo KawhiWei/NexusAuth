@@ -224,7 +224,7 @@ Current limitations: only the User resource is supported; SCIM Bulk, sorting, an
 2. Explicitly configure the bootstrap-administrator variables and `WORKBENCH_CLIENT_SECRET`; do not use Compose fallback values.
 3. Provide a managed X.509 PFX: set `NEXUSAUTH_SSO_ENVIRONMENT=Production`, `NEXUSAUTH_SIGNING_MODE=Certificate`, `NEXUSAUTH_SIGNING_CERTIFICATE_PATH`, and the password secret. Production does not generate a signing certificate automatically.
 4. Share a Data Protection key ring across Provider and Workbench replicas, and persist PostgreSQL data.
-5. For an empty database, run [production-init.sql](../../production-init.sql). Upgrade an existing database only by applying [database migrations](../../database) `001_*.sql` through `005_*.sql` in order; do not rerun the final initialization script.
+5. For an empty database, run [production-init.sql](../../production-init.sql). Upgrade an existing database only by applying [database migrations](../../database) `001_*.sql` through `006_*.sql` in order; do not rerun the final initialization script.
 6. Confirm the database account can use `pgcrypto`. When managed PostgreSQL prohibits `CREATE EXTENSION`, ask the DBA to enable it beforehand.
 7. Supply `WORKBENCH_CLIENT_SECRET` to both database initialization and Workbench API. At API startup, NexusAuth checks and synchronizes the hash for this built-in client. When rotating the secret, update the secret first and then roll the Workbench deployment.
 8. Configure trusted forwarded headers, explicit `AllowedHosts`, HTTPS cookies, log retention, monitoring, backups, and recovery drills.

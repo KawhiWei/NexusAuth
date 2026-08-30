@@ -43,6 +43,7 @@ CREATE TABLE nexusauth.users (
     is_system_account boolean       NOT NULL DEFAULT false,
     failed_login_attempts integer   NOT NULL DEFAULT 0,
     locked_until    timestamptz,
+    token_invalid_before timestamptz,
     created_at      timestamptz     NOT NULL,
     updated_at      timestamptz     NOT NULL,
     CONSTRAINT pk_users PRIMARY KEY (id)
@@ -52,6 +53,24 @@ CREATE UNIQUE INDEX ix_users_username ON nexusauth.users (username);
 CREATE UNIQUE INDEX ix_users_external_id ON nexusauth.users (external_id) WHERE external_id IS NOT NULL;
 CREATE UNIQUE INDEX ix_users_email ON nexusauth.users (email) WHERE email IS NOT NULL;
 CREATE UNIQUE INDEX ix_users_phone_number ON nexusauth.users (phone_number) WHERE phone_number IS NOT NULL;
+
+-- ============================================================
+-- sso_sessions
+-- ============================================================
+CREATE TABLE nexusauth.sso_sessions (
+    id              uuid            NOT NULL,
+    user_id         uuid            NOT NULL,
+    created_at      timestamptz     NOT NULL,
+    expires_at      timestamptz     NOT NULL,
+    revoked_at      timestamptz,
+    CONSTRAINT pk_sso_sessions PRIMARY KEY (id),
+    CONSTRAINT ck_sso_sessions_expiry_after_creation
+        CHECK (expires_at > created_at)
+);
+
+CREATE INDEX ix_sso_sessions_active_user_expiry
+    ON nexusauth.sso_sessions (user_id, expires_at DESC)
+    WHERE revoked_at IS NULL;
 
 -- ============================================================
 -- oauth_clients

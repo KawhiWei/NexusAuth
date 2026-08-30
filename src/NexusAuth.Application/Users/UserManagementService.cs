@@ -1,10 +1,12 @@
 namespace NexusAuth.Application.Users;
 
 using NexusAuth.Application.Logging;
+using NexusAuth.Application.Services.Sessions;
 
 public class UserManagementService(
     IUserRepository userRepository,
     IRefreshTokenRepository refreshTokenRepository,
+    ISsoSessionService sessionService,
     ILogger<UserManagementService> logger) : IUserManagementService
 {
     public async Task<PagedResult<ManagedUserDto>> GetPagedAsync(string? keyword, bool? isActive, int page, int pageSize, CancellationToken ct = default)
@@ -41,7 +43,14 @@ public class UserManagementService(
         user.UpdateScimProfile(user.Username, user.Nickname, isActive, user.ExternalId, user.Email, user.PhoneNumber,
             user.GivenName, user.FamilyName, user.MiddleName, user.HonorificPrefix, user.HonorificSuffix, user.ProfileUrl,
             user.Title, user.UserType, user.PreferredLanguage, user.Locale, user.Timezone);
+        if (!isActive)
+            user.InvalidateTokens(DateTimeOffset.UtcNow);
         await userRepository.UpdateAsync(user, ct);
+        if (!isActive)
+        {
+            await refreshTokenRepository.RevokeAllForUserAsync(user.Id, ct);
+            await sessionService.RevokeAllForUserAsync(user.Id, ct);
+        }
         return Map(user);
     }
 
@@ -55,8 +64,10 @@ public class UserManagementService(
             throw new InvalidOperationException("System account passwords cannot be reset.");
 
         user.ChangePassword(request.NewPassword);
+        user.InvalidateTokens(DateTimeOffset.UtcNow);
         await userRepository.UpdateAsync(user, ct);
         await refreshTokenRepository.RevokeAllForUserAsync(user.Id, ct);
+        await sessionService.RevokeAllForUserAsync(user.Id, ct);
 
         using (ApplicationLogScope.Begin(logger, "UserManagement", user.Id.ToString(), "PasswordResetByAdministrator"))
         {

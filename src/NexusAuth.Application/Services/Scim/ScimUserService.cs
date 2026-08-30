@@ -1,8 +1,12 @@
 using NexusAuth.Domain.AggregateRoots.Users;
+using NexusAuth.Application.Services.Sessions;
 
 namespace NexusAuth.Application.Services.Scim;
 
-public class ScimUserService(IUserRepository userRepository) : IScimUserService
+public class ScimUserService(
+    IUserRepository userRepository,
+    IRefreshTokenRepository refreshTokenRepository,
+    ISsoSessionService sessionService) : IScimUserService
 {
     private const int MaximumPageSize = 200;
 
@@ -39,7 +43,10 @@ public class ScimUserService(IUserRepository userRepository) : IScimUserService
         var username = Required(input.UserName, "userName");
         await EnsureUniqueAsync(username, input.ExternalId, input.Email, id, ct);
         Apply(user, input, username);
+        if (!user.IsActive)
+            user.InvalidateTokens(DateTimeOffset.UtcNow);
         await userRepository.UpdateAsync(user, ct);
+        await RevokeCredentialsIfInactiveAsync(user, ct);
         return Map(user);
     }
 
@@ -53,7 +60,10 @@ public class ScimUserService(IUserRepository userRepository) : IScimUserService
         var username = Required(next.UserName, "userName");
         await EnsureUniqueAsync(username, next.ExternalId, next.Email, id, ct);
         Apply(user, next, username);
+        if (!user.IsActive)
+            user.InvalidateTokens(DateTimeOffset.UtcNow);
         await userRepository.UpdateAsync(user, ct);
+        await RevokeCredentialsIfInactiveAsync(user, ct);
         return Map(user);
     }
 
@@ -61,6 +71,8 @@ public class ScimUserService(IUserRepository userRepository) : IScimUserService
     {
         var user = await userRepository.FindByIdAsync(id, ct);
         if (user is null || !MatchesVersion(user, expectedVersion)) return false;
+        await refreshTokenRepository.RevokeAllForUserAsync(user.Id, ct);
+        await sessionService.RevokeAllForUserAsync(user.Id, ct);
         await userRepository.DeleteAsync(user, ct);
         return true;
     }
@@ -85,6 +97,15 @@ public class ScimUserService(IUserRepository userRepository) : IScimUserService
         username, input.GivenName ?? input.FamilyName ?? username, input.Active ?? true, input.ExternalId, input.Email, input.PhoneNumber,
         input.GivenName, input.FamilyName, input.MiddleName, input.HonorificPrefix, input.HonorificSuffix, input.ProfileUrl,
         input.Title, input.UserType, input.PreferredLanguage, input.Locale, input.Timezone);
+
+    private async Task RevokeCredentialsIfInactiveAsync(User user, CancellationToken ct)
+    {
+        if (user.IsActive)
+            return;
+
+        await refreshTokenRepository.RevokeAllForUserAsync(user.Id, ct);
+        await sessionService.RevokeAllForUserAsync(user.Id, ct);
+    }
 
     private static ScimUserInput ToInput(User user) => new(user.Username, user.ExternalId, user.IsActive, user.Email, user.PhoneNumber,
         user.GivenName, user.FamilyName, user.MiddleName, user.HonorificPrefix, user.HonorificSuffix, user.ProfileUrl, user.Title,

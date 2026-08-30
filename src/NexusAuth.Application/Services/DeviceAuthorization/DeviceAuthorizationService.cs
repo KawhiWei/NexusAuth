@@ -8,6 +8,7 @@ namespace NexusAuth.Application.Services.DeviceAuthorization;
 public class DeviceAuthorizationService(
     IClientService clientService,
     IDeviceAuthorizationRepository deviceAuthorizationRepository,
+    IUserRepository userRepository,
     ISecurityPolicyService securityPolicyService,
     IOptions<JwtOptions> jwtOptions) : IDeviceAuthorizationService
 {
@@ -109,6 +110,9 @@ public class DeviceAuthorizationService(
             if (consumed is null || !consumed.UserId.HasValue)
                 return DeviceAuthorizationPollResult.Failure("invalid_grant", "The device code has already been used.");
 
+            if (!await IsActiveUserAsync(consumed.UserId.Value, ct))
+                return DeviceAuthorizationPollResult.Failure("invalid_grant", "The user account is no longer active.");
+
             return DeviceAuthorizationPollResult.Success(consumed.UserId.Value, consumed.ClientId, consumed.Scope);
         }
 
@@ -192,7 +196,7 @@ public class DeviceAuthorizationService(
                         DateTimeOffset.UtcNow,
                         ct);
                     return consumed?.UserId is { } userId
-                        ? DeviceAuthorizationPollResult.Success(userId, consumed.ClientId, consumed.Scope)
+                        ? await CreateActiveUserPollResultAsync(userId, consumed.ClientId, consumed.Scope, ct)
                         : DeviceAuthorizationPollResult.Failure("invalid_grant", "The device code has already been used.");
                 }
 
@@ -227,5 +231,21 @@ public class DeviceAuthorizationService(
             isPending,
             isApproved,
             isDenied);
+    }
+
+    private async Task<DeviceAuthorizationPollResult> CreateActiveUserPollResultAsync(
+        Guid userId,
+        string clientId,
+        string scope,
+        CancellationToken ct)
+    {
+        return await IsActiveUserAsync(userId, ct)
+            ? DeviceAuthorizationPollResult.Success(userId, clientId, scope)
+            : DeviceAuthorizationPollResult.Failure("invalid_grant", "The user account is no longer active.");
+    }
+
+    private async Task<bool> IsActiveUserAsync(Guid userId, CancellationToken ct)
+    {
+        return (await userRepository.FindByIdAsync(userId, ct))?.IsActive == true;
     }
 }

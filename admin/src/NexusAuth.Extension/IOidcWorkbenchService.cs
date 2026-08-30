@@ -14,6 +14,7 @@ public interface IOidcWorkbenchService
     (string codeChallenge, string codeVerifier) GeneratePkce();
     Task<WorkbenchTokenResult> ExchangeCodeAsync(string code, string codeVerifier, CancellationToken ct);
     Task<WorkbenchTokenResult> RefreshTokensAsync(string refreshToken, CancellationToken ct);
+    Task<AccessTokenIntrospectionResult> IntrospectAccessTokenAsync(string accessToken, CancellationToken ct);
 }
 
 public sealed record WorkbenchTokenResult(
@@ -21,3 +22,5 @@ public sealed record WorkbenchTokenResult(
     string RefreshToken,
     string? IdToken,
     int ExpiresIn);
+
+public sealed record AccessTokenIntrospectionResult(bool Active, string? Subject, string? ClientId);

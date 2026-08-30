@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Threading;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using NexusAuth.Extension;
@@ -35,9 +36,15 @@ public sealed class WorkbenchCookieAuthenticationEvents(
         }
 
         var refreshToken = context.Properties.GetTokenValue("refresh_token");
+        var accessToken = context.Properties.GetTokenValue("access_token");
         var expiresAtValue = context.Properties.GetTokenValue("expires_at");
-        if (string.IsNullOrWhiteSpace(refreshToken) || string.IsNullOrWhiteSpace(expiresAtValue))
+        if (string.IsNullOrWhiteSpace(accessToken)
+            || string.IsNullOrWhiteSpace(refreshToken)
+            || string.IsNullOrWhiteSpace(expiresAtValue))
+        {
+            await RejectAndSignOutAsync(context);
             return;
+        }
 
         if (!DateTimeOffset.TryParse(
                 expiresAtValue,
@@ -50,7 +57,26 @@ public sealed class WorkbenchCookieAuthenticationEvents(
         }
 
         if (expiresAt > DateTimeOffset.UtcNow.Add(AccessTokenRefreshWindow))
+        {
+            try
+            {
+                var introspection = await oidcService.IntrospectAccessTokenAsync(
+                    accessToken,
+                    context.HttpContext.RequestAborted);
+                var subject = context.Principal.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (!introspection.Active
+                    || !string.Equals(introspection.Subject, subject, StringComparison.Ordinal)
+                    || !string.Equals(introspection.ClientId, oidcService.ClientId, StringComparison.Ordinal))
+                {
+                    await RejectAndSignOutAsync(context);
+                }
+            }
+            catch
+            {
+                await RejectAndSignOutAsync(context);
+            }
             return;
+        }
 
         try
         {

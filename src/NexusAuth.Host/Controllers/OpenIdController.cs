@@ -12,6 +12,7 @@ public class OpenIdController(
     IUserService userService,
     IClientService clientService,
     IDeviceAuthorizationService deviceAuthorizationService,
+    ISsoSessionService sessionService,
     IOptions<JwtOptions> jwtOptions) : ControllerBase
 {
     private readonly ITokenSigningCredentialsProvider _signingCredentialsProvider = signingCredentialsProvider;
@@ -19,6 +20,7 @@ public class OpenIdController(
     private readonly IUserService _userService = userService;
     private readonly IClientService _clientService = clientService;
     private readonly IDeviceAuthorizationService _deviceAuthorizationService = deviceAuthorizationService;
+    private readonly ISsoSessionService _sessionService = sessionService;
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
     private static readonly HashSet<string> BaseUserInfoClaims =
     [
@@ -120,7 +122,7 @@ public class OpenIdController(
             return Unauthorized(new { error = "invalid_token", error_description = "Access token does not represent a user." });
 
         var user = await _userService.FindByIdAsync(userId, ct);
-        if (user is null)
+        if (user is null || !user.IsActive)
             return Unauthorized(new { error = "invalid_token", error_description = "User not found." });
 
         var requestedClaims = ResolveRequestedClaims(introspection.Scope, introspection.ClaimsJson);
@@ -309,6 +311,12 @@ public class OpenIdController(
         else if (!string.IsNullOrWhiteSpace(postLogoutRedirectUri))
         {
             return BadRequest(new { error = "invalid_request", error_description = "id_token_hint is required when post_logout_redirect_uri is provided." });
+        }
+
+        if (Guid.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var currentUserId))
+        {
+            await _tokenService.RevokeAllUserTokensAsync(currentUserId, ct);
+            await _sessionService.RevokeAllForUserAsync(currentUserId, ct);
         }
 
         await HttpContext.SignOutAsync(AppWebModule.AuthenticationScheme);

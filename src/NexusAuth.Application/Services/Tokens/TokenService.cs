@@ -246,6 +246,10 @@ public class TokenService(
         if (existingToken.ExpiresAt <= DateTimeOffset.UtcNow)
             return RefreshFailure(clientId ?? existingToken.ClientId, "RefreshTokenExpired", "Refresh token has expired.");
 
+        var user = await userRepository.FindByIdAsync(existingToken.UserId, ct);
+        if (user is null || !user.IsActive)
+            return RefreshFailure(clientId ?? existingToken.ClientId, "UserInactive", "The user account is no longer active.");
+
         // 中文注释：refresh token 必须和当前认证过的客户端绑定，防止一个客户端拿着别人�?refresh token 刷新�?
         // 主要调用方：/connect/token �?refresh_token 分支，以�?Demo.Bff 的会话续期流程�?
         if (!string.IsNullOrWhiteSpace(clientId)
@@ -360,6 +364,15 @@ public class TokenService(
         Guid userId,
         CancellationToken ct = default)
     {
+        // Refresh tokens are stateful and are revoked below. Access tokens are JWTs, so
+        // record a per-user cutoff that introspection applies to every older token.
+        var user = await userRepository.FindByIdAsync(userId, ct);
+        if (user is not null)
+        {
+            user.InvalidateTokens(DateTimeOffset.UtcNow);
+            await userRepository.UpdateAsync(user, ct);
+        }
+
         await refreshTokenRepository.RevokeAllForUserAsync(userId, ct);
 
         using (ApplicationLogScope.Begin(logger, "Token", userId.ToString(), "RefreshTokensRevoked"))
@@ -404,8 +417,19 @@ public class TokenService(
                 return TokenIntrospectionResult.Inactive();
             }
 
+            var subject = GetClaimValue(principal, JwtRegisteredClaimNames.Sub, ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(subject, out var userId))
+            {
+                var user = await userRepository.FindByIdAsync(userId, ct);
+                if (user is null || !user.IsActive
+                    || (user.TokenInvalidBefore.HasValue && jwt.IssuedAt < user.TokenInvalidBefore.Value.UtcDateTime))
+                {
+                    return TokenIntrospectionResult.Inactive();
+                }
+            }
+
             return TokenIntrospectionResult.Success(
-                GetClaimValue(principal, JwtRegisteredClaimNames.Sub, ClaimTypes.NameIdentifier),
+                subject,
                 tokenClientId,
                 principal.FindFirst("scope")?.Value,
                 principal.FindFirst("claims_json")?.Value,

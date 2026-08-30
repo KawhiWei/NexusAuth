@@ -27,6 +27,8 @@ public class DbContext(DbContextOptions options) : LuckDbContextBase(options)
 
     public DbSet<TokenBlacklistEntry> TokenBlacklistEntries => Set<TokenBlacklistEntry>();
 
+    public DbSet<SsoSession> SsoSessions => Set<SsoSession>();
+
     public DbSet<ScimServicePrincipalCredential> ScimServicePrincipalCredentials =>
         Set<ScimServicePrincipalCredential>();
 

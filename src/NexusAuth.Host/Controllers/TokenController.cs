@@ -10,6 +10,7 @@ public class TokenController(
     ITokenService tokenService,
     IDeviceAuthorizationService deviceAuthorizationService,
     IClientService clientService,
+    IUserService userService,
     ISecurityPolicyService securityPolicyService,
     IOptions<JwtOptions> jwtOptions) : ControllerBase
 {
@@ -17,6 +18,7 @@ public class TokenController(
     private readonly ITokenService _tokenService = tokenService;
     private readonly IDeviceAuthorizationService _deviceAuthorizationService = deviceAuthorizationService;
     private readonly IClientService _clientService = clientService;
+    private readonly IUserService _userService = userService;
     private readonly ISecurityPolicyService _securityPolicyService = securityPolicyService;
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
 
@@ -107,6 +109,9 @@ public class TokenController(
 
         if (!result.IsSuccess)
             return BadRequest(new { error = "invalid_grant", error_description = result.Error });
+
+        if (!await IsActiveUserAsync(result.UserId, ct))
+            return BadRequest(new { error = "invalid_grant", error_description = "The user account is no longer active." });
 
         var accessTokenResult = await _tokenService.IssueAccessTokenWithMetadataAsync(result.ClientId, result.Scope, null, result.UserId, result.ClaimsJson, ct);
         var refreshToken = ShouldIssueRefreshToken(result.Scope)
@@ -254,6 +259,9 @@ public class TokenController(
             return BadRequest(new { error = "invalid_grant", error_description = result.Error });
         }
 
+        if (!await IsActiveUserAsync(result.UserId, ct))
+            return BadRequest(new { error = "invalid_grant", error_description = "The user account is no longer active." });
+
         var accessTokenResult = await _tokenService.IssueAccessTokenWithMetadataAsync(result.ClientId!, result.Scope!, null, result.UserId, null, ct);
         var refreshToken = ShouldIssueRefreshToken(result.Scope!)
             ? await _tokenService.IssueRefreshTokenAsync(result.ClientId!, result.UserId, result.Scope!, ct)
@@ -292,6 +300,11 @@ public class TokenController(
     private int GetAccessTokenLifetimeSeconds()
     {
         return checked(_jwtOptions.AccessTokenLifetimeMinutes * 60);
+    }
+
+    private async Task<bool> IsActiveUserAsync(Guid userId, CancellationToken ct)
+    {
+        return (await _userService.FindByIdAsync(userId, ct))?.IsActive == true;
     }
 
     private IActionResult InvalidClient()

@@ -6,7 +6,7 @@ using NexusAuth.Application.Services;
 
 namespace NexusAuth.Host.Pages.Account;
 
-public class LoginModel(IUserService userService, IClientService clientService) : PageModel
+public class LoginModel(IUserService userService, IClientService clientService, ISsoSessionService sessionService) : PageModel
 {
     private const string AuthTimeClaimType = "auth_time";
     private const string AmrClaimType = "amr";
@@ -14,6 +14,7 @@ public class LoginModel(IUserService userService, IClientService clientService) 
 
     private readonly IUserService _userService = userService;
     private readonly IClientService _clientService = clientService;
+    private readonly ISsoSessionService _sessionService = sessionService;
 
     [BindProperty(SupportsGet = true)]
     public string? ReturnUrl { get; set; }
@@ -68,11 +69,14 @@ public class LoginModel(IUserService userService, IClientService clientService) 
             return Page();
         }
 
+        var sessionId = await _sessionService.CreateAsync(user.Id, HttpContext.RequestAborted);
+
         // Build claims and sign in
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Name, user.Username),
+            new("sid", sessionId.ToString()),
             // 中文注释：记录认证时间与认证方式，供 OIDC 的 max_age、auth_time、amr、acr 扩展使用。
             new(AuthTimeClaimType, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()),
             new(AmrClaimType, "pwd"),

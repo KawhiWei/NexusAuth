@@ -61,6 +61,11 @@ public class User : AggregateRootWithIdentity<Guid>
     /// </summary>
     public DateTimeOffset? LockedUntil { get; private set; }
 
+    /// <summary>
+    /// User tokens issued before this instant are rejected by Provider-side validation.
+    /// </summary>
+    public DateTimeOffset? TokenInvalidBefore { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -117,6 +122,15 @@ public class User : AggregateRootWithIdentity<Guid>
 
         PasswordHash = BCrypt.Net.BCrypt.HashPassword(rawPassword, workFactor: 12);
         UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void InvalidateTokens(DateTimeOffset now)
+    {
+        // JWT iat is serialized at whole-second precision. Normalize the
+        // cutoff to the same precision so a freshly issued token is not
+        // mistaken for an older token because of database milliseconds.
+        TokenInvalidBefore = DateTimeOffset.FromUnixTimeSeconds(now.ToUnixTimeSeconds());
+        UpdatedAt = now;
     }
 
     public bool IsLoginLocked(DateTimeOffset now)

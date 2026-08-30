@@ -6,8 +6,15 @@ using NexusAuth.Domain.Repositories;
 
 namespace NexusAuth.Persistence.Repositories;
 
-public class ApiResourceRepository(IUnitOfWork unitOfWork) : EfCoreAggregateRootRepository<ApiResource, Guid>(unitOfWork), IApiResourceRepository
+public class ApiResourceRepository : EfCoreAggregateRootRepository<ApiResource, Guid>, IApiResourceRepository
 {
+    private readonly IUnitOfWork _unitOfWork;
+
+    public ApiResourceRepository(IUnitOfWork unitOfWork) : base(unitOfWork)
+    {
+        _unitOfWork = unitOfWork;
+    }
+
     /// <summary>
     /// 按资源名称查询单个 API 资源。
     /// </summary>
@@ -58,6 +65,15 @@ public class ApiResourceRepository(IUnitOfWork unitOfWork) : EfCoreAggregateRoot
         return await FindAsync(id);
     }
 
+    public async Task<IReadOnlyList<ApiResource>> FindByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
+    {
+        var idSet = ids.Distinct().ToArray();
+        if (idSet.Length == 0)
+            return [];
+
+        return await FindAll(resource => idSet.Contains(resource.Id)).ToListAsync(ct);
+    }
+
     public async Task<(List<ApiResource> Items, int Total)> GetPagedAsync(
         string? keyword,
         bool? isActive,
@@ -104,18 +120,18 @@ public class ApiResourceRepository(IUnitOfWork unitOfWork) : EfCoreAggregateRoot
     public async Task AddAsync(ApiResource resource, CancellationToken ct = default)
     {
         Add(resource);
-        await unitOfWork.CommitAsync(ct);
+        await _unitOfWork.CommitAsync(ct);
     }
 
     public async Task UpdateAsync(ApiResource resource, CancellationToken ct = default)
     {
         Update(resource);
-        await unitOfWork.CommitAsync(ct);
+        await _unitOfWork.CommitAsync(ct);
     }
 
     public async Task DeleteAsync(ApiResource resource, CancellationToken ct = default)
     {
         Remove(resource);
-        await unitOfWork.CommitAsync(ct);
+        await _unitOfWork.CommitAsync(ct);
     }
 }

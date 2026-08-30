@@ -119,7 +119,7 @@ public override void ConfigureServices(ConfigureServicesContext context)
 
 ### 步骤 4：实现 AuthController
 
-参考 `NexusAuth.Workbench/NexusAuth.Workbench.Api/Controllers/AuthController.cs`：
+参考 `admin/src/NexusAuth.Workbench.Api/Controllers/AuthController.cs`：
 
 ```csharp
 [ApiController]

@@ -1,0 +1,95 @@
+.api-resource-page {
+  min-width: 0;
+  color: var(--app-text);
+}
+
+.api-resource-display-name {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--app-text);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.api-resource-code {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--app-text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.api-resource-code {
+  padding: 2px 6px;
+  border: 1px solid var(--app-border);
+  border-radius: 4px;
+  background: var(--app-surface-subtle);
+  color: var(--app-text);
+}
+
+.api-resource-drawer .t-drawer__content-wrapper {
+  max-width: 100vw;
+}
+
+.api-resource-drawer .t-drawer__header {
+  color: var(--app-text);
+  font-weight: 650;
+}
+
+.api-resource-drawer .t-drawer__body {
+  color: var(--app-text);
+}
+
+.api-resource-form .t-form__item {
+  margin-bottom: 20px;
+}
+
+.api-resource-form .t-form__label {
+  color: var(--app-text);
+  font-weight: 600;
+}
+
+.api-resource-form .t-form__help {
+  color: var(--app-text-muted);
+  line-height: 1.5;
+}
+
+.api-resource-drawer__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--app-border);
+}
+
+.api-resource-confirm-body p {
+  margin: 0 0 10px;
+  color: var(--app-text);
+}
+
+.api-resource-confirm-name {
+  overflow-wrap: anywhere;
+  color: var(--app-text);
+  font-weight: 650;
+}
+
+.api-resource-confirm-hint {
+  margin-top: 10px;
+  color: var(--app-text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+@media (max-width: 520px) {
+  .api-resource-drawer .t-drawer__body {
+    padding: 16px;
+  }
+}

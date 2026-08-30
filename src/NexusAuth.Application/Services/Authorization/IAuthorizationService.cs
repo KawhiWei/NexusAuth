@@ -22,6 +22,7 @@ public interface IAuthorizationService : IScopedDependency
 
     Task<AuthorizationCodeResult> ValidateAndConsumeCodeAsync(
         string code,
+        string clientId,
         string redirectUri,
         string? codeVerifier = null,
         CancellationToken ct = default);

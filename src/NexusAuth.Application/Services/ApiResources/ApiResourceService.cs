@@ -44,7 +44,7 @@ public class ApiResourceService(
     {
         var existing = await apiResourceRepository.FindByNameAsync(name, ct);
         if (existing is not null)
-            throw new InvalidOperationException($"API resource with name '{name}' already exists.");
+            throw new ApiResourceAlreadyExistsException(name);
 
         var resource = ApiResource.Create(name, displayName, audience, description);
         await apiResourceRepository.AddAsync(resource, ct);
@@ -75,6 +75,16 @@ public class ApiResourceService(
             request.Description,
             request.IsActive);
 
+        await apiResourceRepository.UpdateAsync(resource, ct);
+        return MapDto(resource);
+    }
+
+    public async Task<ApiResourceDto> UpdateStatusAsync(Guid id, bool isActive, CancellationToken ct = default)
+    {
+        var resource = await apiResourceRepository.FindByIdAsync(id, ct)
+            ?? throw new InvalidOperationException($"Api resource with id {id} not found.");
+
+        resource.Update(isActive: isActive);
         await apiResourceRepository.UpdateAsync(resource, ct);
         return MapDto(resource);
     }

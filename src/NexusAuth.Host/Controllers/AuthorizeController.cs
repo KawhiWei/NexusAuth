@@ -37,38 +37,127 @@ public class AuthorizeController(
     /// <exception cref="ArgumentNullException"></exception>
     [HttpGet("/connect/authorize")]
     public async Task<IActionResult> Authorize(
-        [FromQuery(Name = "response_type")] string responseType,
-        [FromQuery(Name = "client_id")] string clientId,
-        [FromQuery(Name = "redirect_uri")] string redirectUri,
-        [FromQuery] string scope,
+        [FromQuery(Name = "response_type")] string? responseType,
+        [FromQuery(Name = "client_id")] string? clientId,
+        [FromQuery(Name = "redirect_uri")] string? redirectUri,
+        [FromQuery] string? scope,
         [FromQuery] string? state = null,
         [FromQuery] string? nonce = null,
         [FromQuery] string? prompt = null,
         [FromQuery(Name = "max_age")] int? maxAge = null,
+        [FromQuery(Name = "response_mode")] string? responseMode = null,
         [FromQuery] string? claims = null,
         [FromQuery(Name = "code_challenge")] string? codeChallenge = null,
         [FromQuery(Name = "code_challenge_method")] string? codeChallengeMethod = null,
         CancellationToken ct = default)
     {
-        // Only authorization_code flow is supported
-        if (responseType != "code")
-            return BadRequest(new { error = "unsupported_response_type", error_description = "Only 'code' response type is supported." });
-
         if (string.IsNullOrWhiteSpace(clientId))
             return BadRequest(new { error = "invalid_request", error_description = "client_id is required." });
 
         if (string.IsNullOrWhiteSpace(redirectUri))
             return BadRequest(new { error = "invalid_request", error_description = "redirect_uri is required." });
 
-        if (string.IsNullOrWhiteSpace(scope))
-            return BadRequest(new { error = "invalid_request", error_description = "scope is required." });
+        // Establish the trusted callback boundary before any redirect. Invalid client or
+        // redirect_uri requests are always handled locally and never become open redirects.
+        var redirectValidation = await clientService.ValidateClientRedirectUriAsync(clientId, redirectUri, ct);
 
-        // Validate client via Application layer
+        if (!redirectValidation.IsSuccess)
+        {
+            return BadRequest(new { error = redirectValidation.ErrorCode, error_description = redirectValidation.Error });
+        }
+
+        var normalizedResponseMode = ResolveResponseMode(responseMode);
+        if (normalizedResponseMode is null)
+        {
+            return AuthorizationError(
+                redirectUri,
+                "query",
+                "invalid_request",
+                "response_mode must be query or form_post.",
+                state);
+        }
+
+        if (string.IsNullOrWhiteSpace(responseType))
+        {
+            return AuthorizationError(
+                redirectUri,
+                normalizedResponseMode,
+                "invalid_request",
+                "response_type is required.",
+                state);
+        }
+
+        if (!string.Equals(responseType, "code", StringComparison.Ordinal))
+        {
+            return AuthorizationError(
+                redirectUri,
+                normalizedResponseMode,
+                "unsupported_response_type",
+                "Only 'code' response type is supported.",
+                state);
+        }
+
         var clientValidation = await clientService.ValidateClientForAuthorizationAsync(
             clientId, redirectUri, "authorization_code", codeChallenge, codeChallengeMethod, ct);
 
         if (!clientValidation.IsSuccess)
-            return BadRequest(new { error = clientValidation.ErrorCode, error_description = clientValidation.Error });
+        {
+            return AuthorizationError(
+                redirectUri,
+                normalizedResponseMode,
+                clientValidation.ErrorCode ?? "invalid_request",
+                clientValidation.Error ?? "The authorization request is invalid.",
+                state);
+        }
+
+        if (string.IsNullOrWhiteSpace(scope))
+        {
+            return AuthorizationError(
+                redirectUri,
+                normalizedResponseMode,
+                "invalid_request",
+                "scope is required.",
+                state);
+        }
+
+        var scopeValidation = await clientService.ValidateScopesAsync(clientId, scope, allowIdentityScopes: true, ct);
+        if (!scopeValidation.IsSuccess)
+        {
+            if (string.Equals(scopeValidation.ErrorCode, "invalid_client", StringComparison.Ordinal))
+                return BadRequest(new { error = "invalid_client", error_description = scopeValidation.Error });
+
+            return AuthorizationError(
+                redirectUri,
+                normalizedResponseMode,
+                scopeValidation.ErrorCode ?? "invalid_scope",
+                scopeValidation.Error ?? "The requested scope is invalid.",
+                state);
+        }
+
+        var promptValues = ParsePrompt(prompt);
+        var unsupportedPrompt = promptValues.FirstOrDefault(value =>
+            !value.Equals("none", StringComparison.Ordinal)
+            && !value.Equals("login", StringComparison.Ordinal)
+            && !value.Equals("consent", StringComparison.Ordinal));
+        if (unsupportedPrompt is not null)
+        {
+            return AuthorizationError(
+                redirectUri,
+                normalizedResponseMode,
+                "invalid_request",
+                $"Unsupported prompt value '{unsupportedPrompt}'.",
+                state);
+        }
+
+        if (maxAge is < 0)
+        {
+            return AuthorizationError(
+                redirectUri,
+                normalizedResponseMode,
+                "invalid_request",
+                "max_age must not be negative.",
+                state);
+        }
 
         if (!string.IsNullOrWhiteSpace(claims))
         {
@@ -79,19 +168,32 @@ public class AuthorizeController(
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(new { error = "invalid_request", error_description = ex.Message });
+                return AuthorizationError(redirectUri, normalizedResponseMode, "invalid_request", ex.Message, state);
             }
         }
 
-        var promptValues = ParsePrompt(prompt);
         if (promptValues.Contains("none", StringComparer.Ordinal) && promptValues.Count > 1)
-            return BadRequest(new { error = "invalid_request", error_description = "prompt=none cannot be combined with other prompt values." });
+        {
+            return AuthorizationError(
+                redirectUri,
+                normalizedResponseMode,
+                "invalid_request",
+                "prompt=none cannot be combined with other prompt values.",
+                state);
+        }
 
         // Check if user is already authenticated via cookie
         if (User.Identity?.IsAuthenticated != true)
         {
             if (promptValues.Contains("none", StringComparer.Ordinal))
-                return Redirect(BuildErrorRedirectUri(redirectUri, "login_required", "User authentication is required.", state));
+            {
+                return AuthorizationError(
+                    redirectUri,
+                    normalizedResponseMode,
+                    "login_required",
+                    "User authentication is required.",
+                    state);
+            }
 
             // Not logged in — redirect to login page with returnUrl (must be relative for Url.IsLocalUrl)
             var returnUrl = Request.GetEncodedPathAndQuery();
@@ -111,7 +213,7 @@ public class AuthorizeController(
             // 中文注释：当 RP 显式要求 prompt=consent 时，先进入服务端确认页，
             // 由当前用户确认本次授权的 scope 与 claims，再回到授权端继续签发 code。
             // 主要调用方：标准 OIDC 客户端，以及后续需要强制重新确认授权的 demo 场景。
-            return Redirect(BuildConsentPageUrl(clientId, redirectUri, scope, state, nonce, prompt, maxAge, claims, codeChallenge, codeChallengeMethod));
+            return Redirect(BuildConsentPageUrl(clientId, redirectUri, scope, state, nonce, prompt, maxAge, responseMode, claims, codeChallenge, codeChallengeMethod));
         }
 
         // User is authenticated — extract user ID from cookie claims
@@ -125,7 +227,14 @@ public class AuthorizeController(
             if (!authenticatedAt.HasValue || DateTimeOffset.UtcNow > authenticatedAt.Value.AddSeconds(maxAge.Value))
             {
                 if (promptValues.Contains("none", StringComparer.Ordinal))
-                    return Redirect(BuildErrorRedirectUri(redirectUri, "login_required", "The current session is too old for max_age.", state));
+                {
+                    return AuthorizationError(
+                        redirectUri,
+                        normalizedResponseMode,
+                        "login_required",
+                        "The current session is too old for max_age.",
+                        state);
+                }
 
                 await HttpContext.SignOutAsync(AppWebModule.AuthenticationScheme);
                 var returnUrl = Request.GetEncodedPathAndQuery();
@@ -134,27 +243,43 @@ public class AuthorizeController(
         }
 
         // Generate authorization code
-        var code = await authorizationService.GenerateCodeAsync(
-            userId,
-            clientId,
-            redirectUri,
-            scope,
-            codeChallenge,
-            codeChallengeMethod,
-            nonce,
-            claims,
-            authenticatedAt,
-            User.FindFirst("acr")?.Value,
-            User.FindFirst("amr")?.Value,
-            ct);
+        string code;
+        try
+        {
+            code = await authorizationService.GenerateCodeAsync(
+                userId,
+                clientId,
+                redirectUri,
+                scopeValidation.NormalizedScope!,
+                codeChallenge,
+                codeChallengeMethod,
+                nonce,
+                claims,
+                authenticatedAt,
+                User.FindFirst("acr")?.Value,
+                User.FindFirst("amr")?.Value,
+                ct);
+        }
+        catch (InvalidOperationException)
+        {
+            // Scope and claims were validated above. A concurrent client change can still
+            // invalidate them between validation and persistence; return an OAuth error
+            // instead of leaking a framework 500 response.
+            return AuthorizationError(
+                redirectUri,
+                normalizedResponseMode,
+                "invalid_scope",
+                "The requested scope is no longer valid.",
+                state);
+        }
 
-        // Build redirect URI with code (and state if present)
-        var separator = redirectUri.Contains('?') ? '&' : '?';
-        var redirectUrl = $"{redirectUri}{separator}code={Uri.EscapeDataString(code)}";
-        if (!string.IsNullOrWhiteSpace(state))
-            redirectUrl += $"&state={Uri.EscapeDataString(state)}";
+        var parameters = new Dictionary<string, string?>
+        {
+            ["code"] = code,
+            ["state"] = state,
+        };
 
-        return Redirect(redirectUrl);
+        return BuildAuthorizationResponse(redirectUri, normalizedResponseMode, parameters);
     }
 
     private DateTimeOffset? GetAuthenticatedAt()
@@ -174,14 +299,67 @@ public class AuthorizeController(
             ?? [];
     }
 
-    private static string BuildErrorRedirectUri(string redirectUri, string error, string description, string? state)
+    private static string? ResolveResponseMode(string? responseMode)
     {
-        var separator = redirectUri.Contains('?') ? '&' : '?';
-        var errorRedirect = $"{redirectUri}{separator}error={Uri.EscapeDataString(error)}&error_description={Uri.EscapeDataString(description)}";
-        if (!string.IsNullOrWhiteSpace(state))
-            errorRedirect += $"&state={Uri.EscapeDataString(state)}";
+        if (string.IsNullOrWhiteSpace(responseMode)
+            || string.Equals(responseMode, "query", StringComparison.Ordinal))
+            return "query";
 
-        return errorRedirect;
+        return string.Equals(responseMode, "form_post", StringComparison.Ordinal)
+            ? "form_post"
+            : null;
+    }
+
+    private IActionResult AuthorizationError(
+        string redirectUri,
+        string? responseMode,
+        string error,
+        string description,
+        string? state)
+    {
+        var mode = ResolveResponseMode(responseMode) ?? "query";
+        return BuildAuthorizationResponse(
+            redirectUri,
+            mode,
+            new Dictionary<string, string?>
+            {
+                ["error"] = error,
+                ["error_description"] = description,
+                ["state"] = state,
+            });
+    }
+
+    private IActionResult BuildAuthorizationResponse(
+        string redirectUri,
+        string responseMode,
+        IReadOnlyDictionary<string, string?> parameters)
+    {
+        var presentParameters = parameters
+            .Where(pair => pair.Value is not null)
+            .ToDictionary(pair => pair.Key, pair => (string?)pair.Value, StringComparer.Ordinal);
+
+        if (!string.Equals(responseMode, "form_post", StringComparison.Ordinal))
+        {
+            var redirectUrl = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(
+                redirectUri,
+                presentParameters);
+            return new RedirectResult(redirectUrl);
+        }
+
+        Response.Headers["Cache-Control"] = "no-store";
+        Response.Headers["Pragma"] = "no-cache";
+        var action = System.Net.WebUtility.HtmlEncode(redirectUri);
+        var hiddenInputs = string.Join(
+            Environment.NewLine,
+            presentParameters.Select(pair =>
+                $"<input type=\"hidden\" name=\"{System.Net.WebUtility.HtmlEncode(pair.Key)}\" value=\"{System.Net.WebUtility.HtmlEncode(pair.Value)}\" />"));
+        var html = $"<!doctype html><html><head><meta charset=\"utf-8\"><title>Submitting authorization response</title></head><body><form method=\"post\" action=\"{action}\">{hiddenInputs}<noscript><button type=\"submit\">Continue</button></noscript></form><script>document.forms[0].submit();</script></body></html>";
+        return new ContentResult
+        {
+            Content = html,
+            ContentType = "text/html; charset=utf-8",
+            StatusCode = StatusCodes.Status200OK,
+        };
     }
 
     private static string BuildConsentPageUrl(
@@ -192,6 +370,7 @@ public class AuthorizeController(
         string? nonce,
         string? prompt,
         int? maxAge,
+        string? responseMode,
         string? claims,
         string? codeChallenge,
         string? codeChallengeMethod)
@@ -205,6 +384,7 @@ public class AuthorizeController(
             ["nonce"] = nonce,
             ["prompt"] = prompt,
             ["max_age"] = maxAge?.ToString(),
+            ["response_mode"] = responseMode,
             ["claims"] = claims,
             ["code_challenge"] = codeChallenge,
             ["code_challenge_method"] = codeChallengeMethod,

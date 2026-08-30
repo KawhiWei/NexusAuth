@@ -13,9 +13,9 @@ public class AuthorizationCodeConfiguration : IEntityTypeConfiguration<Authoriza
         builder.HasKey(a => a.Id);
         builder.Property(a => a.Id).HasColumnName("id");
 
-        builder.Property(a => a.Code)
-            .HasColumnName("code")
-            .HasMaxLength(256)
+        builder.Property(a => a.CodeHash)
+            .HasColumnName("code_hash")
+            .HasMaxLength(43)
             .IsRequired();
 
         builder.Property(a => a.ClientId)
@@ -77,6 +77,15 @@ public class AuthorizationCodeConfiguration : IEntityTypeConfiguration<Authoriza
             .HasColumnName("created_at")
             .IsRequired();
 
-        builder.HasIndex(a => a.Code).IsUnique();
+        builder.HasIndex(a => a.CodeHash)
+            .HasDatabaseName("ix_authorization_codes_code_hash")
+            .IsUnique();
+
+        builder.HasIndex(a => new { a.CodeHash, a.ClientId, a.IsUsed, a.ExpiresAt })
+            .HasDatabaseName("ix_authorization_codes_consume");
+
+        builder.ToTable(table => table.HasCheckConstraint(
+            "ck_authorization_codes_code_hash_base64url",
+            "code_hash ~ '^[A-Za-z0-9_-]{43}$'"));
     }
 }

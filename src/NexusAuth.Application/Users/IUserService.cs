@@ -18,4 +18,10 @@ public interface IUserService : IScopedDependency
         CancellationToken ct = default);
 
     Task<User?> FindByIdAsync(Guid id, CancellationToken ct = default);
+
+    Task ChangePasswordAsync(
+        Guid userId,
+        string currentPassword,
+        string newPassword,
+        CancellationToken ct = default);
 }

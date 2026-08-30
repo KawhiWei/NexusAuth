@@ -69,6 +69,9 @@ public class IndexModel(IDeviceAuthorizationService deviceAuthorizationService) 
     /// </summary>
     public async Task<IActionResult> OnPostDenyAsync(CancellationToken ct)
     {
+        if (User.Identity?.IsAuthenticated != true)
+            return Redirect($"/account/login?returnUrl={Uri.EscapeDataString($"/device?user_code={UserCode}")}");
+
         Session = await _deviceAuthorizationService.DenyAsync(UserCode, ct);
         if (!Session.IsSuccess)
             ErrorMessage = Session.Error;

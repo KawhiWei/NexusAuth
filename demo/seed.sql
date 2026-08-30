@@ -201,6 +201,8 @@ ON CONFLICT (username) DO UPDATE SET
     is_active = EXCLUDED.is_active,
     updated_at = NOW();
 
+UPDATE users SET is_system_account = true WHERE username = 'admin';
+
 -- ============================================================
 -- Optional mapping table seed (no foreign keys required)
 -- ============================================================

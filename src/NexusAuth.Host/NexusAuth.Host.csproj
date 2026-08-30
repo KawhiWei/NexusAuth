@@ -3,6 +3,7 @@
     <ItemGroup>
         <PackageReference Include="Luck.AutoDependencyInjection" />
         <PackageReference Include="Luck.AspNetCore" />
+        <PackageReference Include="Luck.Logging.Serilog" />
     </ItemGroup>
 
     <ItemGroup>

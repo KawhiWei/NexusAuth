@@ -1,8 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <ItemGroup>
+        <PackageReference Include="EFCore.NamingConventions" />
         <PackageReference Include="Luck.EntityFrameworkCore" />
         <PackageReference Include="Luck.EntityFrameworkCore.PostgreSQL" />
+        <PackageReference Include="Luck.Framework" />
     </ItemGroup>
 
     <ItemGroup>

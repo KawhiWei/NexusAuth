@@ -1,4 +1,4 @@
-
+using NexusAuth.Application.Logging;
 using NexusAuth.Application.Services.OIDC;
 
 namespace NexusAuth.Application.Services.Tokens;
@@ -9,7 +9,8 @@ public class TokenService(
     IUserRepository userRepository,
     IApiResourceRepository apiResourceRepository,
     IOptions<JwtOptions> jwtOptions,
-    ITokenSigningCredentialsProvider signingCredentialsProvider) : ITokenService
+    ITokenSigningCredentialsProvider signingCredentialsProvider,
+    ILogger<TokenService> logger) : ITokenService
 {
     private readonly JwtOptions jwtOptions = jwtOptions.Value;
 
@@ -77,6 +78,20 @@ public class TokenService(
         token.Header[JwtHeaderParameterNames.Kid] = signingCredentialsProvider.KeyId;
 
         var jwt = new JwtSecurityTokenHandler().WriteToken(token);
+
+        using (ApplicationLogScope.Begin(
+                   logger,
+                   "Token",
+                   userId?.ToString() ?? clientId,
+                   "AccessTokenIssued"))
+        {
+            logger.LogInformation(
+                "Access token issued. ClientId={ClientId} UserId={UserId} ExpiresAt={ExpiresAt}",
+                clientId,
+                userId,
+                token.ValidTo);
+        }
+
         return await Task.FromResult(new TokenIssueResult(jwt, jti, token.ValidTo));
     }
 
@@ -164,7 +179,18 @@ public class TokenService(
             signingCredentials: signingCredentialsProvider.GetSigningCredentials());
 
         token.Header[JwtHeaderParameterNames.Kid] = signingCredentialsProvider.KeyId;
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        var jwt = new JwtSecurityTokenHandler().WriteToken(token);
+
+        using (ApplicationLogScope.Begin(logger, "Token", userId.ToString(), "IdTokenIssued"))
+        {
+            logger.LogInformation(
+                "ID token issued. ClientId={ClientId} UserId={UserId} ExpiresAt={ExpiresAt}",
+                clientId,
+                userId,
+                token.ValidTo);
+        }
+
+        return jwt;
     }
 
     /// <summary>
@@ -179,9 +205,18 @@ public class TokenService(
     {
         var refreshLifetime = TimeSpan.FromMinutes(jwtOptions.RefreshTokenLifetimeMinutes);
         var refreshToken = RefreshToken.Create(clientId, userId, scope, refreshLifetime);
-        await refreshTokenRepository.AddAsync(refreshToken, ct);
+        await refreshTokenRepository.AddAsync(refreshToken.Entity, ct);
 
-        return refreshToken.Token;
+        using (ApplicationLogScope.Begin(logger, "Token", userId.ToString(), "RefreshTokenIssued"))
+        {
+            logger.LogInformation(
+                "Refresh token issued. ClientId={ClientId} UserId={UserId} ExpiresAt={ExpiresAt}",
+                clientId,
+                userId,
+                refreshToken.Entity.ExpiresAt);
+        }
+
+        return refreshToken.RawToken;
     }
 
     /// <summary>
@@ -203,32 +238,37 @@ public class TokenService(
         var existingToken = await refreshTokenRepository.FindByTokenAsync(refreshTokenString, ct);
 
         if (existingToken is null)
-            return RefreshResult.Failure("Invalid refresh token.");
+            return RefreshFailure(clientId, "RefreshTokenNotFound", "Invalid refresh token.");
 
         if (existingToken.IsRevoked)
-            return RefreshResult.Failure("Refresh token has been revoked.");
+            return RefreshFailure(clientId ?? existingToken.ClientId, "RefreshTokenRevoked", "Refresh token has been revoked.");
 
         if (existingToken.ExpiresAt <= DateTimeOffset.UtcNow)
-            return RefreshResult.Failure("Refresh token has expired.");
+            return RefreshFailure(clientId ?? existingToken.ClientId, "RefreshTokenExpired", "Refresh token has expired.");
 
         // 中文注释：refresh token 必须和当前认证过的客户端绑定，防止一个客户端拿着别人�?refresh token 刷新�?
         // 主要调用方：/connect/token �?refresh_token 分支，以�?Demo.Bff 的会话续期流程�?
         if (!string.IsNullOrWhiteSpace(clientId)
             && !string.Equals(existingToken.ClientId, clientId, StringComparison.Ordinal))
         {
-            return RefreshResult.Failure("Refresh token does not belong to the authenticated client.");
+            return RefreshFailure(clientId, "ClientMismatch", "Refresh token does not belong to the authenticated client.");
         }
 
-        // Revoke old token
-        await refreshTokenRepository.RevokeAsync(existingToken.Id, ct);
-
-        // Issue new refresh token
+        // The database transaction atomically revokes the old token and stores
+        // the replacement. A concurrent reuse of the same bearer value loses
+        // the conditional update and never receives a new token.
         var newRefreshToken = RefreshToken.Create(
             existingToken.ClientId,
             existingToken.UserId,
             existingToken.Scope,
             TimeSpan.FromMinutes(jwtOptions.RefreshTokenLifetimeMinutes));
-        await refreshTokenRepository.AddAsync(newRefreshToken, ct);
+        var rotatedToken = await refreshTokenRepository.RotateAsync(
+            RefreshToken.Hash(refreshTokenString),
+            existingToken.ClientId,
+            newRefreshToken.Entity,
+            ct);
+        if (rotatedToken is null)
+            return RefreshFailure(existingToken.ClientId, "RefreshTokenRotationFailed", "Refresh token has been revoked, expired, or already used.");
 
         // Issue new access token
         var accessToken = await IssueAccessTokenAsync(
@@ -239,7 +279,15 @@ public class TokenService(
             null,
             ct);
 
-        return RefreshResult.Success(accessToken, newRefreshToken.Token);
+        using (ApplicationLogScope.Begin(logger, "Token", existingToken.ClientId, "RefreshTokenRotated"))
+        {
+            logger.LogInformation(
+                "Refresh token rotation succeeded. ClientId={ClientId} UserId={UserId}",
+                existingToken.ClientId,
+                existingToken.UserId);
+        }
+
+        return RefreshResult.Success(accessToken, newRefreshToken.RawToken);
     }
 
     /// <summary>
@@ -263,15 +311,33 @@ public class TokenService(
     {
         var token = await refreshTokenRepository.FindByTokenAsync(refreshTokenString, ct);
         if (token is null)
+        {
+            using (ApplicationLogScope.Begin(logger, "Token", clientId, "RefreshTokenNotFound"))
+            {
+                logger.LogDebug("Refresh token revocation skipped. Reason={ReasonCode}", "RefreshTokenNotFound");
+            }
             return;
+        }
 
         if (!string.IsNullOrWhiteSpace(clientId)
             && !string.Equals(token.ClientId, clientId, StringComparison.Ordinal))
         {
+            using (ApplicationLogScope.Begin(logger, "Token", clientId, "ClientMismatch"))
+            {
+                logger.LogDebug("Refresh token revocation skipped. Reason={ReasonCode}", "ClientMismatch");
+            }
             return;
         }
 
         await refreshTokenRepository.RevokeAsync(token.Id, ct);
+
+        using (ApplicationLogScope.Begin(logger, "Token", token.ClientId, "RefreshTokenRevoked"))
+        {
+            logger.LogInformation(
+                "Refresh token revoked. ClientId={ClientId} UserId={UserId}",
+                token.ClientId,
+                token.UserId);
+        }
     }
 
     /// <summary>
@@ -295,6 +361,11 @@ public class TokenService(
         CancellationToken ct = default)
     {
         await refreshTokenRepository.RevokeAllForUserAsync(userId, ct);
+
+        using (ApplicationLogScope.Begin(logger, "Token", userId.ToString(), "RefreshTokensRevoked"))
+        {
+            logger.LogInformation("All refresh tokens revoked for user. UserId={UserId}", userId);
+        }
     }
 
     /// <summary>
@@ -364,7 +435,13 @@ public class TokenService(
     {
         var handler = new JwtSecurityTokenHandler();
         if (!handler.CanReadToken(accessToken))
+        {
+            using (ApplicationLogScope.Begin(logger, "Token", clientId, "TokenNotReadable"))
+            {
+                logger.LogDebug("Access token revocation skipped. Reason={ReasonCode}", "TokenNotReadable");
+            }
             return;
+        }
 
         try
         {
@@ -375,18 +452,34 @@ public class TokenService(
 
             var jti = GetClaimValue(principal, JwtRegisteredClaimNames.Jti, ClaimTypes.SerialNumber);
             if (string.IsNullOrWhiteSpace(jti))
+            {
+                using (ApplicationLogScope.Begin(logger, "Token", clientId, "TokenIdentifierMissing"))
+                {
+                    logger.LogDebug("Access token revocation skipped. Reason={ReasonCode}", "TokenIdentifierMissing");
+                }
                 return;
+            }
 
             var tokenClientId = principal.FindFirst("client_id")?.Value;
             if (!string.IsNullOrWhiteSpace(clientId)
                 && !string.Equals(tokenClientId, clientId, StringComparison.Ordinal))
             {
+                using (ApplicationLogScope.Begin(logger, "Token", clientId, "ClientMismatch"))
+                {
+                    logger.LogDebug("Access token revocation skipped. Reason={ReasonCode}", "ClientMismatch");
+                }
                 return;
             }
 
             var existing = await tokenBlacklistRepository.FindByJtiAsync(jti, ct);
             if (existing is not null)
+            {
+                using (ApplicationLogScope.Begin(logger, "Token", tokenClientId ?? clientId, "TokenAlreadyRevoked"))
+                {
+                    logger.LogDebug("Access token revocation skipped. Reason={ReasonCode}", "TokenAlreadyRevoked");
+                }
                 return;
+            }
 
             var jwt = (JwtSecurityToken)validatedToken;
             var entry = TokenBlacklistEntry.Create(
@@ -396,11 +489,38 @@ public class TokenService(
                 jwt.ValidTo);
 
             await tokenBlacklistRepository.AddAsync(entry, ct);
+
+            using (ApplicationLogScope.Begin(logger, "Token", tokenClientId ?? clientId, "AccessTokenRevoked"))
+            {
+                logger.LogInformation(
+                    "Access token revoked. ClientId={ClientId} Subject={Subject}",
+                    tokenClientId,
+                    GetClaimValue(principal, JwtRegisteredClaimNames.Sub, ClaimTypes.NameIdentifier));
+            }
         }
         catch
         {
             // OAuth revocation should not leak token validity details.
+            using (ApplicationLogScope.Begin(logger, "Token", clientId, "TokenValidationFailed"))
+            {
+                logger.LogDebug("Access token revocation skipped. Reason={ReasonCode}", "TokenValidationFailed");
+            }
         }
+    }
+
+    private RefreshResult RefreshFailure(
+        string? clientId,
+        string reasonCode,
+        string error)
+    {
+        using (ApplicationLogScope.Begin(logger, "Token", clientId, reasonCode))
+        {
+            logger.LogWarning(
+                "Refresh token operation failed. Reason={ReasonCode}",
+                reasonCode);
+        }
+
+        return RefreshResult.Failure(error);
     }
 
     private static string ComputeTokenHash(string token)
@@ -437,23 +557,24 @@ public class TokenService(
             .ToArray();
 
         var resources = await apiResourceRepository.FindByAudiencesAsync(resourceScopeNames, ct);
-        var resourceMap = resources
+        var activeAudiences = resources
             .Where(resource => resource.IsActive)
-            .ToDictionary(resource => resource.Audience, resource => resource, StringComparer.Ordinal);
+            .Select(resource => resource.Audience)
+            .ToHashSet(StringComparer.Ordinal);
 
         string? resolved = null;
         foreach (var scopeName in resourceScopeNames)
         {
-            if (!resourceMap.TryGetValue(scopeName, out var resource))
+            if (!activeAudiences.Contains(scopeName))
                 continue;
 
             if (string.IsNullOrWhiteSpace(resolved))
             {
-                resolved = resource.Audience;
+                resolved = scopeName;
                 continue;
             }
 
-            if (!string.Equals(resolved, resource.Audience, StringComparison.Ordinal))
+            if (!string.Equals(resolved, scopeName, StringComparison.Ordinal))
                 throw new InvalidOperationException("Requested scopes span multiple audiences. Please request one resource audience per token.");
         }
 

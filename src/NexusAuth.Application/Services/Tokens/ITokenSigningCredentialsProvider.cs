@@ -1,8 +1,6 @@
-using Luck.Framework.Infrastructure.DependencyInjectionModule;
-
 namespace NexusAuth.Application.Services.Tokens;
 
-public interface ITokenSigningCredentialsProvider : ISingletonDependency
+public interface ITokenSigningCredentialsProvider
 {
     string Algorithm { get; }
 

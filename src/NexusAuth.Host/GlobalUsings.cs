@@ -1,5 +1,6 @@
 global using ITokenSigningCredentialsProvider = NexusAuth.Application.Services.Tokens.ITokenSigningCredentialsProvider;
 global using RsaTokenSigningCredentialsProvider = NexusAuth.Application.Services.Tokens.RsaTokenSigningCredentialsProvider;
+global using NexusAuth.Application.Services.Tokens;
 global using ITokenService = NexusAuth.Application.Services.Tokens.ITokenService;
 global using JwtOptions = NexusAuth.Application.Services.Tokens.JwtOptions;
 global using IAuthorizationService = NexusAuth.Application.Services.Authorization.IAuthorizationService;
@@ -18,3 +19,4 @@ global using ISecurityPolicyService = NexusAuth.Application.Services.Security.IS
 global using NexusAuthSecurityOptions = NexusAuth.Application.Services.Security.NexusAuthSecurityOptions;
 global using ApiResourceService = NexusAuth.Application.Services.ApiResources.ApiResourceService;
 global using IApiResourceService = NexusAuth.Application.Services.ApiResources.IApiResourceService;
+global using IScimCredentialService = NexusAuth.Application.Services.Scim.IScimCredentialService;

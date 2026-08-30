@@ -26,15 +26,21 @@ dotnet run
     }
   },
   "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Port=5432;Database=nexusauth;Username=nexusauth;Password=your-password"
+    "Default": "Host=localhost;Port=5432;Database=nexusauth;Username=nexusauth;Password=your-password"
   },
   "AllowedHosts": "*",
-  "App": {
+  "Jwt": {
     "Issuer": "http://localhost:5100",
-    "SigningKeyPath": "App_Data/signing-key.json"
+    "SigningMode": "Certificate",
+    "SigningCertificatePath": "/run/secrets/nexusauth-signing.pfx",
+    "SigningCertificatePassword": ""
   }
 }
 ```
+
+`Development` 环境会使用 `Jwt:DevelopmentSigningCertificatePath`，证书不存在时自动生成并持久化开发自签名证书。非开发环境不会自动生成证书，必须配置 `Jwt:SigningCertificatePath`，并通过 Secret 或环境变量提供 PFX 密码。
+
+需要兼容原有裸 RSA 文件时，将 `Jwt:SigningMode` 设为 `RsaKeyFile`。开发环境使用 `Jwt:DevelopmentSigningKeyPath`，生产环境必须显式配置 `Jwt:SigningKeyPath`。旧版 `signing-key.json` 可以直接使用；生产环境不会自动生成缺失的 RSA 私钥。
 
 ## 可用端点
 

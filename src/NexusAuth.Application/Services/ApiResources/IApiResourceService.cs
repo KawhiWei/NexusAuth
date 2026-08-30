@@ -28,6 +28,8 @@ public interface IApiResourceService : IScopedDependency
 
     Task<ApiResourceDto> UpdateAsync(Guid id, UpdateApiResourceRequest request, CancellationToken ct = default);
 
+    Task<ApiResourceDto> UpdateStatusAsync(Guid id, bool isActive, CancellationToken ct = default);
+
     Task DeleteAsync(Guid id, CancellationToken ct = default);
 
     Task AssignToClientAsync(
@@ -68,3 +70,5 @@ public record UpdateApiResourceRequest(
     string? Audience,
     string? Description,
     bool? IsActive);
+
+public record UpdateApiResourceStatusRequest(bool IsActive);

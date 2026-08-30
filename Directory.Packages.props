@@ -5,20 +5,26 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageVersion Include="Luck.Framework" Version="2.0.9" />
-        <PackageVersion Include="Luck.DDD.Domain" Version="2.0.9" />
-        <PackageVersion Include="Luck.AutoDependencyInjection" Version="2.0.9" />
-        <PackageVersion Include="Luck.AspNetCore" Version="2.0.9" />
-        <PackageVersion Include="Luck.AppModule" Version="2.0.9" />
-        <PackageVersion Include="Luck.EntityFrameworkCore" Version="2.0.9" />
-        <PackageVersion Include="Luck.EntityFrameworkCore.PostgreSQL" Version="2.0.9" />
-        <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.3" />
-        <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.7.0" />
-        <PackageVersion Include="BCrypt.Net-Next" Version="4.0.3" />
-        <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.9.0" />
-        <PackageVersion Include="Microsoft.Extensions.Http" Version="9.0.0" />
-        <PackageVersion Include="Microsoft.Extensions.Options" Version="9.0.0" />
-        <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.0" />
+        <PackageVersion Include="Luck.Framework" Version="2.0.17" />
+        <PackageVersion Include="Luck.DDD.Domain" Version="2.0.17" />
+        <PackageVersion Include="Luck.AutoDependencyInjection" Version="2.0.17" />
+        <PackageVersion Include="Luck.AspNetCore" Version="2.0.17" />
+        <PackageVersion Include="Luck.AppModule" Version="2.0.17" />
+        <PackageVersion Include="Luck.Logging.Serilog" Version="2.0.17" />
+        <PackageVersion Include="EFCore.NamingConventions" Version="10.0.1" />
+        <PackageVersion Include="Luck.EntityFrameworkCore" Version="2.0.17" />
+        <PackageVersion Include="Luck.EntityFrameworkCore.PostgreSQL" Version="2.0.17" />
+        <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.11" />
+        <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.22.0" />
+        <PackageVersion Include="BCrypt.Net-Next" Version="4.2.1" />
+        <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+        <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.11" />
+        <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.11" />
+        <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.11" />
+        <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+        <PackageVersion Include="xunit" Version="2.9.3" />
+        <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+        <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.11" />
     </ItemGroup>
 
 </Project>

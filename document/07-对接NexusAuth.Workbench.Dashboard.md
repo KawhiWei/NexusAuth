@@ -7,7 +7,7 @@
 ### 安装依赖
 
 ```bash
-cd NexusAuth.Workbench/NexusAuth.Workbench.Dashboard
+cd admin/src/NexusAuth.Workbench.Dashboard
 npm install
 ```
 

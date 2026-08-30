@@ -1,0 +1,132 @@
+.dashboard-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 8px;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 2px 0 4px;
+}
+
+.dashboard-title {
+  color: var(--app-text);
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 28px;
+}
+
+.dashboard-subtitle {
+  color: var(--app-text-muted);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.dashboard-metric-card,
+.dashboard-card {
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface);
+}
+
+.dashboard-metric-card {
+  height: 100%;
+
+  .t-card__body {
+    min-height: 132px;
+  }
+}
+
+.metric-title {
+  color: var(--app-text-secondary);
+  font-size: 14px;
+}
+
+.metric-value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0 14px;
+}
+
+.metric-value {
+  color: var(--app-text);
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 28px;
+}
+
+.dashboard-chart-row {
+  margin-top: 0;
+}
+
+.dashboard-alert-card {
+  margin-top: 0;
+}
+
+.dashboard-alert-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--app-border);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+.dashboard-alert-main {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.dashboard-alert-text {
+  overflow: hidden;
+  color: var(--app-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-alert-time {
+  flex-shrink: 0;
+  color: var(--app-text-muted);
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-header {
+    display: block;
+  }
+
+  .dashboard-subtitle {
+    margin-top: 4px;
+  }
+
+  .dashboard-title {
+    font-size: 18px;
+  }
+
+  .metric-value {
+    font-size: 18px;
+  }
+
+  .dashboard-alert-item {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .dashboard-alert-text {
+    white-space: normal;
+  }
+}

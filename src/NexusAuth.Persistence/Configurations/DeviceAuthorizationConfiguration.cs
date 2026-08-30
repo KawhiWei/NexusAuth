@@ -8,14 +8,16 @@ public class DeviceAuthorizationConfiguration : IEntityTypeConfiguration<DeviceA
 {
     public void Configure(EntityTypeBuilder<DeviceAuthorization> builder)
     {
-        builder.ToTable("device_authorizations");
+        builder.ToTable("device_authorizations", table => table.HasCheckConstraint(
+            "ck_device_authorizations_device_code_hash_base64url",
+            "device_code_hash ~ '^[A-Za-z0-9_-]{43}$'"));
 
         builder.HasKey(d => d.Id);
         builder.Property(d => d.Id).HasColumnName("id");
 
-        builder.Property(d => d.DeviceCode)
-            .HasColumnName("device_code")
-            .HasMaxLength(256)
+        builder.Property(d => d.DeviceCodeHash)
+            .HasColumnName("device_code_hash")
+            .HasMaxLength(43)
             .IsRequired();
 
         builder.Property(d => d.UserCode)
@@ -65,7 +67,10 @@ public class DeviceAuthorizationConfiguration : IEntityTypeConfiguration<DeviceA
         builder.Property(d => d.LastPolledAt)
             .HasColumnName("last_polled_at");
 
-        builder.HasIndex(d => d.DeviceCode).IsUnique();
+        builder.HasIndex(d => d.DeviceCodeHash).IsUnique();
         builder.HasIndex(d => d.UserCodeNormalized).IsUnique();
+        builder.HasIndex(d => new { d.DeviceCodeHash, d.ClientId, d.Status, d.ExpiresAt })
+            .HasDatabaseName("ix_device_authorizations_poll");
+
     }
 }

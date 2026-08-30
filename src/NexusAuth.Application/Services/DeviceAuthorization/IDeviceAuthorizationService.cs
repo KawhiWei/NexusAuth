@@ -50,7 +50,7 @@ public record DeviceAuthorizationPollResult(
         => new(false, error, errorCode, Guid.Empty, null, null, interval);
 
     public static DeviceAuthorizationPollResult Pending(int interval = 5)
-        => new(false, null, null, Guid.Empty, null, null, interval);
+        => new(false, "Authorization is pending.", "authorization_pending", Guid.Empty, null, null, interval);
 }
 
 public record DeviceAuthorizationSessionResult(

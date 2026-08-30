@@ -1,0 +1,171 @@
+.stitch-login-page {
+  position: relative;
+  display: flex;
+  min-height: 100vh;
+  overflow: hidden;
+  color: var(--app-text);
+  background: var(--app-page);
+}
+
+.stitch-login-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(var(--app-border) 1px, transparent 1px), linear-gradient(90deg, var(--app-border) 1px, transparent 1px);
+  background-size: 56px 56px;
+  opacity: 0.28;
+  mask-image: linear-gradient(to bottom, #000000, transparent 72%);
+}
+
+.stitch-login-header,
+.stitch-login-footer {
+  position: fixed;
+  z-index: 3;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+}
+
+.stitch-login-header {
+  top: 0;
+  height: 68px;
+  border-bottom: 1px solid var(--app-border);
+  background: color-mix(in srgb, var(--app-surface) 88%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.stitch-login-brand {
+  flex-shrink: 0;
+
+  .brand__mark {
+    width: 34px;
+    height: 34px;
+  }
+
+  .brand__name {
+    font-size: 17px;
+  }
+}
+
+.stitch-login-theme-button {
+  color: var(--app-text-secondary);
+
+  &:hover {
+    color: var(--app-accent);
+    background: var(--app-accent-soft);
+  }
+}
+
+.stitch-login-main {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 420px);
+  margin: auto;
+  padding: 96px 20px 108px;
+}
+
+.stitch-login-card {
+  padding: 34px 32px 30px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface);
+  box-shadow: var(--td-shadow-2);
+}
+
+.stitch-login-identity {
+  margin-bottom: 28px;
+  text-align: center;
+}
+
+.stitch-login-title {
+  margin: 0 0 8px;
+  color: var(--app-text);
+  font-size: 26px;
+  font-weight: 650;
+  line-height: 34px;
+}
+
+.stitch-login-subtitle {
+  max-width: 270px;
+  margin: 0 auto;
+  color: var(--app-text-secondary);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.stitch-login-submit {
+  height: 44px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--app-accent);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: none;
+
+  &:hover {
+    background: var(--app-accent-hover);
+  }
+}
+
+.stitch-login-status {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+  color: var(--app-text-muted);
+  font-size: 12px;
+}
+
+.stitch-login-status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.stitch-login-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--app-success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-success) 16%, transparent);
+}
+
+.stitch-login-footer {
+  bottom: 0;
+  height: 56px;
+  border-top: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+.stitch-login-side-visual {
+  position: absolute;
+  right: 7vw;
+  bottom: 12vh;
+  width: 116px;
+  height: 1px;
+  background: var(--app-border-strong);
+  opacity: 0.65;
+}
+
+@media (max-width: 640px) {
+  .stitch-login-header,
+  .stitch-login-footer {
+    padding: 0 16px;
+  }
+
+  .stitch-login-main {
+    padding: 88px 16px 80px;
+  }
+
+  .stitch-login-card {
+    padding: 28px 22px 24px;
+  }
+
+  .stitch-login-side-visual {
+    display: none;
+  }
+}

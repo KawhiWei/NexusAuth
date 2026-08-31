@@ -1,0 +1,58 @@
+@page "/account/two-factor"
+@model NexusAuth.Host.Pages.Account.TwoFactorModel
+@{
+    Layout = "_AccountLayout";
+    ViewData["Title"] = "身份验证器";
+}
+<section class="panel security-summary" aria-label="双重验证状态">
+    <div class="score" aria-hidden="true">@(Model.IsEnabled ? "✓" : "2")</div>
+    <div class="summary-copy">
+        <strong>@(Model.IsEnabled ? "双重验证已启用" : "使用身份验证器保护账号")</strong>
+        <span>@(Model.IsEnabled ? "登录时需要密码和动态验证码。" : "绑定后，已配置为 conditional 的登录流程会自动要求动态验证码。")</span>
+    </div>
+    <div class="summary-badge">@(Model.IsEnabled ? "已启用" : "未启用")</div>
+</section>
+
+<section class="panel password-panel" aria-labelledby="totp-title">
+    <div class="section-heading">
+        <div><h1 id="totp-title">身份验证器</h1><p>兼容支持 TOTP 的身份验证器应用。</p></div>
+        <span class="status-chip"><span class="status-dot"></span>@(Model.IsEnabled ? "保护中" : "可配置")</span>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage)) { <div class="message error" role="alert">@Model.ErrorMessage</div> }
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage)) { <div class="message success" role="status">@Model.StatusMessage</div> }
+
+    @if (Model.IsEnrollmentPending)
+    {
+        <div class="password-notice">
+            在身份验证器中手动输入密钥 <strong>@Model.EnrollmentSecret</strong>，或在移动设备上打开下面的配置链接，然后输入生成的六位代码。
+            <a href="@Model.OtpAuthUri">打开身份验证器</a>
+        </div>
+        <form class="password-form" method="post" asp-page-handler="Confirm">
+            <input type="hidden" asp-for="EnrollmentSecret" />
+            <input type="hidden" asp-for="ProtectedEnrollmentSecret" />
+            <input type="hidden" asp-for="OtpAuthUri" />
+            <div class="field"><label class="field-label" asp-for="Code">动态验证码</label><div class="field-content"><input class="password-input" asp-for="Code" autocomplete="one-time-code" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="000000" required /></div></div>
+            <div class="form-actions"><button class="primary-button" type="submit">确认绑定</button><a class="action-note" href="/account/two-factor">取消</a></div>
+        </form>
+    }
+    else if (!Model.IsEnabled)
+    {
+        <p class="password-notice">开始绑定前需要重新验证当前密码。新密钥只有在动态验证码确认成功后才会生效。</p>
+        <form class="password-form" method="post" asp-page-handler="Begin">
+            <div class="field"><label class="field-label" asp-for="CurrentPassword">当前密码</label><div class="field-content"><input class="password-input" asp-for="CurrentPassword" autocomplete="current-password" type="password" required /></div></div>
+            <div class="form-actions"><button class="primary-button" type="submit">开始绑定</button></div>
+        </form>
+    }
+    else if (Model.CanDisable)
+    {
+        <p class="password-notice">关闭双重验证会撤销当前所有 NexusAuth 登录会话，并要求重新登录。</p>
+        <form class="password-form" method="post" asp-page-handler="Disable">
+            <div class="field"><label class="field-label" asp-for="CurrentPassword">当前密码</label><div class="field-content"><input class="password-input" asp-for="CurrentPassword" autocomplete="current-password" type="password" required /></div></div>
+            <div class="form-actions"><button class="primary-button" type="submit">关闭双重验证</button></div>
+        </form>
+    }
+    else
+    {
+        <p class="password-notice">当前登录流程强制要求 TOTP，因此不能由用户自行关闭。</p>
+    }
+</section>

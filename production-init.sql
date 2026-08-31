@@ -44,9 +44,17 @@ CREATE TABLE nexusauth.users (
     failed_login_attempts integer   NOT NULL DEFAULT 0,
     locked_until    timestamptz,
     token_invalid_before timestamptz,
+    totp_secret_protected text,
+    totp_pending_secret_protected text,
+    totp_pending_expires_at timestamptz,
+    totp_enabled    boolean         NOT NULL DEFAULT false,
+    totp_last_used_counter bigint,
     created_at      timestamptz     NOT NULL,
     updated_at      timestamptz     NOT NULL,
-    CONSTRAINT pk_users PRIMARY KEY (id)
+    CONSTRAINT pk_users PRIMARY KEY (id),
+    CONSTRAINT ck_users_totp_state CHECK (
+        (totp_enabled = false) OR (totp_secret_protected IS NOT NULL)
+    )
 );
 
 CREATE UNIQUE INDEX ix_users_username ON nexusauth.users (username);

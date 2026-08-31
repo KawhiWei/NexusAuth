@@ -83,6 +83,25 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.TokenInvalidBefore)
             .HasColumnName("token_invalid_before");
 
+        builder.Property(u => u.TotpSecretProtected)
+            .HasColumnName("totp_secret_protected")
+            .HasColumnType("text");
+
+        builder.Property(u => u.TotpPendingSecretProtected)
+            .HasColumnName("totp_pending_secret_protected")
+            .HasColumnType("text");
+
+        builder.Property(u => u.TotpPendingExpiresAt)
+            .HasColumnName("totp_pending_expires_at");
+
+        builder.Property(u => u.TotpEnabled)
+            .HasColumnName("totp_enabled")
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(u => u.TotpLastUsedCounter)
+            .HasColumnName("totp_last_used_counter");
+
         builder.Property(u => u.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

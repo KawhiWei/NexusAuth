@@ -2,25 +2,36 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Options;
 using NexusAuth.Application.Services;
 using NexusAuth.Application.Services.LoginAudits;
+using NexusAuth.Application.Services.Security;
+using NexusAuth.Application.Users;
+using NexusAuth.Host.Authentication;
+using NexusAuth.Domain.AggregateRoots.Users;
 
 namespace NexusAuth.Host.Pages.Account;
 
 public class LoginModel(
     IUserService userService,
-    IClientService clientService,
     ISsoSessionService sessionService,
-    ILoginAuditService loginAuditService) : PageModel
+    ILoginAuditService loginAuditService,
+    ISecurityPolicyService securityPolicyService,
+    ITotpService totpService,
+    LoginFlowStateProtector flowStateProtector,
+    IOptions<LoginFlowOptions> flowOptions) : PageModel
 {
     private const string AuthTimeClaimType = "auth_time";
     private const string AmrClaimType = "amr";
     private const string AcrClaimType = "acr";
 
     private readonly IUserService _userService = userService;
-    private readonly IClientService _clientService = clientService;
     private readonly ISsoSessionService _sessionService = sessionService;
     private readonly ILoginAuditService _loginAuditService = loginAuditService;
+    private readonly ISecurityPolicyService _securityPolicyService = securityPolicyService;
+    private readonly ITotpService _totpService = totpService;
+    private readonly LoginFlowStateProtector _flowStateProtector = flowStateProtector;
+    private readonly LoginFlowOptions _flowOptions = flowOptions.Value;
 
     [BindProperty(SupportsGet = true)]
     public string? ReturnUrl { get; set; }
@@ -31,9 +42,22 @@ public class LoginModel(
     [BindProperty]
     public string Password { get; set; } = string.Empty;
 
+    [BindProperty]
+    public bool RememberMe { get; set; }
+
+    [BindProperty]
+    public string TotpCode { get; set; } = string.Empty;
+
+    [BindProperty]
+    public string FlowToken { get; set; } = string.Empty;
+
     public string? ErrorMessage { get; set; }
 
     public string? ClientName { get; set; }
+
+    public bool RequiresTotp { get; private set; }
+
+    public bool ShowRememberMe => _flowOptions.AllowRememberMe;
 
     /// <summary>
     /// 渲染登录页，并清理已有外部认证 Cookie。
@@ -77,7 +101,103 @@ public class LoginModel(
             return Page();
         }
 
+        var userPolicy = _securityPolicyService.CheckUser(user);
+        if (!userPolicy.IsSuccess)
+        {
+            await RecordLoginAsync(user.Id, false, "UserDeniedByPolicy");
+            ErrorMessage = "Invalid username or password.";
+            await TryExtractClientNameAsync();
+            return Page();
+        }
+
+        var totpStep = _flowOptions.FindStep(LoginFlowStepTypes.Totp);
+        if (totpStep is not null)
+        {
+            var totpEnabled = await _totpService.IsEnabledAsync(user.Id, HttpContext.RequestAborted);
+            var totpRequired = string.Equals(
+                totpStep.Requirement,
+                LoginFlowRequirements.Required,
+                StringComparison.OrdinalIgnoreCase);
+            if (totpRequired && !totpEnabled)
+            {
+                await RecordLoginAsync(user.Id, false, "TotpEnrollmentRequired");
+                ErrorMessage = "This account must configure an authenticator before it can sign in.";
+                await TryExtractClientNameAsync();
+                return Page();
+            }
+
+            if (totpEnabled)
+            {
+                RequiresTotp = true;
+                FlowToken = _flowStateProtector.Protect(
+                    new PendingLoginFlowState(
+                        user.Id,
+                        user.Username,
+                        ReturnUrl,
+                        _flowOptions.AllowRememberMe && RememberMe,
+                        DateTimeOffset.UtcNow.ToUnixTimeSeconds()),
+                    TimeSpan.FromMinutes(_flowOptions.PendingStateLifetimeMinutes));
+                Password = string.Empty;
+                await TryExtractClientNameAsync();
+                return Page();
+            }
+        }
+
+        return await CompleteLoginAsync(user, RememberMe, DateTimeOffset.UtcNow, "pwd");
+    }
+
+    public async Task<IActionResult> OnPostTotpAsync()
+    {
+        RequiresTotp = true;
+        if (!_flowStateProtector.TryUnprotect(FlowToken, out var flowState) || flowState is null)
+        {
+            RequiresTotp = false;
+            FlowToken = string.Empty;
+            ErrorMessage = "The login attempt expired. Start again.";
+            return Page();
+        }
+
+        Username = flowState.Username;
+        ReturnUrl = flowState.ReturnUrl;
+        RememberMe = flowState.RememberMe;
+        await TryExtractClientNameAsync();
+
+        if (string.IsNullOrWhiteSpace(TotpCode))
+        {
+            ErrorMessage = "Enter the six-digit authenticator code.";
+            return Page();
+        }
+
+        var user = await _userService.FindByIdAsync(flowState.UserId, HttpContext.RequestAborted);
+        if (user is null || !user.IsActive || !_securityPolicyService.CheckUser(user).IsSuccess)
+        {
+            await RecordLoginAsync(flowState.UserId, false, "UserUnavailable");
+            RequiresTotp = false;
+            FlowToken = string.Empty;
+            ErrorMessage = "The login attempt is no longer valid. Start again.";
+            return Page();
+        }
+
+        if (!await _totpService.ValidateAsync(user.Id, TotpCode, HttpContext.RequestAborted))
+        {
+            await RecordLoginAsync(user.Id, false, "InvalidTotp");
+            TotpCode = string.Empty;
+            ErrorMessage = "Invalid or already used authenticator code.";
+            return Page();
+        }
+
+        var authenticatedAt = DateTimeOffset.FromUnixTimeSeconds(flowState.AuthenticatedAtUnixSeconds);
+        return await CompleteLoginAsync(user, flowState.RememberMe, authenticatedAt, "pwd otp");
+    }
+
+    private async Task<IActionResult> CompleteLoginAsync(
+        User user,
+        bool rememberMe,
+        DateTimeOffset authenticatedAt,
+        string authenticationMethods)
+    {
         var sessionId = await _sessionService.CreateAsync(user.Id, HttpContext.RequestAborted);
+        Username = user.Username;
         await RecordLoginAsync(user.Id, true, null);
 
         // Build claims and sign in
@@ -87,9 +207,11 @@ public class LoginModel(
             new(ClaimTypes.Name, user.Username),
             new("sid", sessionId.ToString()),
             // 中文注释：记录认证时间与认证方式，供 OIDC 的 max_age、auth_time、amr、acr 扩展使用。
-            new(AuthTimeClaimType, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()),
-            new(AmrClaimType, "pwd"),
-            new(AcrClaimType, "urn:nexusauth:acr:pwd"),
+            new(AuthTimeClaimType, authenticatedAt.ToUnixTimeSeconds().ToString()),
+            new(AmrClaimType, authenticationMethods),
+            new(AcrClaimType, authenticationMethods.Contains("otp", StringComparison.Ordinal)
+                ? "urn:nexusauth:acr:mfa"
+                : "urn:nexusauth:acr:pwd"),
         };
 
         var identity = new ClaimsIdentity(claims, AppWebModule.AuthenticationScheme);
@@ -97,9 +219,9 @@ public class LoginModel(
 
         var authProperties = new AuthenticationProperties
         {
-            IsPersistent = true,
+            IsPersistent = _flowOptions.AllowRememberMe && rememberMe,
             IssuedUtc = DateTimeOffset.UtcNow,
-            ExpiresUtc = DateTimeOffset.UtcNow.AddHours(24),
+            ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(_flowOptions.SessionLifetimeMinutes),
         };
 
         await HttpContext.SignInAsync(

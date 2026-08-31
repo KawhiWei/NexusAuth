@@ -6,6 +6,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using NexusAuth.Application.Services;
 using NexusAuth.Persistence;
+using NexusAuth.Host.Authentication;
+using Microsoft.Extensions.Options;
+using NexusAuth.Application.Users;
 using System.Threading.RateLimiting;
 
 namespace NexusAuth.Host;
@@ -28,6 +31,20 @@ public class AppWebModule : LuckAppModule
 
         services.AddNexusAuthTokenSigning(configuration);
         services.Configure<NexusAuthSecurityOptions>(configuration.GetSection("Security"));
+        services.AddOptions<LoginFlowOptions>()
+            .Bind(configuration.GetSection(LoginFlowOptions.SectionName))
+            .PostConfigure(options => options.ApplyDefaults())
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<LoginFlowOptions>, LoginFlowOptionsValidator>();
+        services.AddSingleton<LoginFlowStateProtector>();
+        services.AddOptions<TotpOptions>()
+            .Bind(configuration.GetSection(TotpOptions.SectionName))
+            .Validate(options => !string.IsNullOrWhiteSpace(options.Issuer), "Totp:Issuer is required.")
+            .Validate(
+                options => options.EnrollmentLifetimeMinutes is >= 1 and <= 30,
+                "Totp:EnrollmentLifetimeMinutes must be between 1 and 30.")
+            .ValidateOnStart();
+        services.AddSingleton<ITotpSecretProtector, TotpSecretProtector>();
         services.Configure<BootstrapAdminOptions>(configuration.GetSection("BootstrapAdmin"));
         services.AddHostedService<BootstrapAdminHostedService>();
         services.AddScoped<SsoCookieAuthenticationEvents>();

@@ -66,6 +66,30 @@ public class User : AggregateRootWithIdentity<Guid>
     /// </summary>
     public DateTimeOffset? TokenInvalidBefore { get; private set; }
 
+    /// <summary>
+    /// The active TOTP secret is persisted only after being protected by the
+    /// application data-protection boundary. The domain never receives the
+    /// plaintext secret.
+    /// </summary>
+    public string? TotpSecretProtected { get; private set; }
+
+    /// <summary>
+    /// Secret material waiting for enrollment confirmation. Keeping pending
+    /// material separate means starting a new enrollment cannot silently
+    /// disable an already configured authenticator.
+    /// </summary>
+    public string? TotpPendingSecretProtected { get; private set; }
+
+    public DateTimeOffset? TotpPendingExpiresAt { get; private set; }
+
+    public bool TotpEnabled { get; private set; }
+
+    /// <summary>
+    /// The greatest accepted RFC 6238 time-step. Nullable represents a newly
+    /// enabled authenticator that has not accepted a code yet.
+    /// </summary>
+    public long? TotpLastUsedCounter { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -104,6 +128,8 @@ public class User : AggregateRootWithIdentity<Guid>
             IsSystemAccount = false,
             FailedLoginAttempts = 0,
             LockedUntil = null,
+            TotpEnabled = false,
+            TotpLastUsedCounter = null,
             CreatedAt = now,
             UpdatedAt = now,
         };
@@ -170,6 +196,77 @@ public class User : AggregateRootWithIdentity<Guid>
     {
         FailedLoginAttempts = 0;
         LockedUntil = null;
+        UpdatedAt = now;
+    }
+
+    public void BeginTotpEnrollment(
+        string protectedSecret,
+        DateTimeOffset expiresAt,
+        DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(protectedSecret);
+        if (expiresAt <= now)
+            throw new ArgumentOutOfRangeException(nameof(expiresAt), "TOTP enrollment must expire in the future.");
+
+        TotpPendingSecretProtected = protectedSecret;
+        TotpPendingExpiresAt = expiresAt;
+        UpdatedAt = now;
+    }
+
+    public bool ConfirmTotpEnrollment(long lastUsedCounter, DateTimeOffset now)
+    {
+        if (lastUsedCounter < 0)
+            throw new ArgumentOutOfRangeException(nameof(lastUsedCounter));
+
+        if (string.IsNullOrWhiteSpace(TotpPendingSecretProtected)
+            || !TotpPendingExpiresAt.HasValue
+            || TotpPendingExpiresAt.Value <= now)
+        {
+            TotpPendingSecretProtected = null;
+            TotpPendingExpiresAt = null;
+            UpdatedAt = now;
+            return false;
+        }
+
+        TotpSecretProtected = TotpPendingSecretProtected;
+        TotpPendingSecretProtected = null;
+        TotpPendingExpiresAt = null;
+        TotpEnabled = true;
+        TotpLastUsedCounter = lastUsedCounter;
+        UpdatedAt = now;
+        return true;
+    }
+
+    /// <summary>
+    /// Advances the accepted TOTP counter. Production repositories perform
+    /// this transition with a database compare-and-update; this domain method
+    /// also gives in-memory repository implementations the same semantics.
+    /// </summary>
+    public bool TryUseTotpCounter(long counter, DateTimeOffset now)
+    {
+        if (counter < 0)
+            throw new ArgumentOutOfRangeException(nameof(counter));
+
+        if (!IsActive
+            || !TotpEnabled
+            || string.IsNullOrWhiteSpace(TotpSecretProtected)
+            || TotpLastUsedCounter >= counter)
+        {
+            return false;
+        }
+
+        TotpLastUsedCounter = counter;
+        UpdatedAt = now;
+        return true;
+    }
+
+    public void DisableTotp(DateTimeOffset now)
+    {
+        TotpSecretProtected = null;
+        TotpPendingSecretProtected = null;
+        TotpPendingExpiresAt = null;
+        TotpEnabled = false;
+        TotpLastUsedCounter = null;
         UpdatedAt = now;
     }
 

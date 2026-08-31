@@ -186,6 +186,34 @@
                         </div>
                     }
 
+                    @if (Model.RequiresTotp)
+                    {
+                    <form class="space-y-6" method="post" asp-page-handler="Totp">
+                        <input type="hidden" asp-for="FlowToken" />
+                        <div class="space-y-2">
+                            <div class="ml-1 flex items-center justify-between">
+                                <label class="block font-label text-[10px] tracking-widest uppercase text-[var(--on-surface-variant)]/80" asp-for="TotpCode">身份验证器代码</label>
+                                <span class="text-[10px] uppercase tracking-widest font-bold text-[color:var(--primary)]">第二步</span>
+                            </div>
+                            <input class="block w-full rounded-t-lg border-0 border-b-2 border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] px-4 py-4 text-center font-headline text-2xl text-[var(--on-surface)] focus:border-[color:var(--primary)] focus:outline-none focus:ring-0"
+                                   asp-for="TotpCode"
+                                   autocomplete="one-time-code"
+                                   inputmode="numeric"
+                                   maxlength="6"
+                                   pattern="[0-9]{6}"
+                                   placeholder="000000"
+                                   required
+                                   autofocus />
+                            <p class="text-sm leading-6 text-[var(--on-surface-variant)]">输入身份验证器应用当前显示的六位代码。</p>
+                        </div>
+                        <button class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[color:var(--primary)] to-[color:var(--primary-dim)] px-6 py-4 font-bold text-white shadow-[0_0_20px_rgba(21,106,255,0.30)] transition-all hover:-translate-y-0.5" type="submit">
+                            验证并登录
+                        </button>
+                        <a class="block text-center text-sm font-medium text-[color:var(--primary)]" asp-page="/Account/Login" asp-route-returnUrl="@Model.ReturnUrl">重新开始</a>
+                    </form>
+                    }
+                    else
+                    {
                     <form class="space-y-6" method="post">
                         <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
 
@@ -242,10 +270,13 @@
                         </div>
 
                         <div class="flex items-center justify-between py-2">
+                            @if (Model.ShowRememberMe)
+                            {
                             <label class="flex items-center space-x-3 cursor-pointer">
-                                <input class="h-4 w-4 rounded border-[var(--outline-variant)] bg-[var(--surface-container-low)] text-[color:var(--primary)] focus:ring-[color:var(--primary)] focus:ring-offset-[var(--background)]" type="checkbox" />
+                                <input class="h-4 w-4 rounded border-[var(--outline-variant)] bg-[var(--surface-container-low)] text-[color:var(--primary)] focus:ring-[color:var(--primary)] focus:ring-offset-[var(--background)]" asp-for="RememberMe" type="checkbox" />
                                 <span class="text-sm text-[var(--on-surface-variant)]">记住我</span>
                             </label>
+                            }
                             <span class="text-sm text-[color:var(--primary)] font-medium">统一认证</span>
                         </div>
 
@@ -258,6 +289,7 @@
                             </span>
                         </button>
                     </form>
+                    }
 
                     <div class="mt-10 border-t border-[var(--outline-variant)]/10 pt-8">
                         <p class="mb-6 text-center font-label text-[10px] uppercase tracking-widest text-[var(--on-surface-variant)]/60">其他访问方式</p>
@@ -344,7 +376,7 @@
             const passwordInput = document.getElementById('password');
             const passwordToggle = document.getElementById('password-toggle');
             const passwordToggleIcon = document.getElementById('password-toggle-icon');
-            passwordToggle.addEventListener('click', function () {
+            passwordToggle?.addEventListener('click', function () {
                 const showing = passwordInput.type === 'text';
                 passwordInput.type = showing ? 'password' : 'text';
                 passwordToggle.setAttribute('aria-label', showing ? '显示密码' : '隐藏密码');

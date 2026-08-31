@@ -19,11 +19,43 @@ fi
 psql "${psql_args[@]}" --dbname=nexusauth \
   --file=/opt/nexusauth-init/production-init.sql
 
-# Register only the Workbench client required to administer a fresh instance.
-# Demo clients and users are intentionally excluded from runtime initialization.
+# Register the Workbench client and fixed local-only SCIM integration-test
+# credentials. Production initialization does not execute this Docker hook.
 psql "${psql_args[@]}" \
   --set "workbench_client_secret=$WORKBENCH_CLIENT_SECRET" \
   --dbname=nexusauth <<'SQL'
 SET search_path TO nexusauth;
 \i /opt/nexusauth-init/admin-seed.sql
+
+INSERT INTO scim_service_principal_credentials
+    (id, name, token_hash, scopes, is_active, expires_at, last_used_at, created_at, revoked_at)
+VALUES
+    (
+        '36d7cbb2-02a1-44f7-ad6c-9f68e77e63de',
+        'local-scim-integration-read',
+        'UJ7alomHnmklWLdv_dk8nAMaTC3HdDPXYlaRzvt4Dvk',
+        '["scim:read"]'::jsonb,
+        true,
+        NULL,
+        NULL,
+        NOW(),
+        NULL
+    ),
+    (
+        'eb06cb73-586f-48c3-b542-6a54549cf391',
+        'local-scim-integration-read-write',
+        'J0P-nM9qLuo6idK3Rpd_H7cCmbPU6pV5bOB0QQP-FPE',
+        '["scim:read","scim:write"]'::jsonb,
+        true,
+        NULL,
+        NULL,
+        NOW(),
+        NULL
+    )
+ON CONFLICT (name) DO UPDATE SET
+    token_hash = EXCLUDED.token_hash,
+    scopes = EXCLUDED.scopes,
+    is_active = true,
+    expires_at = NULL,
+    revoked_at = NULL;
 SQL

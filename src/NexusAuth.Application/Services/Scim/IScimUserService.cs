@@ -1,4 +1,5 @@
 using Luck.Framework.Infrastructure.DependencyInjectionModule;
+using System.Text.Json;
 
 namespace NexusAuth.Application.Services.Scim;
 
@@ -25,4 +26,4 @@ public sealed record ScimUserInput(
     string? GivenName, string? FamilyName, string? MiddleName, string? HonorificPrefix, string? HonorificSuffix,
     string? ProfileUrl, string? Title, string? UserType, string? PreferredLanguage, string? Locale, string? Timezone);
 
-public sealed record ScimPatchOperation(string Op, string? Path, string? Value);
+public sealed record ScimPatchOperation(string Op, string? Path, JsonElement? Value);

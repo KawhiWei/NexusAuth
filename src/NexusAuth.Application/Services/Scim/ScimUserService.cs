@@ -1,5 +1,6 @@
 using NexusAuth.Domain.AggregateRoots.Users;
 using NexusAuth.Application.Services.Sessions;
+using System.Text.Json;
 
 namespace NexusAuth.Application.Services.Scim;
 
@@ -115,8 +116,13 @@ public class ScimUserService(
         user.GivenName, user.FamilyName, user.MiddleName, user.HonorificPrefix, user.HonorificSuffix, user.ProfileUrl, user.Title,
         user.UserType, user.PreferredLanguage, user.Locale, user.Timezone, user.CreatedAt, user.UpdatedAt);
 
-    public static string Version(ScimUser user) => $"\"{user.UpdatedAt.UtcTicks}\"";
-    private static bool MatchesVersion(User user, string? expected) => string.IsNullOrWhiteSpace(expected) || expected == "*" || expected == $"\"{user.UpdatedAt.UtcTicks}\"";
+    public static string Version(ScimUser user) => Version(user.UpdatedAt);
+    private static bool MatchesVersion(User user, string? expected) => string.IsNullOrWhiteSpace(expected) || expected == "*" || expected == Version(user.UpdatedAt);
+    private static string Version(DateTimeOffset updatedAt)
+    {
+        var postgresTicks = updatedAt.UtcTicks - updatedAt.UtcTicks % TimeSpan.TicksPerMicrosecond;
+        return $"\"{postgresTicks}\"";
+    }
     private static string Required(string? value, string name) => !string.IsNullOrWhiteSpace(value) ? value.Trim() : throw new ArgumentException($"{name} is required.");
 
     private static (string? UserName, string? ExternalId, bool? Active, string? Email) ParseFilter(string? filter)
@@ -138,14 +144,82 @@ public class ScimUserService(
         var remove = string.Equals(operation.Op, "remove", StringComparison.OrdinalIgnoreCase);
         if (!remove && !string.Equals(operation.Op, "add", StringComparison.OrdinalIgnoreCase) && !string.Equals(operation.Op, "replace", StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("PATCH op must be add, replace, or remove.");
-        var value = remove ? null : operation.Value;
+
+        if (path is null)
+            return ApplyPathlessPatch(input, operation, remove);
+
+        var value = remove ? null : StringValue(operation.Value);
         return path switch
         {
-            "username" => input with { UserName = value }, "externalid" => input with { ExternalId = value }, "active" => input with { Active = remove ? true : bool.Parse(value ?? throw new ArgumentException("active requires a boolean value.")) },
+            "username" => input with { UserName = value }, "externalid" => input with { ExternalId = value }, "active" => input with { Active = remove ? true : BooleanValue(operation.Value) },
             "emails.value" => input with { Email = value }, "phonenumbers.value" => input with { PhoneNumber = value }, "name.givenname" => input with { GivenName = value }, "name.familyname" => input with { FamilyName = value },
             "name.middlename" => input with { MiddleName = value }, "name.honorificprefix" => input with { HonorificPrefix = value }, "name.honorificsuffix" => input with { HonorificSuffix = value },
             "profileurl" => input with { ProfileUrl = value }, "title" => input with { Title = value }, "usertype" => input with { UserType = value }, "preferredlanguage" => input with { PreferredLanguage = value }, "locale" => input with { Locale = value }, "timezone" => input with { Timezone = value },
             _ => throw new ArgumentException("Unsupported PATCH path.")
+        };
+    }
+
+    private static ScimUserInput ApplyPathlessPatch(ScimUserInput input, ScimPatchOperation operation, bool remove)
+    {
+        if (remove || operation.Value is not { ValueKind: JsonValueKind.Object } value)
+            throw new ArgumentException("PATCH operations without a path require an object value.");
+
+        foreach (var property in value.EnumerateObject())
+        {
+            if (property.Value.ValueKind == JsonValueKind.Object && property.Name.Equals("name", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var child in property.Value.EnumerateObject())
+                    input = ApplyPatch(input, new ScimPatchOperation(operation.Op, $"name.{child.Name}", child.Value.Clone()));
+                continue;
+            }
+
+            var path = property.Name.Equals("emails", StringComparison.OrdinalIgnoreCase) ? "emails.value"
+                : property.Name.Equals("phoneNumbers", StringComparison.OrdinalIgnoreCase) ? "phoneNumbers.value"
+                : property.Name;
+            var propertyValue = path.EndsWith(".value", StringComparison.Ordinal)
+                ? FirstScimValue(property.Value)
+                : property.Value.Clone();
+            input = ApplyPatch(input, new ScimPatchOperation(operation.Op, path, propertyValue));
+        }
+
+        return input;
+    }
+
+    private static JsonElement? FirstScimValue(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Array)
+            throw new ArgumentException("emails and phoneNumbers require an array value.");
+
+        JsonElement? first = null;
+        foreach (var item in value.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty("value", out var itemValue))
+                continue;
+            first ??= itemValue.Clone();
+            if (item.TryGetProperty("primary", out var primary) && primary.ValueKind == JsonValueKind.True)
+                return itemValue.Clone();
+        }
+        return first;
+    }
+
+    private static bool BooleanValue(JsonElement? value)
+    {
+        return value?.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String when bool.TryParse(value.Value.GetString(), out var parsed) => parsed,
+            _ => throw new ArgumentException("active requires a boolean value.")
+        };
+    }
+
+    private static string? StringValue(JsonElement? value)
+    {
+        return value?.ValueKind switch
+        {
+            null or JsonValueKind.Null or JsonValueKind.Undefined => null,
+            JsonValueKind.String => value.Value.GetString(),
+            _ => value.Value.GetRawText()
         };
     }
 }

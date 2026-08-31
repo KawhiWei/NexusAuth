@@ -42,19 +42,13 @@ public sealed class WorkbenchClientCredentialHostedService(
             return;
         }
 
-        foreach (var secret in client.ClientSecrets.Where(secret =>
-                     secret.IsActive && string.Equals(secret.Type, OAuthClientSecret.TypeSharedSecret, StringComparison.Ordinal)))
-        {
-            secret.Disable();
-        }
-
-        client.Update(clientSecrets: [
+        await clientRepository.ReplaceSharedSecretAsync(
+            client.Id,
             OAuthClientSecret.CreateSharedSecret(
                 client.Id,
                 clientSecret,
-                "Managed by the Workbench Auth:ClientSecret configuration")
-        ]);
-        await clientRepository.UpdateAsync(client, cancellationToken);
+                "Managed by the Workbench Auth:ClientSecret configuration"),
+            cancellationToken);
 
         logger.LogInformation("Workbench OAuth client credential was synchronized from configuration.");
     }

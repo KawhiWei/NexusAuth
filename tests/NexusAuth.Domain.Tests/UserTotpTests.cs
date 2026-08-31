@@ -1,4 +1,4 @@
-using NexusAuth.Domain.AggregateRoots.Users;
+using NexusAuth.Domain.Entities;
 using Xunit;
 
 namespace NexusAuth.Domain.Tests;
@@ -9,26 +9,40 @@ public sealed class UserTotpTests
     public void Enrollment_only_enables_totp_after_confirmation()
     {
         var now = DateTimeOffset.UtcNow;
-        var user = User.Create("alice", "Password!1", "Alice");
+        var credential = UserCredential.CreatePendingTotp(
+            Guid.NewGuid(), "protected-secret", now.AddMinutes(5), now: now);
 
-        user.BeginTotpEnrollment("protected-secret", now.AddMinutes(5), now);
-
-        Assert.False(user.TotpEnabled);
-        Assert.True(user.ConfirmTotpEnrollment(42, now.AddSeconds(1)));
-        Assert.True(user.TotpEnabled);
-        Assert.Equal("protected-secret", user.TotpSecretProtected);
-        Assert.Equal(42, user.TotpLastUsedCounter);
+        Assert.False(credential.IsEnabled);
+        Assert.True(credential.ConfirmTotp("protected-secret", 42, now.AddSeconds(1)));
+        Assert.True(credential.IsEnabled);
+        Assert.Equal("protected-secret", credential.SecretProtected);
+        Assert.Equal(42, credential.LastUsedCounter);
     }
 
     [Fact]
     public void Expired_enrollment_does_not_enable_totp()
     {
         var now = DateTimeOffset.UtcNow;
-        var user = User.Create("alice", "Password!1", "Alice");
-        user.BeginTotpEnrollment("protected-secret", now.AddSeconds(1), now);
+        var credential = UserCredential.CreatePendingTotp(
+            Guid.NewGuid(), "protected-secret", now.AddSeconds(1), now: now);
 
-        Assert.False(user.ConfirmTotpEnrollment(42, now.AddSeconds(2)));
-        Assert.False(user.TotpEnabled);
-        Assert.Null(user.TotpPendingSecretProtected);
+        Assert.False(credential.ConfirmTotp("protected-secret", 42, now.AddSeconds(2)));
+        Assert.False(credential.IsEnabled);
+        Assert.NotNull(credential.PendingSecretProtected);
+    }
+
+    [Fact]
+    public void Separate_authenticator_credentials_keep_replay_counters_independent()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var userId = Guid.NewGuid();
+        var first = UserCredential.CreatePendingTotp(userId, "first-secret", now.AddMinutes(5), now: now);
+        var second = UserCredential.CreatePendingTotp(userId, "second-secret", now.AddMinutes(5), now: now);
+        first.ConfirmTotp("first-secret", 1, now);
+        second.ConfirmTotp("second-secret", 1, now);
+
+        Assert.True(first.TryUseTotpCounter(2, now.AddSeconds(1)));
+        Assert.True(second.TryUseTotpCounter(2, now.AddSeconds(1)));
+        Assert.False(first.TryUseTotpCounter(2, now.AddSeconds(2)));
     }
 }

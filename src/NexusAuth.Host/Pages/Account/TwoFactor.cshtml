@@ -35,24 +35,33 @@
             <div class="form-actions"><button class="primary-button" type="submit">确认绑定</button><a class="action-note" href="/account/two-factor">取消</a></div>
         </form>
     }
-    else if (!Model.IsEnabled)
-    {
-        <p class="password-notice">开始绑定前需要重新验证当前密码。新密钥只有在动态验证码确认成功后才会生效。</p>
-        <form class="password-form" method="post" asp-page-handler="Begin">
-            <div class="field"><label class="field-label" asp-for="CurrentPassword">当前密码</label><div class="field-content"><input class="password-input" asp-for="CurrentPassword" autocomplete="current-password" type="password" required /></div></div>
-            <div class="form-actions"><button class="primary-button" type="submit">开始绑定</button></div>
-        </form>
-    }
-    else if (Model.CanDisable)
-    {
-        <p class="password-notice">关闭双重验证会撤销当前所有 NexusAuth 登录会话，并要求重新登录。</p>
-        <form class="password-form" method="post" asp-page-handler="Disable">
-            <div class="field"><label class="field-label" asp-for="CurrentPassword">当前密码</label><div class="field-content"><input class="password-input" asp-for="CurrentPassword" autocomplete="current-password" type="password" required /></div></div>
-            <div class="form-actions"><button class="primary-button" type="submit">关闭双重验证</button></div>
-        </form>
-    }
     else
     {
-        <p class="password-notice">当前登录流程强制要求 TOTP，因此不能由用户自行关闭。</p>
+        <p class="password-notice">开始绑定前需要重新验证当前密码。每台身份验证器都会创建独立凭据，新密钥只有在动态验证码确认成功后才会生效。</p>
+        <form class="password-form" method="post" asp-page-handler="Begin">
+            <div class="field"><label class="field-label" asp-for="CurrentPassword">当前密码</label><div class="field-content"><input class="password-input" asp-for="CurrentPassword" autocomplete="current-password" type="password" required /></div></div>
+            <div class="form-actions"><button class="primary-button" type="submit">@(Model.IsEnabled ? "添加身份验证器" : "开始绑定")</button></div>
+        </form>
+        @if (Model.IsEnabled)
+        {
+            <div class="password-notice">
+                <strong>已绑定的身份验证器</strong>
+                @foreach (var credential in Model.Credentials.Where(credential => credential.IsEnabled))
+                {
+                    <div class="form-actions">
+                        <span>@credential.DisplayName</span>
+                        @if (Model.CanDisable)
+                        {
+                            <form method="post" asp-page-handler="Disable">
+                                <input type="hidden" name="CredentialId" value="@credential.Id" />
+                                <input class="password-input" name="CurrentPassword" autocomplete="current-password" type="password" placeholder="当前密码" required />
+                                <button class="primary-button" type="submit">移除此设备</button>
+                            </form>
+                        }
+                    </div>
+                }
+                @if (!Model.CanDisable) { <p>当前登录流程强制要求 TOTP，因此不能由用户自行关闭。</p> }
+            </div>
+        }
     }
 </section>

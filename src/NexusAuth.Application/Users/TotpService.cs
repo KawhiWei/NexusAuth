@@ -4,6 +4,7 @@ namespace NexusAuth.Application.Users;
 
 public sealed class TotpService(
     IUserRepository userRepository,
+    IUserCredentialRepository credentialRepository,
     ITotpSecretProtector secretProtector,
     IOptions<TotpOptions> options) : ITotpService
 {
@@ -20,14 +21,14 @@ public sealed class TotpService(
         var secret = TotpAlgorithm.Base32Encode(RandomNumberGenerator.GetBytes(20));
         var protectedSecret = secretProtector.Protect(secret);
         var expiresAt = now.AddMinutes(_options.EnrollmentLifetimeMinutes);
-        user.BeginTotpEnrollment(protectedSecret, expiresAt, now);
-        await userRepository.UpdateAsync(user, ct);
+        var credential = UserCredential.CreatePendingTotp(user.Id, protectedSecret, expiresAt, now: now);
+        await credentialRepository.AddAsync(credential, ct);
 
         var issuer = string.IsNullOrWhiteSpace(_options.Issuer) ? "NexusAuth" : _options.Issuer.Trim();
         var label = Uri.EscapeDataString($"{issuer}:{user.Username}");
         var uri = $"otpauth://totp/{label}?secret={secret}"
             + $"&issuer={Uri.EscapeDataString(issuer)}&algorithm=SHA1&digits=6&period=30";
-        return new TotpEnrollment(protectedSecret, secret, uri);
+        return new TotpEnrollment(credential.Id, protectedSecret, secret, uri);
     }
 
     public async Task<bool> ConfirmEnrollmentAsync(
@@ -36,13 +37,9 @@ public sealed class TotpService(
         string code,
         CancellationToken ct = default)
     {
-        var user = await userRepository.FindByIdAsync(userId, ct);
         var now = DateTimeOffset.UtcNow;
-        if (user is null
-            || !user.IsActive
-            || string.IsNullOrWhiteSpace(user.TotpPendingSecretProtected)
-            || !string.Equals(user.TotpPendingSecretProtected, protectedSecret, StringComparison.Ordinal)
-            || user.TotpPendingExpiresAt <= now)
+        var credential = await credentialRepository.FindPendingTotpAsync(userId, protectedSecret, ct);
+        if (credential is null || credential.PendingExpiresAt <= now)
         {
             return false;
         }
@@ -53,8 +50,9 @@ public sealed class TotpService(
             return false;
         }
 
-        return await userRepository.TryConfirmTotpEnrollmentAsync(
-            user.Id,
+        return await credentialRepository.TryConfirmTotpAsync(
+            credential.Id,
+            userId,
             protectedSecret,
             counter,
             now,
@@ -64,30 +62,49 @@ public sealed class TotpService(
     public async Task<bool> IsEnabledAsync(Guid userId, CancellationToken ct = default)
     {
         var user = await userRepository.FindByIdAsync(userId, ct);
-        return user is { IsActive: true, TotpEnabled: true }
-            && !string.IsNullOrWhiteSpace(user.TotpSecretProtected);
+        return user is { IsActive: true }
+            && (await credentialRepository.GetEnabledTotpAsync(userId, ct)).Count > 0;
     }
 
     public async Task<bool> ValidateAsync(Guid userId, string code, CancellationToken ct = default)
     {
         var user = await userRepository.FindByIdAsync(userId, ct);
-        if (user is not { IsActive: true, TotpEnabled: true }
-            || string.IsNullOrWhiteSpace(user.TotpSecretProtected)
-            || !TryUnprotect(user.TotpSecretProtected, out var secret)
-            || !TotpAlgorithm.TryFindCounter(secret, code, DateTimeOffset.UtcNow, out var counter))
+        if (user is not { IsActive: true })
         {
             return false;
         }
 
-        return await userRepository.TryUseTotpCounterAsync(user.Id, counter, DateTimeOffset.UtcNow, ct);
+        var now = DateTimeOffset.UtcNow;
+        foreach (var credential in await credentialRepository.GetEnabledTotpAsync(userId, ct))
+        {
+            if (string.IsNullOrWhiteSpace(credential.SecretProtected)
+                || !TryUnprotect(credential.SecretProtected, out var secret)
+                || !TotpAlgorithm.TryFindCounter(secret, code, now, out var counter))
+            {
+                continue;
+            }
+
+            if (await credentialRepository.TryUseTotpCounterAsync(credential.Id, userId, counter, now, ct))
+                return true;
+        }
+
+        return false;
     }
 
-    public async Task DisableAsync(Guid userId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TotpCredentialSummary>> GetCredentialsAsync(Guid userId, CancellationToken ct = default)
     {
-        var user = await userRepository.FindByIdAsync(userId, ct)
-            ?? throw new InvalidOperationException("User was not found.");
-        user.DisableTotp(DateTimeOffset.UtcNow);
-        await userRepository.UpdateAsync(user, ct);
+        return (await credentialRepository.GetTotpAsync(userId, ct))
+            .Select(credential => new TotpCredentialSummary(
+                credential.Id,
+                credential.DisplayName,
+                credential.IsEnabled,
+                credential.CreatedAt))
+            .ToArray();
+    }
+
+    public Task<bool> DisableAsync(Guid userId, Guid credentialId, CancellationToken ct = default)
+    {
+        return credentialRepository.DisableAsync(credentialId, userId, DateTimeOffset.UtcNow, ct);
     }
 
     private bool TryUnprotect(string protectedSecret, out string secret)

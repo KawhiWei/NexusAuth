@@ -25,12 +25,6 @@ public class LoginModel(
     private const string AmrClaimType = "amr";
     private const string AcrClaimType = "acr";
 
-    private readonly IUserService _userService = userService;
-    private readonly ISsoSessionService _sessionService = sessionService;
-    private readonly ILoginAuditService _loginAuditService = loginAuditService;
-    private readonly ISecurityPolicyService _securityPolicyService = securityPolicyService;
-    private readonly ITotpService _totpService = totpService;
-    private readonly LoginFlowStateProtector _flowStateProtector = flowStateProtector;
     private readonly LoginFlowOptions _flowOptions = flowOptions.Value;
 
     [BindProperty(SupportsGet = true)]
@@ -92,7 +86,7 @@ public class LoginModel(
             return Page();
         }
 
-        var user = await _userService.ValidateCredentialsAsync(Username, Password);
+        var user = await userService.ValidateCredentialsAsync(Username, Password);
         if (user is null)
         {
             await RecordLoginAsync(null, false, "InvalidCredentials");
@@ -101,7 +95,7 @@ public class LoginModel(
             return Page();
         }
 
-        var userPolicy = _securityPolicyService.CheckUser(user);
+        var userPolicy = securityPolicyService.CheckUser(user);
         if (!userPolicy.IsSuccess)
         {
             await RecordLoginAsync(user.Id, false, "UserDeniedByPolicy");
@@ -113,7 +107,7 @@ public class LoginModel(
         var totpStep = _flowOptions.FindStep(LoginFlowStepTypes.Totp);
         if (totpStep is not null)
         {
-            var totpEnabled = await _totpService.IsEnabledAsync(user.Id, HttpContext.RequestAborted);
+            var totpEnabled = await totpService.IsEnabledAsync(user.Id, HttpContext.RequestAborted);
             var totpRequired = string.Equals(
                 totpStep.Requirement,
                 LoginFlowRequirements.Required,
@@ -129,7 +123,7 @@ public class LoginModel(
             if (totpEnabled)
             {
                 RequiresTotp = true;
-                FlowToken = _flowStateProtector.Protect(
+                FlowToken = flowStateProtector.Protect(
                     new PendingLoginFlowState(
                         user.Id,
                         user.Username,
@@ -149,7 +143,7 @@ public class LoginModel(
     public async Task<IActionResult> OnPostTotpAsync()
     {
         RequiresTotp = true;
-        if (!_flowStateProtector.TryUnprotect(FlowToken, out var flowState) || flowState is null)
+        if (!flowStateProtector.TryUnprotect(FlowToken, out var flowState) || flowState is null)
         {
             RequiresTotp = false;
             FlowToken = string.Empty;
@@ -168,8 +162,8 @@ public class LoginModel(
             return Page();
         }
 
-        var user = await _userService.FindByIdAsync(flowState.UserId, HttpContext.RequestAborted);
-        if (user is null || !user.IsActive || !_securityPolicyService.CheckUser(user).IsSuccess)
+        var user = await userService.FindByIdAsync(flowState.UserId, HttpContext.RequestAborted);
+        if (user is null || !user.IsActive || !securityPolicyService.CheckUser(user).IsSuccess)
         {
             await RecordLoginAsync(flowState.UserId, false, "UserUnavailable");
             RequiresTotp = false;
@@ -178,7 +172,7 @@ public class LoginModel(
             return Page();
         }
 
-        if (!await _totpService.ValidateAsync(user.Id, TotpCode, HttpContext.RequestAborted))
+        if (!await totpService.ValidateAsync(user.Id, TotpCode, HttpContext.RequestAborted))
         {
             await RecordLoginAsync(user.Id, false, "InvalidTotp");
             TotpCode = string.Empty;
@@ -196,7 +190,7 @@ public class LoginModel(
         DateTimeOffset authenticatedAt,
         string authenticationMethods)
     {
-        var sessionId = await _sessionService.CreateAsync(user.Id, HttpContext.RequestAborted);
+        var sessionId = await sessionService.CreateAsync(user.Id, HttpContext.RequestAborted);
         Username = user.Username;
         await RecordLoginAsync(user.Id, true, null);
 
@@ -273,7 +267,7 @@ public class LoginModel(
     private Task RecordLoginAsync(Guid? userId, bool isSuccessful, string? failureReason)
     {
         var clientId = TryExtractClientId();
-        return _loginAuditService.RecordAsync(new LoginAuditRecord(
+        return loginAuditService.RecordAsync(new LoginAuditRecord(
             Username,
             userId,
             clientId,

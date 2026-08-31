@@ -20,7 +20,7 @@ ON CONFLICT (name) DO UPDATE SET
     description = EXCLUDED.description;
 
 -- ============================================================
--- OAuth Client: nexusauth.workbench (参考 demo-bff-secret 格式)
+-- OAuth Client: nexusauth.workbench
 -- ============================================================
 INSERT INTO oauth_clients (id, client_id, token_endpoint_auth_method, jwks, jwks_uri, client_name, description, redirect_uris, post_logout_redirect_uris, allowed_scopes, allowed_grant_types, require_pkce, is_active, created_at)
 VALUES (
@@ -50,22 +50,9 @@ ON CONFLICT (client_id) DO UPDATE SET
     require_pkce = EXCLUDED.require_pkce,
     is_active = EXCLUDED.is_active;
 
-INSERT INTO oauth_client_secrets (id, client_id, type, value, plain_value, description, is_active, created_at)
-VALUES (
-    'a8dc73d9-253c-4945-b096-8933e8d557ec',
-    'a9846c33-0147-44a8-b0be-fc2ddfccd732',
-    'shared_secret',
-    crypt(:'workbench_client_secret', gen_salt('bf', 12)),
-    NULL,
-    'Managed by WORKBENCH_CLIENT_SECRET',
-    true,
-    NOW()
-)
-ON CONFLICT (id) DO UPDATE SET
-    value = EXCLUDED.value,
-    plain_value = EXCLUDED.plain_value,
-    description = EXCLUDED.description,
-    is_active = EXCLUDED.is_active;
+-- The Workbench API creates and rotates its BCrypt-protected client secret
+-- during startup. Keeping it out of SQL avoids database-specific hashing
+-- functions and makes this schema seed deterministic.
 
 -- ============================================================
 -- Client API Resource mapping

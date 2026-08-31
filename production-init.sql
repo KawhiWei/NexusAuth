@@ -3,7 +3,7 @@
 -- 说明：
 -- 1) 本脚本只用于空的 nexusauth 数据库；不会创建、切换或删除数据库。
 -- 2) 本脚本定义当前最终 schema，不包含任何历史兼容 DDL。
--- 3) 已有数据库必须按 database/ 中的版本迁移升级，不能重跑本脚本。
+-- 3) This script is the single source of truth for a fresh database.
 -- 4) 本脚本不写入 demo 用户或初始管理员；初始管理员由 SSO BootstrapAdmin 配置创建。
 -- 5) 推荐执行：psql --dbname=nexusauth --file=production-init.sql
 -- ============================================================
@@ -44,23 +44,40 @@ CREATE TABLE nexusauth.users (
     failed_login_attempts integer   NOT NULL DEFAULT 0,
     locked_until    timestamptz,
     token_invalid_before timestamptz,
-    totp_secret_protected text,
-    totp_pending_secret_protected text,
-    totp_pending_expires_at timestamptz,
-    totp_enabled    boolean         NOT NULL DEFAULT false,
-    totp_last_used_counter bigint,
     created_at      timestamptz     NOT NULL,
     updated_at      timestamptz     NOT NULL,
-    CONSTRAINT pk_users PRIMARY KEY (id),
-    CONSTRAINT ck_users_totp_state CHECK (
-        (totp_enabled = false) OR (totp_secret_protected IS NOT NULL)
-    )
+    CONSTRAINT pk_users PRIMARY KEY (id)
 );
 
 CREATE UNIQUE INDEX ix_users_username ON nexusauth.users (username);
 CREATE UNIQUE INDEX ix_users_external_id ON nexusauth.users (external_id) WHERE external_id IS NOT NULL;
 CREATE UNIQUE INDEX ix_users_email ON nexusauth.users (email) WHERE email IS NOT NULL;
 CREATE UNIQUE INDEX ix_users_phone_number ON nexusauth.users (phone_number) WHERE phone_number IS NOT NULL;
+
+-- ============================================================
+-- user_credentials
+-- ============================================================
+CREATE TABLE nexusauth.user_credentials (
+    id uuid NOT NULL,
+    user_id uuid NOT NULL REFERENCES nexusauth.users(id) ON DELETE CASCADE,
+    type varchar(32) NOT NULL,
+    display_name varchar(128) NOT NULL,
+    secret_protected text,
+    pending_secret_protected text,
+    pending_expires_at timestamptz,
+    is_enabled boolean NOT NULL DEFAULT false,
+    last_used_counter bigint,
+    created_at timestamptz NOT NULL,
+    updated_at timestamptz NOT NULL,
+    disabled_at timestamptz,
+    CONSTRAINT pk_user_credentials PRIMARY KEY (id),
+    CONSTRAINT ck_user_credentials_totp_state CHECK (
+        (type <> 'totp') OR (is_enabled = false) OR (secret_protected IS NOT NULL)
+    )
+);
+
+CREATE INDEX ix_user_credentials_user_type_enabled
+    ON nexusauth.user_credentials (user_id, type, is_enabled);
 
 -- ============================================================
 -- sso_sessions

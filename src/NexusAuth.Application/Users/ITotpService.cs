@@ -17,7 +17,9 @@ public interface ITotpService : IScopedDependency
 
     Task<bool> ValidateAsync(Guid userId, string code, CancellationToken ct = default);
 
-    Task DisableAsync(Guid userId, CancellationToken ct = default);
+    Task<IReadOnlyList<TotpCredentialSummary>> GetCredentialsAsync(Guid userId, CancellationToken ct = default);
+
+    Task<bool> DisableAsync(Guid userId, Guid credentialId, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -26,9 +28,12 @@ public interface ITotpService : IScopedDependency
 /// the Base32 value shown to an authenticator and OtpauthUri is its QR payload.
 /// </summary>
 public sealed record TotpEnrollment(
+    Guid CredentialId,
     string ProtectedSecret,
     string ManualEntryKey,
     string OtpauthUri);
+
+public sealed record TotpCredentialSummary(Guid Id, string DisplayName, bool IsEnabled, DateTimeOffset CreatedAt);
 
 public sealed class TotpOptions
 {

@@ -34,9 +34,14 @@ public sealed class TwoFactorModel(
     [BindProperty]
     public string OtpAuthUri { get; set; } = string.Empty;
 
+    [BindProperty]
+    public Guid CredentialId { get; set; }
+
     public bool IsEnabled { get; private set; }
 
     public bool IsEnrollmentPending { get; private set; }
+
+    public IReadOnlyList<TotpCredentialSummary> Credentials { get; private set; } = [];
 
     public bool CanDisable => !string.Equals(
         _flowOptions.FindStep(LoginFlowStepTypes.Totp)?.Requirement,
@@ -52,7 +57,7 @@ public sealed class TwoFactorModel(
         if (!TryGetUserId(out var userId))
             return Challenge(AppWebModule.AuthenticationScheme);
 
-        IsEnabled = await totpService.IsEnabledAsync(userId, ct);
+        await LoadCredentialsAsync(ct);
         return Page();
     }
 
@@ -62,7 +67,7 @@ public sealed class TwoFactorModel(
         if (user is null)
         {
             ErrorMessage = "Current password is incorrect.";
-            await LoadEnabledAsync(ct);
+            await LoadCredentialsAsync(ct);
             return Page();
         }
 
@@ -72,7 +77,7 @@ public sealed class TwoFactorModel(
         OtpAuthUri = enrollment.OtpauthUri;
         CurrentPassword = string.Empty;
         IsEnrollmentPending = true;
-        IsEnabled = await totpService.IsEnabledAsync(user.Id, ct);
+        await LoadCredentialsAsync(ct);
         return Page();
     }
 
@@ -82,7 +87,7 @@ public sealed class TwoFactorModel(
             return Challenge(AppWebModule.AuthenticationScheme);
 
         IsEnrollmentPending = true;
-        IsEnabled = await totpService.IsEnabledAsync(userId, ct);
+        await LoadCredentialsAsync(ct);
         if (!await totpService.ConfirmEnrollmentAsync(userId, ProtectedEnrollmentSecret, Code, ct))
         {
             Code = string.Empty;
@@ -94,7 +99,7 @@ public sealed class TwoFactorModel(
         ProtectedEnrollmentSecret = string.Empty;
         OtpAuthUri = string.Empty;
         IsEnrollmentPending = false;
-        IsEnabled = true;
+        await LoadCredentialsAsync(ct);
         StatusMessage = "Authenticator verification is enabled.";
         return Page();
     }
@@ -104,7 +109,7 @@ public sealed class TwoFactorModel(
         if (!CanDisable)
         {
             ErrorMessage = "The active login flow requires TOTP and does not allow it to be disabled.";
-            await LoadEnabledAsync(ct);
+            await LoadCredentialsAsync(ct);
             return Page();
         }
 
@@ -112,11 +117,16 @@ public sealed class TwoFactorModel(
         if (user is null)
         {
             ErrorMessage = "Current password is incorrect.";
-            await LoadEnabledAsync(ct);
+            await LoadCredentialsAsync(ct);
             return Page();
         }
 
-        await totpService.DisableAsync(user.Id, ct);
+        if (!await totpService.DisableAsync(user.Id, CredentialId, ct))
+        {
+            ErrorMessage = "The authenticator is no longer available.";
+            await LoadCredentialsAsync(ct);
+            return Page();
+        }
         await sessionService.RevokeAllForUserAsync(user.Id, ct);
         await HttpContext.SignOutAsync(AppWebModule.AuthenticationScheme);
         return RedirectToPage("/Account/Login");
@@ -131,10 +141,13 @@ public sealed class TwoFactorModel(
         return await userService.ValidateCredentialsAsync(username, CurrentPassword, ct);
     }
 
-    private async Task LoadEnabledAsync(CancellationToken ct)
+    private async Task LoadCredentialsAsync(CancellationToken ct)
     {
         if (TryGetUserId(out var userId))
-            IsEnabled = await totpService.IsEnabledAsync(userId, ct);
+        {
+            Credentials = await totpService.GetCredentialsAsync(userId, ct);
+            IsEnabled = Credentials.Any(credential => credential.IsEnabled);
+        }
     }
 
     private bool TryGetUserId(out Guid userId)

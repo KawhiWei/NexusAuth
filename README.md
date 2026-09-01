@@ -124,6 +124,17 @@ WORKBENCH_CLIENT_SECRET=REPLACE_WITH_A_LONG_RANDOM_SECRET
 
 `WORKBENCH_CLIENT_SECRET` 是 `nexusauth.workbench` 系统 OAuth 客户端的唯一密钥来源。首次初始化数据库时会以该值生成 BCrypt 哈希，Workbench API 运行时也使用同一值认证；生产环境必须显式设置它。Compose 中的回退值仅用于本地开发，不能用于生产。
 
+NexusAuth Host 支持使用带 `NEXUSAUTH_` 前缀的单下划线环境变量覆盖配置。Docker Compose 将配置路径平铺为这种命名格式，不再使用 .NET 默认的双下划线配置键，例如：
+
+```bash
+NEXUSAUTH_JWT_ISSUER=https://sso.example.com
+NEXUSAUTH_LOGIN_PAGE_MARKETING_DESCRIPTION="OAuth 2.1 和 OIDC · 授权码 + PKCE · SCIM 2.0 标准协议"
+NEXUSAUTH_CONNECTION_STRINGS_DEFAULT="Host=db;Port=5432;Database=nexusauth;Username=nexusauth;Password=REPLACE_WITH_A_SECRET"
+NEXUSAUTH_WORKBENCH_AUTH_AUTHORITY=https://sso.example.com
+```
+
+Host 的登录页、JWT、数据库连接和 Workbench API 配置均可通过对应的 `NEXUSAUTH_...` 单下划线变量设置。
+
 `demo/seed.sql` 不再由 Compose 自动执行。需要演示客户端与示例用户时，可以在本地开发数据库中手动执行该脚本。
 
 ### 数据库脚本职责
@@ -133,7 +144,7 @@ WORKBENCH_CLIENT_SECRET=REPLACE_WITH_A_LONG_RANDOM_SECRET
 - `admin/src/NexusAuth.Workbench.Api/seed.sql`：登记 Workbench 所需的 scope 和 OAuth 客户端；通过 psql 变量 `workbench_client_secret` 写入 `WORKBENCH_CLIENT_SECRET` 的 BCrypt 哈希。
 - `demo/seed.sql`：只用于本地演示客户端和示例用户，禁止用于生产。
 
-本地 Compose 默认使用 Development 环境自动生成并持久化开发签名证书。生产环境必须设置 `NEXUSAUTH_SSO_ENVIRONMENT=Production`，挂载由证书管理系统提供的 PFX，并通过 `NEXUSAUTH_SIGNING_CERTIFICATE_PATH` 和 Secret 配置证书密码。生产环境不会自动生成开发证书。
+本地 Compose 默认使用 Development 环境自动生成并持久化开发签名证书。生产环境必须设置 `NEXUSAUTH_SSO_ENVIRONMENT=Production`，挂载由证书管理系统提供的 PFX，并通过 `NEXUSAUTH_JWT_SIGNING_CERTIFICATE_PATH` 和 Secret 配置证书密码。生产环境不会自动生成开发证书。
 
 要重新初始化本地数据库（会删除 Compose 数据卷，请确认数据可丢失）：
 
@@ -188,11 +199,11 @@ app.MapControllers();
 
 其中 `级别` 是独立的 `TRC`、`DBG`、`INF`、`WRN`、`ERR` 或 `FTL` 字段，不再拼在日志内容里。
 
-MVC 请求使用控制器名作为 `Module`、Action 名作为 `Category`；`Subcategory` 是可选业务分类，请求完成日志中为空。业务日志可通过 `ApplicationLogScope.Begin(logger, subcategory, businessId, outcome)` 写入 `Authentication`、`ClientAuthentication`、`AuthorizationCode` 或 `Token` 等子分类。非 MVC Controller 端点使用 `HTTP` 作为模块，并以 Endpoint DisplayName 作为分类。站点启动日志没有控制器上下文，仍使用各站点的 `LuckLogging.Module`。
+MVC 请求使用控制器名作为 `Module`、Action 名作为 `Category`；`Subcategory` 是可选业务分类，请求完成日志中为空。业务日志通过 `Luck.Logging.Serilog` 的 `BeginLuckLogScope(subcategory: ..., filter2: ...)` 写入 `Authentication`、`ClientAuthentication`、`AuthorizationCode` 或 `Token` 等子分类。非 MVC Controller 端点使用 `HTTP` 作为模块，并以 Endpoint DisplayName 作为分类。站点启动日志没有控制器上下文，仍使用各站点的 `LuckLogging.Module`。
 
 `RequestTraceId` 是独立的 W3C 分布式追踪标识，优先取 `Activity.Current.TraceId`，由标准 `traceparent` 在服务间传播。`Filter1` 在每个服务的请求入口直接生成一次，并在该请求内保持不变。`Filter2` 优先从当前用户的 `NameIdentifier` 或 `sub` Claim 获取；匿名请求没有用户 ID 时由组件生成请求级 GUID。`Filter1` 和 `Filter2` 不使用自定义 HTTP Header 传播。
 
-业务层通过 `ApplicationLogScope.Begin(logger, subcategory, businessId, outcome)` 建立嵌套 scope：`Filter1` 始终继承请求入口的唯一 ID；业务代码明确掌握用户、客户端或其他业务主键时，可以用 `businessId` 补充当前业务日志的 `Filter2`；`outcome` 记录 `LoginSucceeded`、`InvalidPassword` 或 `RefreshTokenRotated` 等业务结果。未传入业务 ID 时继承请求级用户 ID。
+业务层通过 `BeginLuckLogScope(subcategory: ..., filter2: ...)` 建立嵌套 scope：`Filter1` 始终继承请求入口的唯一 ID；业务代码明确掌握用户、客户端或其他业务主键时，可以用业务主键补充当前日志的 `Filter2`。`LoginSucceeded`、`InvalidPassword` 或 `RefreshTokenRotated` 等业务结果作为具体日志事件的结构化 `Outcome` 字段记录。未传入业务 ID 时继承请求级用户 ID。
 
 这种格式借鉴了 SkyEye 日志的字段职责，但没有照搬完整 HTTP body、header、Cookie 或 SQL 内容。认证日志可能包含敏感上下文，默认只记录排查所需的稳定标识和结果码，绝不记录 password、client secret、authorization code、access token、refresh token、private key、assertion、verifier 或完整 claims/scope。需要查看请求细节时，应结合 TraceId 到受控的网关或审计系统中排查。
 
@@ -201,9 +212,9 @@ MVC 请求使用控制器名作为 `Module`、Action 名作为 `Category`；`Sub
 - SSO：`logs/nexusauth-sso-YYYYMMDD.log`
 - Workbench：`logs/nexusauth-workbench-YYYYMMDD.log`
 
-文件按天滚动，单文件达到 100MB 时继续分片，每个站点保留最近 30 个文件，并启用共享写入和约 1 秒的磁盘刷新。默认最低级别为 `Information`。可以在各站点的 `LuckLogging` 配置节中覆盖 `Module`、`FilePath`、`MinimumLevel`、`MinimumLevelOverrides`、`FileSizeLimitBytes`、`RetainedFileCountLimit`、`RollOnFileSizeLimit`、`Shared` 和 `FlushIntervalSeconds`；环境变量使用双下划线，例如 `LuckLogging__MinimumLevel=Information`、`LuckLogging__MinimumLevelOverrides__Microsoft.AspNetCore=Information` 或 `LuckLogging__FilePath=/var/log/nexusauth/sso-.log`。
+文件按天滚动，单文件达到 100MB 时继续分片，每个站点保留最近 30 个文件，并启用共享写入和约 1 秒的磁盘刷新。默认最低级别为 `Information`。可以在各站点的 `LuckLogging` 配置节中覆盖 `Module`、`FilePath`、`MinimumLevel`、`MinimumLevelOverrides`、`FileSizeLimitBytes`、`RetainedFileCountLimit`、`RollOnFileSizeLimit`、`Shared` 和 `FlushIntervalSeconds`；环境变量使用带 `NEXUSAUTH_` 前缀的单下划线格式，例如 `NEXUSAUTH_LUCK_LOGGING_MINIMUM_LEVEL=Information`、`NEXUSAUTH_LUCK_LOGGING_MINIMUM_LEVEL_OVERRIDES_MICROSOFT_ASPNETCORE=Information` 或 `NEXUSAUTH_LUCK_LOGGING_FILE_PATH=/var/log/nexusauth/sso-.log`。
 
-默认不会记录 `Information` 级别的 EF Core SQL 命令，避免查询参数长期落盘。确需短时间排查数据库问题时，可以把 `LuckLogging__MinimumLevelOverrides__Microsoft.EntityFrameworkCore.Database.Command` 调整为 `Information`，排查结束后应立即恢复为 `Warning`。
+默认不会记录 `Information` 级别的 EF Core SQL 命令，避免查询参数长期落盘。确需短时间排查数据库问题时，可以把 `NEXUSAUTH_LUCK_LOGGING_MINIMUM_LEVEL_OVERRIDES_MICROSOFT_ENTITYFRAMEWORKCORE_DATABASE_COMMAND` 调整为 `Information`，排查结束后应立即恢复为 `Warning`。
 
 默认过滤规则把 `Microsoft`、`System` 和 `Npgsql` 的日志门槛设为 `Warning`，其中所有 `Microsoft.*` 分类只有 `Warning`、`Error` 和 `Fatal` 会被记录；NexusAuth 自定义分类不设置额外门槛，可以记录全部级别。业务日志覆盖注册、登录结果、客户端认证结果、授权码签发与消费、令牌签发、refresh token 轮换和撤销等高价值事件。
 

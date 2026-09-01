@@ -28,21 +28,31 @@ services:
     environment:
       TZ: Asia/Shanghai
       ASPNETCORE_ENVIRONMENT: ${NEXUSAUTH_SSO_ENVIRONMENT:-Development}
-      ConnectionStrings__Default: Host=db;Port=5432;Database=nexusauth;Username=${POSTGRES_USER:-nexusauth};Password=${POSTGRES_PASSWORD:-nexusauth_dev_password};Search Path=nexusauth
-      Jwt__Issuer: ${NEXUSAUTH_ISSUER:-http://localhost:5100}
-      Jwt__SigningMode: ${NEXUSAUTH_SIGNING_MODE:-Certificate}
-      Jwt__DevelopmentSigningCertificatePath: App_Data/development-signing-certificate.pfx
-      Jwt__DevelopmentSigningCertificatePassword: ${NEXUSAUTH_DEVELOPMENT_SIGNING_CERTIFICATE_PASSWORD:-nexusauth-compose-dev}
-      Jwt__SigningCertificatePath: ${NEXUSAUTH_SIGNING_CERTIFICATE_PATH:-}
-      Jwt__SigningCertificatePassword: ${NEXUSAUTH_SIGNING_CERTIFICATE_PASSWORD:-}
-      Jwt__DevelopmentSigningKeyPath: App_Data/signing-key.json
-      Jwt__SigningKeyPath: ${NEXUSAUTH_SIGNING_KEY_PATH:-}
-      Jwt__AccessTokenLifetimeMinutes: ${NEXUSAUTH_ACCESS_TOKEN_LIFETIME_MINUTES:-60}
-      Jwt__RefreshTokenLifetimeMinutes: ${NEXUSAUTH_REFRESH_TOKEN_LIFETIME_MINUTES:-43200}
-      BootstrapAdmin__Username: ${NEXUSAUTH_BOOTSTRAP_ADMIN_USERNAME:-admin}
-      BootstrapAdmin__Password: ${NEXUSAUTH_BOOTSTRAP_ADMIN_PASSWORD:-wzw0126..}
-      BootstrapAdmin__Nickname: ${NEXUSAUTH_BOOTSTRAP_ADMIN_NICKNAME:-NexusAdmin}
-      BootstrapAdmin__Email: ${NEXUSAUTH_BOOTSTRAP_ADMIN_EMAIL:-admin@163.com}
+      NEXUSAUTH_CONNECTION_STRINGS_DEFAULT: Host=db;Port=5432;Database=nexusauth;Username=${POSTGRES_USER:-nexusauth};Password=${POSTGRES_PASSWORD:-nexusauth_dev_password};Search Path=nexusauth
+      NEXUSAUTH_JWT_ISSUER: ${NEXUSAUTH_JWT_ISSUER:-http://localhost:5100}
+      NEXUSAUTH_JWT_SIGNING_MODE: ${NEXUSAUTH_JWT_SIGNING_MODE:-Certificate}
+      NEXUSAUTH_JWT_DEVELOPMENT_SIGNING_CERTIFICATE_PATH: App_Data/development-signing-certificate.pfx
+      NEXUSAUTH_JWT_DEVELOPMENT_SIGNING_CERTIFICATE_PASSWORD: ${NEXUSAUTH_JWT_DEVELOPMENT_SIGNING_CERTIFICATE_PASSWORD:-nexusauth-compose-dev}
+      NEXUSAUTH_JWT_SIGNING_CERTIFICATE_PATH: ${NEXUSAUTH_JWT_SIGNING_CERTIFICATE_PATH:-}
+      NEXUSAUTH_JWT_SIGNING_CERTIFICATE_PASSWORD: ${NEXUSAUTH_JWT_SIGNING_CERTIFICATE_PASSWORD:-}
+      NEXUSAUTH_JWT_DEVELOPMENT_SIGNING_KEY_PATH: App_Data/signing-key.json
+      NEXUSAUTH_JWT_SIGNING_KEY_PATH: ${NEXUSAUTH_JWT_SIGNING_KEY_PATH:-}
+      NEXUSAUTH_JWT_ACCESS_TOKEN_LIFETIME_MINUTES: ${NEXUSAUTH_JWT_ACCESS_TOKEN_LIFETIME_MINUTES:-60}
+      NEXUSAUTH_JWT_REFRESH_TOKEN_LIFETIME_MINUTES: ${NEXUSAUTH_JWT_REFRESH_TOKEN_LIFETIME_MINUTES:-43200}
+      NEXUSAUTH_SLIDER_CAPTCHA_ENABLED: ${NEXUSAUTH_SLIDER_CAPTCHA_ENABLED:-false}
+      NEXUSAUTH_SLIDER_CAPTCHA_CHALLENGE_LIFETIME_SECONDS: ${NEXUSAUTH_SLIDER_CAPTCHA_CHALLENGE_LIFETIME_SECONDS:-120}
+      NEXUSAUTH_SLIDER_CAPTCHA_TOLERANCE_PIXELS: ${NEXUSAUTH_SLIDER_CAPTCHA_TOLERANCE_PIXELS:-5}
+      NEXUSAUTH_SLIDER_CAPTCHA_TRACK_WIDTH_PIXELS: ${NEXUSAUTH_SLIDER_CAPTCHA_TRACK_WIDTH_PIXELS:-300}
+      NEXUSAUTH_LOGIN_PAGE_BRAND_NAME: ${NEXUSAUTH_LOGIN_PAGE_BRAND_NAME:-NexusAuth}
+      NEXUSAUTH_LOGIN_PAGE_BRAND_LOGO_URL: ${NEXUSAUTH_LOGIN_PAGE_BRAND_LOGO_URL:-/brand/nexusauth-logo.svg}
+      NEXUSAUTH_LOGIN_PAGE_MARKETING_HEADING: ${NEXUSAUTH_LOGIN_PAGE_MARKETING_HEADING:-基于 OAuth 2.1 与 OIDC 的统一身份认证}
+      NEXUSAUTH_LOGIN_PAGE_MARKETING_DESCRIPTION: ${NEXUSAUTH_LOGIN_PAGE_MARKETING_DESCRIPTION:-支持 OAuth 2.1、OpenID Connect（OIDC）、授权码 + PKCE 和 SCIM 2.0 标准协议。}
+      NEXUSAUTH_LOGIN_PAGE_LOGIN_TITLE: ${NEXUSAUTH_LOGIN_PAGE_LOGIN_TITLE:-Sign In}
+      NEXUSAUTH_LOGIN_PAGE_LOGIN_SUBTITLE: ${NEXUSAUTH_LOGIN_PAGE_LOGIN_SUBTITLE:-Please enter your details to sign in.}
+      NEXUSAUTH_BOOTSTRAP_ADMIN_USERNAME: ${NEXUSAUTH_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      NEXUSAUTH_BOOTSTRAP_ADMIN_PASSWORD: ${NEXUSAUTH_BOOTSTRAP_ADMIN_PASSWORD:-wzw0126..}
+      NEXUSAUTH_BOOTSTRAP_ADMIN_NICKNAME: ${NEXUSAUTH_BOOTSTRAP_ADMIN_NICKNAME:-NexusAdmin}
+      NEXUSAUTH_BOOTSTRAP_ADMIN_EMAIL: ${NEXUSAUTH_BOOTSTRAP_ADMIN_EMAIL:-admin@163.com}
     volumes:
       - nexusauth-signing-key:/app/App_Data
       - nexusauth-sso-keys:/root/.aspnet/DataProtection-Keys
@@ -67,17 +77,17 @@ services:
     environment:
       TZ: Asia/Shanghai
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      ConnectionStrings__Default: Host=db;Port=5432;Database=nexusauth;Username=${POSTGRES_USER:-nexusauth};Password=${POSTGRES_PASSWORD:-nexusauth_dev_password};Search Path=nexusauth
-      Auth__Authority: ${NEXUSAUTH_ISSUER:-http://localhost:5100}
-      Auth__BackchannelAuthority: http://sso:8080
-      Auth__ClientId: nexusauth.workbench
-      Auth__ClientSecret: ${WORKBENCH_CLIENT_SECRET:-c57cf0e110c54ad2ac5591b99801b852}
-      Auth__RedirectUri: http://localhost:5051/signin-oidc
-      Auth__PostLogoutRedirectUri: http://localhost:5273/
-      Auth__Scope: openid profile workbench offline_access
-      Auth__Audience: workbench
-      Auth__RequireHttpsMetadata: "false"
-      Auth__SignOutProvider: "true"
+      NEXUSAUTH_WORKBENCH_CONNECTION_STRINGS_DEFAULT: Host=db;Port=5432;Database=nexusauth;Username=${POSTGRES_USER:-nexusauth};Password=${POSTGRES_PASSWORD:-nexusauth_dev_password};Search Path=nexusauth
+      NEXUSAUTH_WORKBENCH_AUTH_AUTHORITY: ${NEXUSAUTH_JWT_ISSUER:-http://localhost:5100}
+      NEXUSAUTH_WORKBENCH_AUTH_BACKCHANNEL_AUTHORITY: http://sso:8080
+      NEXUSAUTH_WORKBENCH_AUTH_CLIENT_ID: nexusauth.workbench
+      NEXUSAUTH_WORKBENCH_AUTH_CLIENT_SECRET: ${WORKBENCH_CLIENT_SECRET:-c57cf0e110c54ad2ac5591b99801b852}
+      NEXUSAUTH_WORKBENCH_AUTH_REDIRECT_URI: http://localhost:5051/signin-oidc
+      NEXUSAUTH_WORKBENCH_AUTH_POST_LOGOUT_REDIRECT_URI: http://localhost:5273/
+      NEXUSAUTH_WORKBENCH_AUTH_SCOPE: openid profile workbench offline_access
+      NEXUSAUTH_WORKBENCH_AUTH_AUDIENCE: workbench
+      NEXUSAUTH_WORKBENCH_AUTH_REQUIRE_HTTPS_METADATA: "false"
+      NEXUSAUTH_WORKBENCH_AUTH_SIGN_OUT_PROVIDER: "true"
     depends_on:
       db:
         condition: service_healthy

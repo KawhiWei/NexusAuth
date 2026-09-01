@@ -71,4 +71,25 @@ public sealed class LoginFlowTests
 
         Assert.False(protector.TryUnprotect(tampered, out _));
     }
+
+    [Fact]
+    public void Slider_captcha_accepts_the_target_once_and_rejects_replay()
+    {
+        var protector = new SliderCaptchaChallengeProtector(new EphemeralDataProtectionProvider());
+        var token = protector.Protect(new SliderCaptchaChallenge(120, "nonce"), TimeSpan.FromMinutes(1));
+
+        Assert.True(protector.TryValidate(token, 123));
+        Assert.False(protector.TryValidate(token, 123));
+    }
+
+    [Fact]
+    public void Slider_captcha_rejects_a_tampered_token_or_an_offset_outside_tolerance()
+    {
+        var protector = new SliderCaptchaChallengeProtector(new EphemeralDataProtectionProvider());
+        var token = protector.Protect(new SliderCaptchaChallenge(120, "nonce"), TimeSpan.FromMinutes(1));
+        var tampered = token[..^1] + (token[^1] == 'A' ? 'B' : 'A');
+
+        Assert.False(protector.TryValidate(tampered, 120));
+        Assert.False(protector.TryValidate(token, 126));
+    }
 }

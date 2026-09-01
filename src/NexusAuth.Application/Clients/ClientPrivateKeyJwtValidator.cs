@@ -7,13 +7,10 @@ public static class ClientPrivateKeyJwtValidator
 
     private static readonly JwtSecurityTokenHandler Handler = new()
     {
-        // 保留 JWT 原始 claim 名称，避�?sub 被映射成 NameIdentifier 后取不到值�?
         MapInboundClaims = false,
     };
 
     /// <summary>
-    /// 校验 private_key_jwt 客户端断言�?
-    /// 主要调用方：ClientService，在 /connect/token�?connect/revocation�?connect/introspect 等端点统一复用�?
     /// </summary>
     public static ClientAssertionValidationResult Validate(string assertionJwt, OAuthClient client, string expectedAudience)
     {

@@ -1,6 +1,6 @@
 namespace NexusAuth.Application.Users;
 
-using NexusAuth.Application.Logging;
+using Luck.Logging.Serilog;
 using NexusAuth.Application.Services.Sessions;
 
 public class UserManagementService(
@@ -69,10 +69,9 @@ public class UserManagementService(
         await refreshTokenRepository.RevokeAllForUserAsync(user.Id, ct);
         await sessionService.RevokeAllForUserAsync(user.Id, ct);
 
-        using (ApplicationLogScope.Begin(logger, "UserManagement", user.Id.ToString(), "PasswordResetByAdministrator"))
-        {
-            logger.LogInformation("User password reset by an administrator. UserId={UserId}", user.Id);
-        }
+        logger.LogLuckInformation(
+            "User password reset by an administrator. UserId={UserId} Outcome={Outcome}",
+            [user.Id, "PasswordResetByAdministrator"]);
     }
 
     private async Task EnsureEmailUniqueAsync(string? email, Guid userId, CancellationToken ct)

@@ -7,4 +7,8 @@
         <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     </PropertyGroup>
 
+    <ItemGroup>
+        <PackageReference Include="Luck.Logging.Serilog" />
+    </ItemGroup>
+
 </Project>

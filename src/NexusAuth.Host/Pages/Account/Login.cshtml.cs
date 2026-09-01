@@ -9,6 +9,7 @@ using NexusAuth.Application.Services.Security;
 using NexusAuth.Application.Users;
 using NexusAuth.Host.Authentication;
 using NexusAuth.Domain.AggregateRoots.Users;
+using NexusAuth.Domain.Repositories;
 
 namespace NexusAuth.Host.Pages.Account;
 
@@ -18,14 +19,22 @@ public class LoginModel(
     ILoginAuditService loginAuditService,
     ISecurityPolicyService securityPolicyService,
     ITotpService totpService,
+    IOAuthClientRepository clientRepository,
+    ILogger<LoginModel> logger,
     LoginFlowStateProtector flowStateProtector,
-    IOptions<LoginFlowOptions> flowOptions) : PageModel
+    SliderCaptchaChallengeProtector sliderCaptchaChallengeProtector,
+    IOptions<SliderCaptchaOptions> sliderCaptchaOptions,
+    IOptions<LoginFlowOptions> flowOptions,
+    IOptions<LoginPageOptions> loginPageOptions) : PageModel
 {
     private const string AuthTimeClaimType = "auth_time";
     private const string AmrClaimType = "amr";
     private const string AcrClaimType = "acr";
 
     private readonly LoginFlowOptions _flowOptions = flowOptions.Value;
+    private readonly SliderCaptchaOptions _sliderCaptchaOptions = sliderCaptchaOptions.Value;
+
+    public LoginPageOptions LoginPage { get; } = loginPageOptions.Value;
 
     [BindProperty(SupportsGet = true)]
     public string? ReturnUrl { get; set; }
@@ -45,13 +54,27 @@ public class LoginModel(
     [BindProperty]
     public string FlowToken { get; set; } = string.Empty;
 
+    [BindProperty]
+    public string SliderCaptchaToken { get; set; } = string.Empty;
+
+    [BindProperty]
+    public int? SliderCaptchaOffset { get; set; }
+
     public string? ErrorMessage { get; set; }
 
-    public string? ClientName { get; set; }
+    public string? AuthorizationClientDisplayName { get; private set; }
 
     public bool RequiresTotp { get; private set; }
 
     public bool ShowRememberMe => _flowOptions.AllowRememberMe;
+
+    public bool SliderCaptchaEnabled => _sliderCaptchaOptions.Enabled;
+
+    public int SliderCaptchaTrackWidthPixels => _sliderCaptchaOptions.TrackWidthPixels;
+
+    public int SliderCaptchaTolerancePixels => _sliderCaptchaOptions.TolerancePixels;
+
+    public int SliderCaptchaTargetOffsetPixels { get; private set; }
 
     /// <summary>
     /// 渲染登录页，并清理已有外部认证 Cookie。
@@ -69,6 +92,7 @@ public class LoginModel(
 
         // Try to extract client_id from returnUrl to show client name
         await TryExtractClientNameAsync();
+        RefreshSliderCaptchaChallenge();
 
         return Page();
     }
@@ -78,11 +102,23 @@ public class LoginModel(
     /// </summary>
     public async Task<IActionResult> OnPostAsync()
     {
+        if (SliderCaptchaEnabled
+            && !sliderCaptchaChallengeProtector.TryValidate(SliderCaptchaToken, SliderCaptchaOffset))
+        {
+            await RecordLoginAsync(null, false, "SliderCaptchaFailed");
+            ErrorMessage = "Please complete the slider verification.";
+            Password = string.Empty;
+            await TryExtractClientNameAsync();
+            RefreshSliderCaptchaChallenge();
+            return Page();
+        }
+
         if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password))
         {
             await RecordLoginAsync(null, false, "MissingCredentials");
             ErrorMessage = "Username and password are required.";
             await TryExtractClientNameAsync();
+            RefreshSliderCaptchaChallenge();
             return Page();
         }
 
@@ -92,6 +128,7 @@ public class LoginModel(
             await RecordLoginAsync(null, false, "InvalidCredentials");
             ErrorMessage = "Invalid username or password.";
             await TryExtractClientNameAsync();
+            RefreshSliderCaptchaChallenge();
             return Page();
         }
 
@@ -101,6 +138,7 @@ public class LoginModel(
             await RecordLoginAsync(user.Id, false, "UserDeniedByPolicy");
             ErrorMessage = "Invalid username or password.";
             await TryExtractClientNameAsync();
+            RefreshSliderCaptchaChallenge();
             return Page();
         }
 
@@ -117,6 +155,7 @@ public class LoginModel(
                 await RecordLoginAsync(user.Id, false, "TotpEnrollmentRequired");
                 ErrorMessage = "This account must configure an authenticator before it can sign in.";
                 await TryExtractClientNameAsync();
+                RefreshSliderCaptchaChallenge();
                 return Page();
             }
 
@@ -253,14 +292,16 @@ public class LoginModel(
                 return;
 
             var queryParams = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(query);
-            if (queryParams.TryGetValue("client_id", out var clientId) && !string.IsNullOrWhiteSpace(clientId))
-            {
-                ClientName = clientId;
-            }
+            if (!queryParams.TryGetValue("client_id", out var clientId) || string.IsNullOrWhiteSpace(clientId))
+                return;
+
+            var client = await clientRepository.FindByClientIdAsync(clientId.ToString(), HttpContext.RequestAborted);
+            AuthorizationClientDisplayName = client is { IsActive: true } ? client.ClientName : null;
         }
-        catch
+        catch (Exception exception)
         {
-            // Ignore parsing errors — client name is cosmetic
+            logger.LogWarning(exception, "Unable to resolve authorization client name for the login page.");
+            AuthorizationClientDisplayName = null;
         }
     }
 
@@ -275,6 +316,21 @@ public class LoginModel(
             failureReason,
             HttpContext.Connection.RemoteIpAddress?.ToString(),
             HttpContext.Request.Headers.UserAgent.ToString()), HttpContext.RequestAborted);
+    }
+
+    private void RefreshSliderCaptchaChallenge()
+    {
+        if (!SliderCaptchaEnabled)
+        {
+            SliderCaptchaToken = string.Empty;
+            SliderCaptchaOffset = null;
+            return;
+        }
+
+        var challenge = sliderCaptchaChallengeProtector.CreateChallenge();
+        SliderCaptchaToken = challenge.Token;
+        SliderCaptchaTargetOffsetPixels = challenge.TargetOffsetPixels;
+        SliderCaptchaOffset = null;
     }
 
     private string? TryExtractClientId()

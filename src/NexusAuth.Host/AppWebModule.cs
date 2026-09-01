@@ -36,7 +36,16 @@ public class AppWebModule : LuckAppModule
             .PostConfigure(options => options.ApplyDefaults())
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<LoginFlowOptions>, LoginFlowOptionsValidator>();
+        services.AddOptions<LoginPageOptions>()
+            .Bind(configuration.GetSection(LoginPageOptions.SectionName))
+            .ValidateOnStart();
         services.AddSingleton<LoginFlowStateProtector>();
+        services.AddOptions<SliderCaptchaOptions>()
+            .Bind(configuration.GetSection(SliderCaptchaOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<SliderCaptchaOptions>, SliderCaptchaOptionsValidator>();
+        services.AddMemoryCache();
+        services.AddSingleton<SliderCaptchaChallengeProtector>();
         services.AddOptions<TotpOptions>()
             .Bind(configuration.GetSection(TotpOptions.SectionName))
             .Validate(options => !string.IsNullOrWhiteSpace(options.Issuer), "Totp:Issuer is required.")

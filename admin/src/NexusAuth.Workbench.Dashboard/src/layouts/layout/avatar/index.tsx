@@ -84,7 +84,7 @@ const AvatarComponent = () => {
       options={options}
       onClick={handleClickMenuItem}
     >
-      <Button variant="text" style={{ padding: 0 }}>
+      <Button className="layout-avatar-trigger" variant="text" shape="circle" size="small">
         <Avatar className="layout-avatar">
           H
         </Avatar>

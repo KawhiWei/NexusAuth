@@ -2,7 +2,27 @@
 
 本文是 NexusAuth 当前 OAuth 2.0 / OpenID Connect Provider 的行为说明。它解释授权请求如何校验、错误何时回跳、PKCE 如何按客户端生效，以及 token endpoint 如何处理客户端认证冲突。
 
-本文描述的是实现边界，不代表 NexusAuth 已实现所有 OAuth/OIDC 扩展。接入方应先阅读 [05-配置 OAuth 客户端](./05-配置OAuth客户端.md) 获取可执行示例。
+本文描述的是实现边界，不代表 NexusAuth 已实现所有 OAuth/OIDC 扩展。接入方可先阅读 [使用手册](./12-使用手册.md) 的接入章节，再按需查看 [Workbench 接入说明](./06-对接NexusAuth.Workbench.md) 和 [Demo 示例](./10-Demo示例详解.md)。
+
+## 0. 端点总览
+
+Provider 默认地址为 `http://localhost:5100`；生产环境应使用 HTTPS Issuer。`/connect/token`、`/connect/deviceauthorization`、`/connect/introspect` 和 `/connect/revocation` 这几个 POST 端点要求 `application/x-www-form-urlencoded`；授权、登出等 GET 端点使用查询参数，UserInfo 使用 Bearer 头，并在需要客户端身份的端点提供已登记的客户端认证。
+
+| 方法 | 端点 | 用途 | 客户端认证 |
+|---|---|---|---|
+| GET | `/.well-known/openid-configuration` | OIDC Discovery | 否 |
+| GET | `/.well-known/jwks.json` | Provider 签名公钥 | 否 |
+| GET | `/connect/authorize` | Authorization Code 授权请求 | 否，用户在 Provider 会话中登录 |
+| POST | `/connect/token` | 授权码、client credentials、device code、refresh token 换取令牌 | 是 |
+| GET | `/connect/userinfo` | 使用 Bearer access token 读取用户信息 | Bearer token |
+| POST | `/connect/deviceauthorization` | 创建设备授权请求 | 是 |
+| POST | `/connect/introspect` | 检查 access token 或 ID token 状态 | 是 |
+| POST | `/connect/revocation` | 撤销 access token 或 refresh token | 是 |
+| GET | `/connect/endsession` | OIDC RP-Initiated Logout | 按 `id_token_hint` 校验 |
+| GET/POST | `/device` | 用户输入设备码并批准/拒绝 | Provider Cookie |
+| GET/POST | `/account/login` | Provider 用户登录 | Provider Cookie |
+
+Discovery 的 `scopes_supported` 只列标准身份 scope：`openid`、`profile`、`email`、`phone`、`address` 和 `offline_access`。业务 API scope 由客户端与 API resource 的登记关系决定，不应假设所有业务 scope 都会出现在 Discovery 中。
 
 ## 1. 设计目标
 
@@ -104,7 +124,37 @@ PKCE 策略属于客户端元数据。Provider 不应把所有客户端都硬编
 
 `code_challenge` 不能代替 `state`，`state` 不能代替 PKCE。前者保护授权码兑换，后者让客户端确认回调属于当前浏览器会话；OIDC 客户端还应使用 `nonce` 关联 ID Token。
 
-## 5. 客户端认证互斥规则
+## 5. Token Endpoint 行为
+
+`POST /connect/token` 只接受 `application/x-www-form-urlencoded`。请求先解析并验证客户端身份，再按 `grant_type` 进入对应分支；普通业务参数错误不会被包装成 `invalid_client`。
+
+### authorization_code
+
+请求至少包含 `grant_type=authorization_code`、`code` 和与授权请求完全一致的 `redirect_uri`。授权码在数据库中只保存 SHA-256 哈希，绑定客户端、用户、scope、回调地址、PKCE challenge 和 OIDC 上下文，默认有效期为 10 分钟，并且只能成功消费一次。
+
+如果授权请求包含 `openid`，响应会包含 ID Token；如果 scope 包含 `offline_access` 且客户端允许 `refresh_token`，响应会包含 refresh token。缺少或错误的 `code_verifier`、授权码已使用、过期、客户端不匹配或回调地址不一致，通常返回 `invalid_grant`。
+
+### client_credentials
+
+请求包含 `grant_type=client_credentials` 和客户端允许的 `scope`。该流程代表客户端而不是用户，只签发 access token，不签发 ID Token 或 refresh token。客户端仍必须通过登记的认证方式完成认证，并且 scope 必须属于其允许的 API resources。
+
+### refresh_token
+
+请求包含 `grant_type=refresh_token` 和 `refresh_token`，客户端必须重新认证。Provider 会检查 refresh token 的客户端归属、用户状态和绝对过期时间，然后在数据库事务中撤销旧 token、写入新 token 并签发新的 access token。客户端必须原子地保存新 refresh token，旧值再次使用会失败。
+
+### device_code
+
+设备流程使用 grant type `urn:ietf:params:oauth:grant-type:device_code`，请求包含 `device_code` 并重新完成客户端认证。设备码状态包括：
+
+- `authorization_pending`：用户还没有完成批准；
+- `slow_down`：轮询过于频繁，客户端应按响应增加间隔；
+- `expired_token`：设备码超过生命周期；
+- `access_denied`：用户拒绝授权；
+- 成功后设备码被一次性消费，不能再次兑换。
+
+Provider 默认设备码有效期为 15 分钟，实际值由 `Jwt:DeviceCodeLifetimeMinutes` 决定。设备客户端应使用响应中的 `interval`，并遵循 `Retry-After`，不要固定高频请求。
+
+## 6. 客户端认证互斥规则
 
 客户端在注册时选择一个 `token_endpoint_auth_method`。请求进入 token、introspection、revocation 或 device authorization 这类需要客户端身份的端点后，Provider 按以下规则处理：
 
@@ -127,7 +177,7 @@ PKCE 策略属于客户端元数据。Provider 不应把所有客户端都硬编
 
 普通业务参数错误不应伪装成认证错误：缺少 `grant_type`、`code`、`refresh_token` 或 `device_code` 使用 `invalid_request`；客户端身份已识别但未获准使用 grant 时使用 `unauthorized_client`；客户端身份无法验证时使用 `invalid_client` 和 HTTP 401。
 
-## 6. 响应模式实现
+## 7. 响应模式实现
 
 ### query
 
@@ -145,7 +195,27 @@ https://client.example.com/signin-oidc?code=...&state=...
 
 `response_mode=form_post` 不是 JARM：表单字段仍是普通 OAuth 响应参数，不是签名的 JWT。JARM 当前未实现。
 
-## 7. 扩展边界
+## 8. OIDC 能力与登出
+
+### Discovery、ID Token 和 UserInfo
+
+OIDC Discovery 通过 `/.well-known/openid-configuration` 发布授权、token、UserInfo、JWKS、设备授权、introspection、revocation 和登出端点，以及当前支持的响应类型、grant、认证方式和 `S256`。签名公钥通过 `/.well-known/jwks.json` 发布。
+
+授权码兑换只有在授权请求包含 `openid` scope 时才签发 ID Token。ID Token 使用 RS256，`aud` 是客户端 ID；授权请求中的 `nonce` 会绑定到授权码并写入 ID Token，客户端必须验证 issuer、audience、签名、有效期和 nonce。ID Token 的有效期跟随 access token 生命周期。
+
+`GET /connect/userinfo` 只接受有效的 Bearer access token，不接受 ID Token 或 refresh token。基础响应包含 `sub`、`preferred_username` 和 `name`；`email`、`phone_number` 等字段受 scope 控制，`claims` 请求可进一步请求已支持的字段。token 无效、已撤销、不是 access token 或对应用户已停用时返回 `401 invalid_token`。
+
+### RP-Initiated Logout
+
+客户端调用 `/connect/endsession` 时，如果提供 `post_logout_redirect_uri`，必须同时提供有效的 `id_token_hint`。Provider 会根据 ID Token 识别客户端，并要求登出回调地址与客户端登记值精确匹配；验证通过后：
+
+1. 撤销当前用户的 token 和 SSO session；
+2. 清除 Provider 登录 Cookie；
+3. 将可选的 `state` 追加到已验证的登出回调地址并重定向。
+
+没有合法回调地址时，Provider 重定向到 `/`。只提供 `post_logout_redirect_uri` 而没有 `id_token_hint` 会返回 `invalid_request`；不要把任意外部地址当作登出回调。
+
+## 9. 扩展边界
 
 ### 已实现的协议能力
 
@@ -171,7 +241,7 @@ https://client.example.com/signin-oidc?code=...&state=...
 
 这些扩展不能通过放宽 `redirect_uri`、关闭 PKCE 或允许认证方式混用来“模拟”。如果目标是 FAPI、金融级开放平台或跨组织第三方生态，应先为请求对象、密钥轮换、sender-constrained token 和一致性测试单独建立设计。
 
-## 8. 安全理由总结
+## 10. 安全理由总结
 
 1. 先验证 `client_id` 和精确 `redirect_uri`，避免开放重定向和错误信息泄露。
 2. 非法 scope 作为可处理的 `invalid_scope` 返回，避免未经处理的异常变成 500，也避免签发超出客户端权限的 code。

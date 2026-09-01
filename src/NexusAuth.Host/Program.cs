@@ -53,6 +53,7 @@ static void AddSingleUnderscoreEnvironmentVariables(ConfigurationManager configu
         ["NEXUSAUTH_SLIDER_CAPTCHA_CHALLENGE_LIFETIME_SECONDS"] = "SliderCaptcha:ChallengeLifetimeSeconds",
         ["NEXUSAUTH_SLIDER_CAPTCHA_TOLERANCE_PIXELS"] = "SliderCaptcha:TolerancePixels",
         ["NEXUSAUTH_SLIDER_CAPTCHA_TRACK_WIDTH_PIXELS"] = "SliderCaptcha:TrackWidthPixels",
+        ["NEXUSAUTH_LOGIN_FLOW_REMEMBER_ME_LIFETIME_DAYS"] = "LoginFlow:RememberMeLifetimeDays",
         ["NEXUSAUTH_LOGIN_PAGE_BRAND_NAME"] = "LoginPage:BrandName",
         ["NEXUSAUTH_LOGIN_PAGE_BRAND_LOGO_URL"] = "LoginPage:BrandLogoUrl",
         ["NEXUSAUTH_LOGIN_PAGE_MARKETING_HEADING"] = "LoginPage:MarketingHeading",

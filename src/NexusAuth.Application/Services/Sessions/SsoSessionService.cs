@@ -5,11 +5,9 @@ namespace NexusAuth.Application.Services.Sessions;
 
 public sealed class SsoSessionService(ISsoSessionRepository sessionRepository) : ISsoSessionService
 {
-    private static readonly TimeSpan AbsoluteLifetime = TimeSpan.FromHours(24);
-
-    public async Task<Guid> CreateAsync(Guid userId, CancellationToken ct = default)
+    public async Task<Guid> CreateAsync(Guid userId, TimeSpan lifetime, CancellationToken ct = default)
     {
-        var session = SsoSession.Create(userId, AbsoluteLifetime);
+        var session = SsoSession.Create(userId, lifetime);
         await sessionRepository.AddAsync(session, ct);
         return session.Id;
     }

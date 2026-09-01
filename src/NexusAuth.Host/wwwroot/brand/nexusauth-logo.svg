@@ -1,9 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" role="img" aria-labelledby="title description">
+<svg xmlns="http://www.w3.org/2000/svg" width="112" height="112" viewBox="0 0 112 112" role="img" aria-labelledby="title description">
   <title id="title">NexusAuth</title>
   <desc id="description">NexusAuth logo mark with a blue rounded square, white diagonal link, and mint status point.</desc>
-  <g transform="translate(24 24)">
-    <rect width="112" height="112" rx="30" fill="#2563EB"/>
-    <rect x="24" y="50" width="64" height="14" rx="7" fill="#FFFFFF" transform="rotate(-35 56 57)"/>
-    <circle cx="88" cy="86" r="10" fill="#B9FFD8"/>
-  </g>
+  <path d="M0 0H102A10 10 0 0 1 112 10V112H10A10 10 0 0 1 0 102Z" fill="#2563EB"/>
+  <rect x="24" y="50" width="64" height="14" rx="7" fill="#FFFFFF" transform="rotate(-35 56 57)"/>
+  <circle cx="88" cy="86" r="10" fill="#B9FFD8"/>
 </svg>

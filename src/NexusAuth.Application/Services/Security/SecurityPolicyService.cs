@@ -6,7 +6,6 @@ public class SecurityPolicyService(IOptions<NexusAuthSecurityOptions> options) :
     private readonly NexusAuthSecurityOptions options = options.Value;
 
     /// <summary>
-    /// 执行客户端黑白名单策略校验�?
     /// </summary>
     public PolicyCheckResult CheckClient(string clientId)
     {
@@ -20,7 +19,6 @@ public class SecurityPolicyService(IOptions<NexusAuthSecurityOptions> options) :
     }
 
     /// <summary>
-    /// 执行用户黑白名单策略校验�?
     /// </summary>
     public PolicyCheckResult CheckUser(User user)
     {

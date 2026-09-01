@@ -46,4 +46,5 @@ public interface IUserRepository : IAggregateRootRepository<User, Guid>, IScoped
         CancellationToken ct = default);
 
     Task ResetLoginFailuresAsync(Guid userId, DateTimeOffset now, CancellationToken ct = default);
+
 }

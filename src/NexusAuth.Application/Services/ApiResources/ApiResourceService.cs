@@ -32,7 +32,6 @@ public class ApiResourceService(
     }
 
     /// <summary>
-    /// 注册 API 资源，并指定�?audience�?
     /// </summary>
     
     public async Task<ApiResource> RegisterAsync(
@@ -100,7 +99,6 @@ public class ApiResourceService(
     }
 
     /// <summary>
-    /// 将资源授权给指定客户端�?
     /// </summary>
     public async Task AssignToClientAsync(
         Guid clientId,
@@ -112,7 +110,6 @@ public class ApiResourceService(
     }
 
     /// <summary>
-    /// 撤销客户端对指定资源的授权�?
     /// </summary>
     public async Task RevokeFromClientAsync(
         Guid clientId,
@@ -123,7 +120,6 @@ public class ApiResourceService(
     }
 
     /// <summary>
-    /// 查询客户端当前可访问的资源列表�?
     /// </summary>
     public async Task<IReadOnlyList<ApiResource>> GetClientResourcesAsync(
         Guid clientId,
@@ -133,7 +129,6 @@ public class ApiResourceService(
     }
 
     /// <summary>
-    /// 查询全部启用状态的资源�?
     /// </summary>
     public async Task<IReadOnlyList<ApiResource>> GetAllActiveResourcesAsync(
         CancellationToken ct = default)

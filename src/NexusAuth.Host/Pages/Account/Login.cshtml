@@ -58,149 +58,667 @@
     </script>
     <style>
         html.dark {
-            --background: #06092f;
-            --on-background: #e3e3ff;
-            --surface: #06092f;
-            --surface-bright: #1f2660;
-            --surface-container: #0f1442;
-            --surface-container-high: #141a4c;
-            --surface-container-highest: #1a2056;
-            --surface-container-low: #090e38;
-            --surface-container-lowest: #000000;
-            --on-surface: #e3e3ff;
-            --on-surface-variant: #a4a8d5;
-            --primary: #8eabff;
-            --primary-dim: #156aff;
-            --secondary: #8a95ff;
-            --outline: #6e729d;
-            --outline-variant: #41456c;
-            --danger: #ff716c;
-            --card-accent: linear-gradient(90deg, rgba(255,255,255,0.92), rgba(227,227,255,0.78), rgba(255,255,255,0.92));
+            --page-bg: #020617;
+            --brand-bg: #0f172a;
+            --card-bg: #0f172a;
+            --field-bg: #020617;
+            --on-surface: #ffffff;
+            --on-surface-variant: #cbd5e1;
+            --outline: #64748b;
+            --outline-variant: #334155;
+            --primary: #004ac6;
+            --primary-hover: #003ea8;
+            --danger: #fca5a5;
+            --danger-bg: rgba(127, 29, 29, 0.35);
             color-scheme: dark;
         }
 
         html.light {
-            --background: #fdfdfd;
-            --on-background: #06092f;
-            --surface: #fdfdfd;
-            --surface-bright: #ffffff;
-            --surface-container: #f8f9fc;
-            --surface-container-high: #f0f2f9;
-            --surface-container-highest: #e2e5f0;
-            --surface-container-low: #fcfcfd;
-            --surface-container-lowest: #ffffff;
-            --on-surface: #06092f;
-            --on-surface-variant: #41456c;
-            --primary: #156aff;
-            --primary-dim: #156aff;
-            --secondary: #8a95ff;
-            --outline: #6e729d;
-            --outline-variant: #41456c;
-            --danger: #d7383b;
-            --card-accent: linear-gradient(90deg, #156aff, #156aff, #8a95ff);
+            --page-bg: #faf8ff;
+            --brand-bg: #f2f3ff;
+            --card-bg: #ffffff;
+            --field-bg: #faf8ff;
+            --on-surface: #131b2e;
+            --on-surface-variant: #434655;
+            --outline: #737686;
+            --outline-variant: #c3c6d7;
+            --primary: #004ac6;
+            --primary-hover: #003ea8;
+            --danger: #93000a;
+            --danger-bg: #ffdad6;
             color-scheme: light;
         }
 
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
         }
 
-        .glass-panel {
-            background: color-mix(in srgb, var(--surface-container) 78%, transparent);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
+        html,
+        body {
+            margin: 0;
+            min-height: 100%;
         }
 
-        .tech-gradient-bg {
-            background: radial-gradient(circle at 50% 50%, var(--surface-container) 0%, var(--surface) 100%);
+        body {
+            min-height: max(884px, 100dvh);
+            background: var(--page-bg);
+            color: var(--on-surface);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            -webkit-font-smoothing: antialiased;
         }
 
-        .data-grid {
-            background-image:
-                linear-gradient(color-mix(in srgb, var(--primary) 5%, transparent) 1px, transparent 1px),
-                linear-gradient(90deg, color-mix(in srgb, var(--primary) 5%, transparent) 1px, transparent 1px);
-            background-size: 44px 44px;
-            filter: blur(0.4px);
-            opacity: 0.55;
+        button,
+        input {
+            font: inherit;
+        }
+
+        .auth-shell {
+            min-height: max(884px, 100dvh);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--page-bg);
+        }
+
+        .brand-corner {
+            position: fixed;
+            top: 24px;
+            left: 24px;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--primary);
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1.2;
+            text-decoration: none;
         }
 
         .theme-toggle {
-            border: 1px solid color-mix(in srgb, var(--outline-variant) 40%, transparent);
-            background: color-mix(in srgb, var(--surface-container-high) 75%, transparent);
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 50;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            padding: 8px;
+            border: 0;
+            border-radius: 999px;
+            color: var(--on-surface-variant);
+            background: transparent;
+            cursor: pointer;
+            transition: background-color 160ms ease, color 160ms ease;
         }
 
-        html.light .login-decoration {
+        .theme-toggle:hover {
+            color: var(--on-surface);
+            background: color-mix(in srgb, var(--on-surface) 8%, transparent);
+        }
+
+        .theme-toggle:focus-visible,
+        .password-toggle:focus-visible,
+        .slider-captcha-dialog button:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        .theme-toggle svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .auth-brand-panel {
             display: none;
+        }
+
+        .auth-form-panel {
+            position: relative;
+            display: flex;
+            flex: 1;
+            min-width: 0;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 64px 16px 32px;
+            background: var(--page-bg);
+        }
+
+        .mobile-brand {
+            position: absolute;
+            top: 40px;
+            left: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .brand-mark {
+            display: block;
+            width: 32px;
+            height: 32px;
+            border-radius: 4px;
+            object-fit: cover;
+        }
+
+        .mobile-brand-name,
+        .card-mobile-brand,
+        .brand-name {
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .mobile-brand-name,
+        .card-mobile-brand {
+            font-size: 20px;
+            line-height: 1.4;
+        }
+
+        .auth-card {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 480px;
+            margin-top: 40px;
+            padding: 24px;
+            border: 1px solid color-mix(in srgb, var(--outline-variant) 30%, transparent);
+            border-radius: 12px;
+            background: var(--card-bg);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+
+        .auth-card-header {
+            margin-bottom: 24px;
+        }
+
+        .card-mobile-brand {
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .auth-card-title {
+            margin: 0 0 4px;
+            color: var(--on-surface);
+            font-size: 24px;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .auth-card-subtitle {
+            margin: 0;
+            color: var(--on-surface-variant);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .mobile-only {
+            display: none;
+        }
+
+        .auth-error {
+            margin: 0 0 24px;
+            padding: 12px 16px;
+            border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+            border-radius: 8px;
+            color: var(--danger);
+            background: var(--danger-bg);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .form-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .field-label-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .field-label,
+        .field-label-row label {
+            color: var(--on-surface-variant);
+            font-size: 14px;
+            font-weight: 500;
+            line-height: 1;
+        }
+
+        .field-label-row span {
+            color: var(--primary);
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        .input-wrap {
+            position: relative;
+        }
+
+        .input-icon {
+            position: absolute;
+            top: 50%;
+            left: 8px;
+            width: 18.5px;
+            height: 18.5px;
+            color: var(--outline);
+            pointer-events: none;
+            transform: translateY(-50%);
+        }
+
+        .input-icon svg {
+            width: 18.5px;
+            height: 18.5px;
+        }
+
+        .login-input {
+            display: block;
+            width: 100%;
+            height: 48px;
+            padding: 0 16px 0 40px;
+            border: 1px solid var(--outline-variant);
+            border-radius: 4px;
+            color: var(--on-surface) !important;
+            background-color: var(--field-bg) !important;
+            font-size: 14px;
+            line-height: 1.5;
+            transition: border-color 160ms ease, box-shadow 160ms ease;
+        }
+
+        .input-wrap > .login-input {
+            padding-left: 48px !important;
+        }
+
+        .input-wrap > #password.login-input {
+            padding-right: 48px !important;
+        }
+
+        .login-input::placeholder {
+            color: color-mix(in srgb, var(--outline-variant) 70%, transparent);
+        }
+
+        .login-input:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(0, 74, 198, 0.2);
+        }
+
+        .login-input:-webkit-autofill,
+        .login-input:-webkit-autofill:hover,
+        .login-input:-webkit-autofill:focus {
+            -webkit-box-shadow: 0 0 0 1000px var(--field-bg) inset !important;
+            -webkit-text-fill-color: var(--on-surface) !important;
+            caret-color: var(--on-surface);
+        }
+
+        .password-toggle {
+            position: absolute;
+            top: 50%;
+            right: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            padding: 4px;
+            border: 0;
+            color: var(--outline);
+            background: transparent;
+            cursor: pointer;
+            transform: translateY(-50%);
+        }
+
+        .password-toggle:hover {
+            color: var(--on-surface);
+        }
+
+        .password-toggle svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .remember-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .remember-row label {
+            color: var(--on-surface-variant);
+            font-size: 14px;
+            line-height: 1.5;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .remember-row input {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            accent-color: var(--primary);
+        }
+
+        .login-submit {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 48px;
+            margin-top: 8px;
+            border: 0;
+            border-radius: 4px;
+            color: #ffffff;
+            background: var(--primary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 160ms ease, box-shadow 160ms ease;
+        }
+
+        .login-submit:hover {
+            background: var(--primary-hover);
+            box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+        }
+
+        .totp-input {
+            padding-left: 16px;
+            text-align: center;
+            font-size: 24px;
+            letter-spacing: 4px;
+        }
+
+        .totp-help {
+            margin: 4px 0 0;
+            color: var(--on-surface-variant);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .restart-link {
+            display: block;
+            margin-top: 16px;
+            color: var(--primary);
+            font-size: 14px;
+            font-weight: 500;
+            text-align: center;
+            text-decoration: none;
+        }
+
+        .restart-link:hover {
+            text-decoration: underline;
+        }
+
+        .client-name {
+            margin-top: 24px;
+            color: var(--on-surface-variant);
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .client-name strong {
+            color: var(--on-surface);
+        }
+
+        .auth-footer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            width: 100%;
+            padding: 24px 16px;
+            border-top: 1px solid var(--outline-variant);
+            color: var(--on-surface-variant);
+            background: var(--card-bg);
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .auth-footer-brand {
+            color: var(--on-surface);
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .auth-footer-links {
+            display: flex;
+            gap: 16px;
+        }
+
+        .auth-footer a {
+            color: var(--on-surface-variant);
+            text-decoration: none;
+        }
+
+        .auth-footer a:hover {
+            color: var(--primary);
+        }
+
+        .slider-captcha-scene {
+            background:
+                linear-gradient(125deg, rgba(0, 74, 198, 0.92), rgba(37, 99, 235, 0.8)),
+                repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.14) 0 2px, transparent 2px 14px);
+        }
+
+        .slider-captcha-piece {
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+            transition: none;
+            will-change: transform;
+        }
+
+        #slider-captcha-handle,
+        #slider-captcha-progress {
+            will-change: transform;
+        }
+
+        #slider-captcha-progress {
+            transform-origin: left center;
+        }
+
+        .slider-captcha-dialog {
+            z-index: 2147483647;
+        }
+
+        @@media (min-width: 768px) {
+            .auth-shell {
+                flex-direction: row;
+            }
+
+            .auth-brand-panel {
+                position: relative;
+                display: flex;
+                width: 50%;
+                min-height: max(884px, 100dvh);
+                align-items: center;
+                padding: 40px;
+                overflow: hidden;
+                background: var(--brand-bg);
+            }
+
+            .auth-brand-panel::after {
+                position: absolute;
+                inset: 0;
+                background: linear-gradient(135deg, rgba(0, 74, 198, 0.1), transparent 52%);
+                content: "";
+                pointer-events: none;
+            }
+
+            .auth-brand-content {
+                position: relative;
+                z-index: 1;
+                width: min(100%, 448px);
+                margin: 0 auto;
+            }
+
+            .brand-row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 24px;
+            }
+
+            .brand-name {
+                font-size: 36px;
+                line-height: 1.2;
+            }
+
+            .brand-title {
+                margin: 0 0 16px;
+                color: var(--on-surface);
+                font-size: 30px;
+                font-weight: 700;
+                line-height: 1.1;
+            }
+
+            .brand-description {
+                max-width: 384px;
+                margin: 0;
+                color: var(--on-surface-variant);
+                font-size: 14px;
+                line-height: 1.6;
+            }
+
+            .auth-form-panel {
+                min-height: max(884px, 100dvh);
+                padding: 40px;
+            }
+
+            .mobile-brand,
+            .mobile-only {
+                display: none;
+            }
+
+            .auth-card {
+                margin-top: 0;
+                padding: 40px;
+                box-shadow: none;
+            }
+
+            .card-mobile-brand {
+                display: none;
+            }
+
+            .auth-card-header {
+                margin-bottom: 24px;
+            }
+
+            .auth-footer {
+                display: none;
+            }
+        }
+
+        @@media (max-width: 767px) {
+            .brand-corner {
+                top: 20px;
+                left: 20px;
+            }
+
+            .desktop-only {
+                display: none;
+            }
+
+            .mobile-only {
+                display: block;
+            }
+
+            .auth-card-header {
+                text-align: center;
+            }
+
+            .auth-card-title {
+                margin-bottom: 4px;
+            }
         }
     </style>
 </head>
-<body class="bg-[var(--background)] text-[var(--on-background)] font-body min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
-    <div class="absolute inset-0 z-0 tech-gradient-bg data-grid"></div>
-    <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[color:var(--primary)]/10 blur-[120px] rounded-full"></div>
-    <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[color:var(--secondary)]/10 blur-[120px] rounded-full"></div>
+<body>
+    <div class="auth-shell">
+        <button id="theme-toggle" type="button" class="theme-toggle" aria-label="切换至亮色模式" title="切换主题">☼</button>
+        <a class="brand-corner" href="/" aria-label="@Model.LoginPage.BrandName">
+            <img class="brand-mark" src="@Model.LoginPage.BrandLogoUrl" alt="" />
+            <span>@Model.LoginPage.BrandName</span>
+        </a>
 
-    <header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 md:px-8 h-16 bg-transparent backdrop-blur-xl">
-        <div class="flex items-center gap-3" aria-label="NexusAuth 登录中心">
-            <img class="h-9 w-9" src="/brand/nexusauth-logo.svg" alt="" />
-            <span class="text-xl font-bold text-[var(--on-surface)] font-headline">NexusAuth 登录中心</span>
-        </div>
-        <div class="flex gap-3 items-center">
-            <button id="theme-toggle" type="button" class="theme-toggle px-4 py-2 rounded-lg text-xs md:text-sm text-[var(--on-surface-variant)] hover:text-[var(--on-surface)] transition-colors">
-                亮色模式
-            </button>
-        </div>
-    </header>
-
-    <main class="relative z-10 grid min-h-screen w-full grid-cols-1 gap-10 px-6 pb-24 pt-24 lg:grid-cols-[minmax(0,1fr)_475px] lg:items-center lg:px-8">
-        <section class="hidden min-w-0 lg:grid lg:gap-8 lg:pl-8 xl:pl-16">
-            <div class="max-w-[720px]">
-                <p class="mt-6 max-w-[56ch] text-base leading-8 text-[var(--on-surface-variant)] xl:text-lg">
-                    NexusAuth 负责承载 OAuth 2.0 与 OpenID Connect 授权流程，统一处理浏览器登录、BFF 会话、设备授权和外部系统接入。
-                    当前页面沿用《科技登录界面》的视觉语言，用更克制的玻璃层与深蓝色域组织登录体验。
-                </p>
+        <aside class="auth-brand-panel" aria-label="NexusAuth">
+            <div class="auth-brand-content">
+                <h1 class="brand-title">@Model.LoginPage.MarketingHeading</h1>
+                <p class="brand-description">@Model.LoginPage.MarketingDescription</p>
             </div>
-            <div class="grid max-w-[760px] grid-cols-3 gap-4">
-                <div class="rounded-2xl bg-[var(--surface-variant)]/60 p-5 backdrop-blur-xl">
-                    <strong class="block font-headline text-sm text-[var(--on-surface)]">OAuth Core</strong>
-                    <span class="mt-2 block text-sm leading-6 text-[var(--on-surface-variant)]">Authorization Code、Refresh Token、Device Code 等能力统一落在一个认证核心中。</span>
-                </div>
-                <div class="rounded-2xl bg-[var(--surface-variant)]/60 p-5 backdrop-blur-xl">
-                    <strong class="block font-headline text-sm text-[var(--on-surface)]">Dual Client Auth</strong>
-                    <span class="mt-2 block text-sm leading-6 text-[var(--on-surface-variant)]">同一认证中心兼容 client_secret 和 private_key_jwt 两种客户端认证方式。</span>
-                </div>
-                <div class="rounded-2xl bg-[var(--surface-variant)]/60 p-5 backdrop-blur-xl">
-                    <strong class="block font-headline text-sm text-[var(--on-surface)]">OIDC Ready</strong>
-                    <span class="mt-2 block text-sm leading-6 text-[var(--on-surface-variant)]">Discovery、JWKS、UserInfo、Logout 等端点已经具备对接外部系统的基础能力。</span>
-                </div>
-            </div>
-        </section>
+        </aside>
 
-        <section class="z-10 flex w-full justify-center lg:justify-end lg:pr-8 xl:pr-16">
-            <div class="w-full max-w-[475px]">
-                <div class="glass-panel border border-[color:var(--outline-variant)]/20 rounded-[18px] p-8 md:p-9 shadow-2xl relative overflow-hidden">
-                    <div class="absolute top-0 left-0 w-full h-1" style="background: var(--card-accent);"></div>
+        <main class="auth-form-panel">
+            <section class="auth-card" aria-labelledby="login-title">
+                <header class="auth-card-header">
+                    <h1 id="login-title" class="auth-card-title">@(Model.RequiresTotp ? "验证身份" : Model.LoginPage.LoginTitle)</h1>
+                    <p class="auth-card-subtitle mobile-only">@Model.LoginPage.LoginSubtitle</p>
+                </header>
                     @if (!string.IsNullOrEmpty(Model.ErrorMessage))
                     {
-                        <div class="mb-6 rounded-xl border border-[color:var(--danger)]/30 bg-[color:var(--danger)]/10 px-4 py-3 text-sm text-[color:var(--danger)]">
+                        <div class="auth-error">
                             @Model.ErrorMessage
                         </div>
                     }
 
-                    <form class="space-y-6" method="post">
+                    @if (Model.RequiresTotp)
+                    {
+                    <form class="login-form" method="post" asp-page-handler="Totp">
+                        <input type="hidden" asp-for="FlowToken" />
+                        <div class="form-field">
+                            <div class="field-label-row">
+                                <label asp-for="TotpCode">身份验证器代码</label>
+                                <span>第二步</span>
+                            </div>
+                            <input class="login-input totp-input"
+                                   asp-for="TotpCode"
+                                   autocomplete="one-time-code"
+                                   inputmode="numeric"
+                                   maxlength="6"
+                                   pattern="[0-9]{6}"
+                                   placeholder="000000"
+                                   required
+                                   autofocus />
+                            <p class="totp-help">输入身份验证器应用当前显示的六位代码。</p>
+                        </div>
+                        <button class="login-submit" type="submit">
+                            验证并登录
+                        </button>
+                        <a class="restart-link" asp-page="/Account/Login" asp-route-returnUrl="@Model.ReturnUrl">重新开始</a>
+                    </form>
+                    }
+                    else
+                    {
+                    <form id="login-form" class="login-form" method="post">
                         <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+                        @if (Model.SliderCaptchaEnabled)
+                        {
+                        <input id="slider-captcha-token" type="hidden" asp-for="SliderCaptchaToken" />
+                        <input id="slider-captcha-offset" type="hidden" asp-for="SliderCaptchaOffset" />
+                        }
 
-                        <div class="space-y-2">
-                            <label class="ml-1 block font-label text-[10px] tracking-widest uppercase text-[var(--on-surface-variant)]/80">用户名 / 邮箱</label>
-                            <div class="relative group">
-                                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <span class="text-[var(--outline)] transition-colors group-focus-within:text-[color:var(--primary)]" aria-hidden="true">
+                        <div class="form-field">
+                            <label class="field-label" for="username">Username or Email</label>
+                            <div class="input-wrap">
+                                <span class="input-icon" aria-hidden="true">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25V8a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 8v8a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 16v-.25" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m3.75 7.5 7.28 5.204a1.5 1.5 0 0 0 1.744 0L20.25 7.5" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6.75a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 20.118a7.5 7.5 0 0 1 15 0A17.93 17.93 0 0 1 12 21.75a17.93 17.93 0 0 1-7.5-1.632Z" />
                                         </svg>
-                                    </span>
-                                </div>
-                                <input class="block w-full rounded-t-lg border-0 border-b-2 border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] py-4 pl-12 pr-4 text-[var(--on-surface)] placeholder:text-[var(--outline)]/50 focus:border-[color:var(--primary)] focus:outline-none focus:ring-0 transition-all"
+                                </span>
+                                <input class="login-input"
                                        id="username"
                                        name="Username"
                                        placeholder="admin@nexusauth.local"
@@ -211,26 +729,24 @@
                             </div>
                         </div>
 
-                        <div class="space-y-2">
-                            <div class="ml-1 flex items-center justify-between">
-                                <label class="block font-label text-[10px] tracking-widest uppercase text-[var(--on-surface-variant)]/80">密码</label>
-                                <span class="text-[10px] uppercase tracking-widest font-bold text-[color:var(--primary)]">安全接入</span>
+                        <div class="form-field">
+                            <div class="field-label-row">
+                                <label for="password">Password</label>
+                                <span>安全接入</span>
                             </div>
-                            <div class="relative group">
-                                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <span class="text-[var(--outline)] transition-colors group-focus-within:text-[color:var(--primary)]" aria-hidden="true">
+                            <div class="input-wrap">
+                                <span class="input-icon" aria-hidden="true">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V7.875a4.5 4.5 0 1 0-9 0V10.5m-.75 0h10.5A2.25 2.25 0 0 1 19.5 12.75v6A2.25 2.25 0 0 1 17.25 21h-10.5A2.25 2.25 0 0 1 4.5 18.75v-6A2.25 2.25 0 0 1 6.75 10.5Z" />
                                         </svg>
-                                    </span>
-                                </div>
-                                <input class="block w-full rounded-t-lg border-0 border-b-2 border-[var(--outline-variant)] bg-[var(--surface-container-lowest)] py-4 pl-12 pr-12 text-[var(--on-surface)] placeholder:text-[var(--outline)]/50 focus:border-[color:var(--primary)] focus:outline-none focus:ring-0 transition-all"
+                                </span>
+                                <input class="login-input"
                                        id="password"
                                        name="Password"
                                        placeholder="••••••••"
                                        required
                                        type="password" />
-                                <button class="absolute inset-y-0 right-0 pr-4 flex items-center text-[var(--outline)] hover:text-[var(--on-surface)] transition-colors" type="button" id="password-toggle" aria-label="显示密码">
+                                <button class="password-toggle" type="button" id="password-toggle" aria-label="显示密码">
                                     <span id="password-toggle-icon" aria-hidden="true">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.644C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.437 0 .644C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178Z" />
@@ -241,82 +757,62 @@
                             </div>
                         </div>
 
-                        <div class="flex items-center justify-between py-2">
-                            <label class="flex items-center space-x-3 cursor-pointer">
-                                <input class="h-4 w-4 rounded border-[var(--outline-variant)] bg-[var(--surface-container-low)] text-[color:var(--primary)] focus:ring-[color:var(--primary)] focus:ring-offset-[var(--background)]" type="checkbox" />
-                                <span class="text-sm text-[var(--on-surface-variant)]">记住我</span>
+                        <div class="remember-row">
+                            @if (Model.ShowRememberMe)
+                            {
+                            <label>
+                                <input asp-for="RememberMe" type="checkbox" />
+                                记住我
                             </label>
-                            <span class="text-sm text-[color:var(--primary)] font-medium">统一认证</span>
+                            }
                         </div>
 
-                        <button class="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[color:var(--primary)] to-[color:var(--primary-dim)] px-6 py-4 font-bold text-white shadow-[0_0_20px_rgba(21,106,255,0.30)] transition-all hover:-translate-y-0.5 hover:shadow-[0_0_30px_rgba(21,106,255,0.45)] active:translate-y-0" type="submit">
-                            <span class="font-headline tracking-wide">登录</span>
-                            <span aria-hidden="true">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12h15m0 0-6-6m6 6-6 6" />
-                                </svg>
-                            </span>
-                        </button>
+                        <button class="login-submit" type="submit">@Model.LoginPage.LoginTitle</button>
                     </form>
 
-                    <div class="mt-10 border-t border-[var(--outline-variant)]/10 pt-8">
-                        <p class="mb-6 text-center font-label text-[10px] uppercase tracking-widest text-[var(--on-surface-variant)]/60">其他访问方式</p>
-                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <button type="button" class="flex items-center justify-center gap-2 rounded-xl border border-[color:var(--outline-variant)]/20 px-4 py-3 text-xs text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-highest)]/70">
-                                <span aria-hidden="true">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 10.5a3.75 3.75 0 1 1 7.5 0v2.25a6 6 0 0 1-12 0V9.75a8.25 8.25 0 0 1 16.5 0v3.75a10.5 10.5 0 0 1-21 0V12" />
-                                    </svg>
-                                </span>
-                                <span>生物识别</span>
-                            </button>
-                            <button type="button" class="flex items-center justify-center gap-2 rounded-xl border border-[color:var(--outline-variant)]/20 px-4 py-3 text-xs text-[var(--on-surface-variant)] transition-colors hover:bg-[var(--surface-container-highest)]/70">
-                                <span aria-hidden="true">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75h6v6h-6zm10.5 0h6v6h-6zm-10.5 10.5h6v6h-6zm12 0v2.25m0 0V20.25m0-3.75H20.25M15.75 16.5H13.5m4.5-2.25H20.25m-6.75 6h2.25m2.25 0h2.25" />
-                                    </svg>
-                                </span>
-                                <span>扫码登录</span>
-                            </button>
+                    @if (Model.SliderCaptchaEnabled)
+                    {
+                    <div id="slider-captcha-dialog" class="slider-captcha-dialog fixed inset-0 hidden items-center justify-center bg-black/65 p-4" role="dialog" aria-modal="true" aria-labelledby="slider-captcha-title">
+                        <div class="w-full max-w-[420px] rounded-lg border border-[color:var(--outline-variant)]/40 bg-[var(--surface-container)] p-6 shadow-2xl">
+                            <div class="mb-5 flex items-start justify-between gap-4">
+                                <div>
+                                    <h2 id="slider-captcha-title" class="font-headline text-lg font-bold text-[var(--on-surface)]">安全验证</h2>
+                                    <p class="mt-1 text-sm text-[var(--on-surface-variant)]">拖动滑块，将拼图移动到缺口位置。</p>
+                                </div>
+                                <button id="slider-captcha-close" type="button" class="text-xl text-[var(--on-surface-variant)] hover:text-[var(--on-surface)]" aria-label="关闭验证">&times;</button>
+                            </div>
+                            <div id="slider-captcha-scene" class="slider-captcha-scene relative mx-auto h-40 w-full overflow-hidden rounded-md border border-white/20" data-target="@Model.SliderCaptchaTargetOffsetPixels" data-tolerance="@Model.SliderCaptchaTolerancePixels" data-track-width="@Model.SliderCaptchaTrackWidthPixels">
+                                <div class="absolute inset-0 opacity-40" style="background-image: radial-gradient(circle at 16% 25%, white 0 2px, transparent 3px), radial-gradient(circle at 75% 72%, white 0 3px, transparent 4px), linear-gradient(135deg, transparent 42%, rgba(255,255,255,.42) 43% 47%, transparent 48%);"></div>
+                                <div id="slider-captcha-gap" class="absolute top-[52px] h-11 w-11 rounded-md border-2 border-dashed border-white/80 bg-black/20" aria-hidden="true"></div>
+                                <div id="slider-captcha-piece" class="slider-captcha-piece absolute top-[52px] h-11 w-11 rounded-md border border-white/80 bg-white/35 backdrop-blur-sm" aria-hidden="true"></div>
+                            </div>
+                            <div id="slider-captcha-track" class="relative mt-5 h-12 select-none rounded-md bg-[var(--surface-container-highest)]" aria-label="拖动完成安全验证">
+                                <div id="slider-captcha-progress" class="absolute inset-y-0 left-0 rounded-md bg-[color:var(--primary)]/30"></div>
+                                <span class="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-[var(--on-surface-variant)]">按住滑块向右拖动</span>
+                                <button id="slider-captcha-handle" type="button" class="absolute left-0 top-0 flex h-12 w-12 touch-none items-center justify-center rounded-md bg-[color:var(--primary)] text-white shadow-lg" aria-label="拖动滑块">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </button>
+                            </div>
+                            <p id="slider-captcha-status" class="mt-3 min-h-5 text-center text-sm text-[var(--on-surface-variant)]" aria-live="polite"></p>
                         </div>
                     </div>
+                    }
+                    }
 
-                    @if (!string.IsNullOrEmpty(Model.ClientName))
+                    @if (!string.IsNullOrEmpty(Model.AuthorizationClientDisplayName))
                     {
-                        <div class="mt-8 text-center text-[11px] text-[var(--on-surface-variant)]">
-                            当前授权客户端：<span class="font-semibold text-[var(--on-surface)]">@Model.ClientName</span>
+                        <div class="client-name">
+                            当前授权客户端：<span class="font-semibold text-[var(--on-surface)]">@Model.AuthorizationClientDisplayName</span>
                         </div>
                     }
-                </div>
+            </section>
+        </main>
 
-                <div class="mt-8 flex items-center justify-center gap-6 opacity-40 grayscale transition-all hover:opacity-100 hover:grayscale-0 cursor-default">
-                    <div class="flex items-center gap-2">
-                        <div class="h-1.5 w-1.5 rounded-full bg-emerald-400"></div>
-                        <span class="font-label text-[10px] uppercase tracking-widest">系统在线</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="font-label text-[10px] uppercase tracking-widest">OAuth Ready</span>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <footer class="fixed bottom-0 w-full z-50 flex flex-col gap-3 px-6 py-5 text-[10px] md:flex-row md:items-center md:justify-between md:px-8 md:py-6 font-body tracking-widest uppercase">
-        <div class="text-slate-500">
-            © 2024 NexusAuth. 保留所有权利。
-        </div>
-        <div class="flex gap-6">
-            <span class="text-slate-500 hover:text-blue-300 transition-colors">隐私政策</span>
-            <span class="text-slate-500 hover:text-blue-300 transition-colors">服务条款</span>
-            <span class="text-slate-500 hover:text-blue-300 transition-colors">联系我们</span>
-        </div>
-    </footer>
-
-    <div class="login-decoration fixed top-1/2 right-[-100px] transform -translate-y-1/2 opacity-20 pointer-events-none hidden lg:block">
-        <div class="w-[400px] h-[600px] rounded-full overflow-hidden border border-[color:var(--primary)]/20 rotate-12">
-            <img alt="abstract" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBswZ3WRm_5iPnXX2RFwLEO77a5cXAgIoMWY8H4E3UryFE8vL-Iy0a7ojtnGDxSD-ann7myAs5BGDGTCEZOUkppEGwQ2y-mLz6V5L1BCLA5op896ZtL0grH_txgSV9SJK88ydBprF1wnwKiFZk9BOB0DDsdZARTB_ppSInKWqV2mh5ZaiY_1A1vh7bj0rdmgXotCd69qev3Z7lgWcKmKtut9Q6Rg9VeiLy1Hx2OBPlPVfUTCIzA1FCetWXq2i-sqiJcTIi3MuKCip8" />
-        </div>
+        <footer class="auth-footer">
+            <strong class="auth-footer-brand">@Model.LoginPage.BrandName</strong>
+            <div class="auth-footer-links"><a href="#">Privacy Policy</a><a href="#">Terms of Service</a></div>
+            <span>© 2024 NexusAuth. All rights reserved.</span>
+        </footer>
     </div>
 
     <script>
@@ -330,7 +826,8 @@
             function applyTheme(theme) {
                 root.classList.remove('light', 'dark');
                 root.classList.add(theme);
-                toggle.textContent = theme === 'dark' ? '亮色模式' : '暗色模式';
+                toggle.setAttribute('aria-label', theme === 'dark' ? '切换至亮色模式' : '切换至暗色模式');
+                toggle.textContent = theme === 'dark' ? '☼' : '◐';
             }
 
             applyTheme(stored || (prefersDark ? 'dark' : 'light'));
@@ -344,13 +841,145 @@
             const passwordInput = document.getElementById('password');
             const passwordToggle = document.getElementById('password-toggle');
             const passwordToggleIcon = document.getElementById('password-toggle-icon');
-            passwordToggle.addEventListener('click', function () {
+            passwordToggle?.addEventListener('click', function () {
                 const showing = passwordInput.type === 'text';
                 passwordInput.type = showing ? 'password' : 'text';
                 passwordToggle.setAttribute('aria-label', showing ? '显示密码' : '隐藏密码');
                 passwordToggleIcon.innerHTML = showing
                     ? '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.644C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.437 0 .644C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>'
                     : '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18" /><path stroke-linecap="round" stroke-linejoin="round" d="M10.477 10.488A3 3 0 0 0 12 15a3 3 0 0 0 2.121-.879" /><path stroke-linecap="round" stroke-linejoin="round" d="M9.88 5.09A9.953 9.953 0 0 1 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.437 0 .644a10.01 10.01 0 0 1-4.02 5.278M6.228 6.228A9.956 9.956 0 0 0 2.036 11.678a1.012 1.012 0 0 0 0 .644C3.423 16.49 7.36 19.5 12 19.5a9.95 9.95 0 0 0 5.09-1.38" /></svg>';
+            });
+
+            const form = document.getElementById('login-form');
+            const dialog = document.getElementById('slider-captcha-dialog');
+            if (!form || !dialog) return;
+
+            document.body.appendChild(dialog);
+
+            const scene = document.getElementById('slider-captcha-scene');
+            const gap = document.getElementById('slider-captcha-gap');
+            const piece = document.getElementById('slider-captcha-piece');
+            const track = document.getElementById('slider-captcha-track');
+            const handle = document.getElementById('slider-captcha-handle');
+            const progress = document.getElementById('slider-captcha-progress');
+            const offsetInput = document.getElementById('slider-captcha-offset');
+            const status = document.getElementById('slider-captcha-status');
+            const close = document.getElementById('slider-captcha-close');
+            let verified = false;
+            let dragging = false;
+            let startX = 0;
+            let currentOffset = 0;
+            let trackTravel = 0;
+            let sceneTravel = 0;
+            let handleWidth = 0;
+            let pendingOffset = 0;
+            let animationFrame = 0;
+
+            function maxOffset() {
+                return trackTravel;
+            }
+
+            function measure() {
+                handleWidth = handle.clientWidth;
+                trackTravel = Math.max(0, track.clientWidth - handleWidth);
+                sceneTravel = Math.max(0, scene.clientWidth - piece.clientWidth);
+                progress.style.width = `${track.clientWidth}px`;
+            }
+
+            function setPosition(offset) {
+                currentOffset = Math.max(0, Math.min(maxOffset(), offset));
+                const configuredWidth = Number(scene.dataset.trackWidth);
+                const normalizedOffset = maxOffset() === 0 ? 0 : Math.round(currentOffset / maxOffset() * configuredWidth);
+                const ratio = maxOffset() === 0 ? 0 : currentOffset / maxOffset();
+                handle.style.transform = `translate3d(${currentOffset}px, 0, 0)`;
+                progress.style.transform = `scaleX(${Math.min(1, (currentOffset + handleWidth) / Math.max(1, track.clientWidth))})`;
+                piece.style.transform = `translate3d(${ratio * sceneTravel}px, 0, 0)`;
+                offsetInput.value = normalizedOffset;
+            }
+
+            function queuePosition(offset) {
+                pendingOffset = offset;
+                if (animationFrame) return;
+
+                animationFrame = window.requestAnimationFrame(function () {
+                    animationFrame = 0;
+                    setPosition(pendingOffset);
+                });
+            }
+
+            function prepare() {
+                verified = false;
+                offsetInput.value = '';
+                status.textContent = '';
+                measure();
+                piece.style.left = '0px';
+                setPosition(0);
+                const configuredWidth = Number(scene.dataset.trackWidth);
+                const target = Number(scene.dataset.target);
+                gap.style.left = `${target / configuredWidth * (scene.clientWidth - gap.clientWidth)}px`;
+            }
+
+            function openDialog() {
+                dialog.classList.remove('hidden');
+                dialog.classList.add('flex');
+                window.requestAnimationFrame(function () {
+                    prepare();
+                    handle.focus();
+                });
+            }
+
+            function closeDialog() {
+                dialog.classList.add('hidden');
+                dialog.classList.remove('flex');
+            }
+
+            form.addEventListener('submit', function (event) {
+                if (!verified) {
+                    event.preventDefault();
+                    openDialog();
+                }
+            });
+
+            handle.addEventListener('pointerdown', function (event) {
+                dragging = true;
+                startX = event.clientX - currentOffset;
+                handle.setPointerCapture(event.pointerId);
+            });
+
+            handle.addEventListener('pointermove', function (event) {
+                if (dragging) queuePosition(event.clientX - startX);
+            });
+
+            handle.addEventListener('pointerup', function (event) {
+                if (!dragging) return;
+                dragging = false;
+                handle.releasePointerCapture(event.pointerId);
+                if (animationFrame) {
+                    window.cancelAnimationFrame(animationFrame);
+                    animationFrame = 0;
+                }
+                setPosition(event.clientX - startX);
+                const target = Number(scene.dataset.target);
+                const configuredWidth = Number(scene.dataset.trackWidth);
+                const submittedOffset = Number(offsetInput.value);
+                const tolerance = Number(scene.dataset.tolerance);
+                if (Math.abs(submittedOffset - target) <= tolerance) {
+                    verified = true;
+                    status.textContent = '验证通过，正在提交...';
+                    window.setTimeout(function () {
+                        closeDialog();
+                        form.requestSubmit();
+                    }, 180);
+                    return;
+                }
+
+                status.textContent = '请将拼图对准缺口后重试。';
+                window.setTimeout(function () { setPosition(0); }, 300);
+            });
+
+            close.addEventListener('click', closeDialog);
+            window.addEventListener('resize', function () {
+                if (!dialog.classList.contains('hidden')) prepare();
             });
         })();
     </script>

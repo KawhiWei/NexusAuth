@@ -177,7 +177,7 @@ psql -U nexusauth -d nexusauth -f admin/src/NexusAuth.Workbench.Api/seed.sql
 
 3. BFF 自动检查 access token 是否即将过期
 
-4. 若即将��期且存在 refresh token，则自动调用 `/connect/token`
+4. 若即将过期且存在 refresh token，则自动调用 `/connect/token`
 
 5. 拿到新 token 后自动更新 Cookie Session
 

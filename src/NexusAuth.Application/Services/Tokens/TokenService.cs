@@ -1,4 +1,4 @@
-using NexusAuth.Application.Logging;
+using Luck.Logging.Serilog;
 using NexusAuth.Application.Services.OIDC;
 
 namespace NexusAuth.Application.Services.Tokens;
@@ -12,10 +12,9 @@ public class TokenService(
     ITokenSigningCredentialsProvider signingCredentialsProvider,
     ILogger<TokenService> logger) : ITokenService
 {
-    private readonly JwtOptions jwtOptions = jwtOptions.Value;
+    private readonly JwtOptions _jwtOptions = jwtOptions.Value;
 
     /// <summary>
-    /// 签发访问令牌（简化返回，仅返�?JWT 字符串）�?
     /// </summary>
     public Task<string> IssueAccessTokenAsync(
         string clientId,
@@ -30,10 +29,6 @@ public class TokenService(
     }
 
     /// <summary>
-    /// 签发访问令牌并返回元信息（jti、过期时间等）�?
-    /// 主要调用方：
-    /// - TokenController �?authorization_code / client_credentials / device_code 分支
-    /// - TokenService.RefreshAsync 内部续签 access_token
     /// </summary>
     public async Task<TokenIssueResult> IssueAccessTokenWithMetadataAsync(
         string clientId,
@@ -61,43 +56,29 @@ public class TokenService(
 
         if (!string.IsNullOrWhiteSpace(claimsJson))
         {
-            // 中文注释：把原始 OIDC claims 请求透传�?access_token 中，
-            // 这样 userinfo 端点可以按客户端真实请求返回更精确的 claim 集合�?
-            // 主要调用方：授权码流程与设备码流程换 token�?
             claims.Add(new("claims_json", claimsJson));
         }
 
         var token = new JwtSecurityToken(
-            issuer: jwtOptions.Issuer,
+            issuer: _jwtOptions.Issuer,
             audience: resolvedAudience,
             claims: claims,
             notBefore: now,
-            expires: now.AddMinutes(jwtOptions.AccessTokenLifetimeMinutes),
+            expires: now.AddMinutes(_jwtOptions.AccessTokenLifetimeMinutes),
             signingCredentials: signingCredentialsProvider.GetSigningCredentials());
 
         token.Header[JwtHeaderParameterNames.Kid] = signingCredentialsProvider.KeyId;
 
         var jwt = new JwtSecurityTokenHandler().WriteToken(token);
 
-        using (ApplicationLogScope.Begin(
-                   logger,
-                   "Token",
-                   userId?.ToString() ?? clientId,
-                   "AccessTokenIssued"))
-        {
-            logger.LogInformation(
-                "Access token issued. ClientId={ClientId} UserId={UserId} ExpiresAt={ExpiresAt}",
-                clientId,
-                userId,
-                token.ValidTo);
-        }
+        logger.LogLuckInformation(
+            "Access token issued. ClientId={ClientId} UserId={UserId} ExpiresAt={ExpiresAt} Outcome={Outcome}",
+            [clientId, userId, token.ValidTo, "AccessTokenIssued"]);
 
         return await Task.FromResult(new TokenIssueResult(jwt, jti, token.ValidTo));
     }
 
     /// <summary>
-    /// 签发 OIDC �?id_token�?
-    /// 主要调用方：TokenController �?authorization_code / device_code 分支�?
     /// </summary>
     public async Task<string> IssueIdTokenAsync(
         string clientId,
@@ -127,7 +108,6 @@ public class TokenService(
             new("at_hash", ComputeTokenHash(accessToken)),
         };
 
-        // 中文注释：只要是 OIDC 认证结果，auth_time �?RP 做会话时效判断很有价值，直接带上�?
         if (authenticatedAt.HasValue)
             claims.Add(new("auth_time", authenticatedAt.Value.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
 
@@ -171,31 +151,24 @@ public class TokenService(
             claims.Add(new("nonce", nonce));
 
         var token = new JwtSecurityToken(
-            issuer: jwtOptions.Issuer,
+            issuer: _jwtOptions.Issuer,
             audience: clientId,
             claims: claims,
             notBefore: now,
-            expires: now.AddMinutes(jwtOptions.AccessTokenLifetimeMinutes),
+            expires: now.AddMinutes(_jwtOptions.AccessTokenLifetimeMinutes),
             signingCredentials: signingCredentialsProvider.GetSigningCredentials());
 
         token.Header[JwtHeaderParameterNames.Kid] = signingCredentialsProvider.KeyId;
         var jwt = new JwtSecurityTokenHandler().WriteToken(token);
 
-        using (ApplicationLogScope.Begin(logger, "Token", userId.ToString(), "IdTokenIssued"))
-        {
-            logger.LogInformation(
-                "ID token issued. ClientId={ClientId} UserId={UserId} ExpiresAt={ExpiresAt}",
-                clientId,
-                userId,
-                token.ValidTo);
-        }
+        logger.LogLuckInformation(
+            "ID token issued. ClientId={ClientId} UserId={UserId} ExpiresAt={ExpiresAt} Outcome={Outcome}",
+            [clientId, userId, token.ValidTo, "IdTokenIssued"]);
 
         return jwt;
     }
 
     /// <summary>
-    /// 生成并持久化 refresh_token�?
-    /// 主要调用方：TokenController �?authorization_code / device_code 分支�?
     /// </summary>
     public async Task<string> IssueRefreshTokenAsync(
         string clientId,
@@ -203,32 +176,21 @@ public class TokenService(
         string scope,
         CancellationToken ct = default)
     {
-        var refreshLifetime = TimeSpan.FromMinutes(jwtOptions.RefreshTokenLifetimeMinutes);
+        var refreshLifetime = TimeSpan.FromMinutes(_jwtOptions.RefreshTokenLifetimeMinutes);
         var refreshToken = RefreshToken.Create(clientId, userId, scope, refreshLifetime);
         await refreshTokenRepository.AddAsync(refreshToken.Entity, ct);
 
-        using (ApplicationLogScope.Begin(logger, "Token", userId.ToString(), "RefreshTokenIssued"))
-        {
-            logger.LogInformation(
-                "Refresh token issued. ClientId={ClientId} UserId={UserId} ExpiresAt={ExpiresAt}",
-                clientId,
-                userId,
-                refreshToken.Entity.ExpiresAt);
-        }
+        logger.LogLuckInformation(
+            "Refresh token issued. ClientId={ClientId} UserId={UserId} ExpiresAt={ExpiresAt} Outcome={Outcome}",
+            [clientId, userId, refreshToken.Entity.ExpiresAt, "RefreshTokenIssued"]);
 
         return refreshToken.RawToken;
     }
 
     /// <summary>
-    /// 使用 refresh_token 轮换刷新访问令牌�?
-    /// 主要流程�?
+    /// 使用 refresh_token 轮换刷新访问令牌
+    /// 主要流程
     /// 1. 查找 refresh_token
-    /// 2. 校验是否过期、是否已吊销、是否属于当�?client
-    /// 3. 吊销�?refresh_token
-    /// 4. 签发新的 refresh_token �?access_token
-    /// 主要调用方：
-    /// - TokenController �?refresh_token 分支
-    /// - Demo.Bff 的自动续期逻辑
     /// </summary>
     public async Task<RefreshResult> RefreshAsync(
         string refreshTokenString,
@@ -250,8 +212,6 @@ public class TokenService(
         if (user is null || !user.IsActive)
             return RefreshFailure(clientId ?? existingToken.ClientId, "UserInactive", "The user account is no longer active.");
 
-        // 中文注释：refresh token 必须和当前认证过的客户端绑定，防止一个客户端拿着别人�?refresh token 刷新�?
-        // 主要调用方：/connect/token �?refresh_token 分支，以�?Demo.Bff 的会话续期流程�?
         if (!string.IsNullOrWhiteSpace(clientId)
             && !string.Equals(existingToken.ClientId, clientId, StringComparison.Ordinal))
         {
@@ -265,7 +225,7 @@ public class TokenService(
             existingToken.ClientId,
             existingToken.UserId,
             existingToken.Scope,
-            TimeSpan.FromMinutes(jwtOptions.RefreshTokenLifetimeMinutes));
+            TimeSpan.FromMinutes(_jwtOptions.RefreshTokenLifetimeMinutes));
         var rotatedToken = await refreshTokenRepository.RotateAsync(
             RefreshToken.Hash(refreshTokenString),
             existingToken.ClientId,
@@ -283,19 +243,14 @@ public class TokenService(
             null,
             ct);
 
-        using (ApplicationLogScope.Begin(logger, "Token", existingToken.ClientId, "RefreshTokenRotated"))
-        {
-            logger.LogInformation(
-                "Refresh token rotation succeeded. ClientId={ClientId} UserId={UserId}",
-                existingToken.ClientId,
-                existingToken.UserId);
-        }
+        logger.LogLuckInformation(
+            "Refresh token rotation succeeded. ClientId={ClientId} UserId={UserId} Outcome={Outcome}",
+            [existingToken.ClientId, existingToken.UserId, "RefreshTokenRotated"]);
 
         return RefreshResult.Success(accessToken, newRefreshToken.RawToken);
     }
 
     /// <summary>
-    /// 吊销单个 refresh_token�?
     /// </summary>
     public async Task RevokeRefreshTokenAsync(
         string refreshTokenString,
@@ -305,8 +260,6 @@ public class TokenService(
     }
 
     /// <summary>
-    /// 吊销 refresh_token，并可选校�?token 是否属于当前客户端�?
-    /// 主要调用方：/connect/revocation �?Demo.Bff 退出登录流程�?
     /// </summary>
     public async Task RevokeRefreshTokenAsync(
         string refreshTokenString,
@@ -316,37 +269,29 @@ public class TokenService(
         var token = await refreshTokenRepository.FindByTokenAsync(refreshTokenString, ct);
         if (token is null)
         {
-            using (ApplicationLogScope.Begin(logger, "Token", clientId, "RefreshTokenNotFound"))
-            {
-                logger.LogDebug("Refresh token revocation skipped. Reason={ReasonCode}", "RefreshTokenNotFound");
-            }
+            logger.LogLuckWarning(
+                "Refresh token revocation skipped. Reason={ReasonCode} Outcome={Outcome}",
+                ["RefreshTokenNotFound", "RefreshTokenNotFound"]);
             return;
         }
 
         if (!string.IsNullOrWhiteSpace(clientId)
             && !string.Equals(token.ClientId, clientId, StringComparison.Ordinal))
         {
-            using (ApplicationLogScope.Begin(logger, "Token", clientId, "ClientMismatch"))
-            {
-                logger.LogDebug("Refresh token revocation skipped. Reason={ReasonCode}", "ClientMismatch");
-            }
+            logger.LogLuckWarning(
+                "Refresh token revocation skipped. Reason={ReasonCode} Outcome={Outcome}",
+                ["ClientMismatch", "ClientMismatch"]);
             return;
         }
 
         await refreshTokenRepository.RevokeAsync(token.Id, ct);
 
-        using (ApplicationLogScope.Begin(logger, "Token", token.ClientId, "RefreshTokenRevoked"))
-        {
-            logger.LogInformation(
-                "Refresh token revoked. ClientId={ClientId} UserId={UserId}",
-                token.ClientId,
-                token.UserId);
-        }
+        logger.LogLuckInformation(
+            "Refresh token revoked. ClientId={ClientId} UserId={UserId} Outcome={Outcome}",
+            [token.ClientId, token.UserId, "RefreshTokenRevoked"]);
     }
 
     /// <summary>
-    /// 判断 refresh_token 是否属于指定客户端�?
-    /// 主要调用方：/connect/revocation 的客户端边界检查�?
     /// </summary>
     public async Task<bool> IsRefreshTokenOwnedByClientAsync(
         string refreshTokenString,
@@ -358,7 +303,6 @@ public class TokenService(
     }
 
     /// <summary>
-    /// 吊销指定用户的全�?refresh_token�?
     /// </summary>
     public async Task RevokeAllUserTokensAsync(
         Guid userId,
@@ -375,14 +319,12 @@ public class TokenService(
 
         await refreshTokenRepository.RevokeAllForUserAsync(userId, ct);
 
-        using (ApplicationLogScope.Begin(logger, "Token", userId.ToString(), "RefreshTokensRevoked"))
-        {
-            logger.LogInformation("All refresh tokens revoked for user. UserId={UserId}", userId);
-        }
+        logger.LogLuckInformation(
+            "All refresh tokens revoked for user. UserId={UserId} Outcome={Outcome}",
+            [userId, "RefreshTokensRevoked"]);
     }
 
     /// <summary>
-    /// �?access_token 进行自检（OAuth2 introspection 风格）�?
     /// </summary>
     public async Task<TokenIntrospectionResult> IntrospectAsync(string token, CancellationToken ct = default)
     {
@@ -390,8 +332,6 @@ public class TokenService(
     }
 
     /// <summary>
-    /// �?access_token / id_token 做自检，并可选限制只能由所属客户端查询�?
-    /// 主要调用方：/connect/introspect�?connect/userinfo�?
     /// </summary>
     public async Task<TokenIntrospectionResult> IntrospectAsync(string token, string? clientId, CancellationToken ct = default)
     {
@@ -402,7 +342,7 @@ public class TokenService(
         {
             var principal = handler.ValidateToken(
                 token,
-                signingCredentialsProvider.CreateTokenValidationParameters(jwtOptions.Issuer, null),
+                signingCredentialsProvider.CreateTokenValidationParameters(_jwtOptions.Issuer, null),
                 out var validatedToken);
 
             var jwt = (JwtSecurityToken)validatedToken;
@@ -444,7 +384,6 @@ public class TokenService(
     }
 
     /// <summary>
-    /// 吊销 access_token（通过黑名单记�?jti）�?
     /// </summary>
     public async Task RevokeAccessTokenAsync(string accessToken, CancellationToken ct = default)
     {
@@ -452,18 +391,15 @@ public class TokenService(
     }
 
     /// <summary>
-    /// 吊销 access_token，并可选校验它是否属于当前客户端�?
-    /// 主要调用方：/connect/revocation�?
     /// </summary>
     public async Task RevokeAccessTokenAsync(string accessToken, string? clientId, CancellationToken ct = default)
     {
         var handler = new JwtSecurityTokenHandler();
         if (!handler.CanReadToken(accessToken))
         {
-            using (ApplicationLogScope.Begin(logger, "Token", clientId, "TokenNotReadable"))
-            {
-                logger.LogDebug("Access token revocation skipped. Reason={ReasonCode}", "TokenNotReadable");
-            }
+            logger.LogLuckWarning(
+                "Access token revocation skipped. Reason={ReasonCode} Outcome={Outcome}",
+                ["TokenNotReadable", "TokenNotReadable"]);
             return;
         }
 
@@ -471,16 +407,15 @@ public class TokenService(
         {
             var principal = handler.ValidateToken(
                 accessToken,
-                signingCredentialsProvider.CreateTokenValidationParameters(jwtOptions.Issuer, null),
+                signingCredentialsProvider.CreateTokenValidationParameters(_jwtOptions.Issuer, null),
                 out var validatedToken);
 
             var jti = GetClaimValue(principal, JwtRegisteredClaimNames.Jti, ClaimTypes.SerialNumber);
             if (string.IsNullOrWhiteSpace(jti))
             {
-                using (ApplicationLogScope.Begin(logger, "Token", clientId, "TokenIdentifierMissing"))
-                {
-                    logger.LogDebug("Access token revocation skipped. Reason={ReasonCode}", "TokenIdentifierMissing");
-                }
+                logger.LogLuckWarning(
+                    "Access token revocation skipped. Reason={ReasonCode} Outcome={Outcome}",
+                    ["TokenIdentifierMissing", "TokenIdentifierMissing"]);
                 return;
             }
 
@@ -488,20 +423,18 @@ public class TokenService(
             if (!string.IsNullOrWhiteSpace(clientId)
                 && !string.Equals(tokenClientId, clientId, StringComparison.Ordinal))
             {
-                using (ApplicationLogScope.Begin(logger, "Token", clientId, "ClientMismatch"))
-                {
-                    logger.LogDebug("Access token revocation skipped. Reason={ReasonCode}", "ClientMismatch");
-                }
+                logger.LogLuckWarning(
+                    "Access token revocation skipped. Reason={ReasonCode} Outcome={Outcome}",
+                    ["ClientMismatch", "ClientMismatch"]);
                 return;
             }
 
             var existing = await tokenBlacklistRepository.FindByJtiAsync(jti, ct);
             if (existing is not null)
             {
-                using (ApplicationLogScope.Begin(logger, "Token", tokenClientId ?? clientId, "TokenAlreadyRevoked"))
-                {
-                    logger.LogDebug("Access token revocation skipped. Reason={ReasonCode}", "TokenAlreadyRevoked");
-                }
+                logger.LogLuckWarning(
+                    "Access token revocation skipped. Reason={ReasonCode} Outcome={Outcome}",
+                    ["TokenAlreadyRevoked", "TokenAlreadyRevoked"]);
                 return;
             }
 
@@ -514,21 +447,16 @@ public class TokenService(
 
             await tokenBlacklistRepository.AddAsync(entry, ct);
 
-            using (ApplicationLogScope.Begin(logger, "Token", tokenClientId ?? clientId, "AccessTokenRevoked"))
-            {
-                logger.LogInformation(
-                    "Access token revoked. ClientId={ClientId} Subject={Subject}",
-                    tokenClientId,
-                    GetClaimValue(principal, JwtRegisteredClaimNames.Sub, ClaimTypes.NameIdentifier));
-            }
+            logger.LogLuckInformation(
+                "Access token revoked. ClientId={ClientId} Subject={Subject} Outcome={Outcome}",
+                [tokenClientId, GetClaimValue(principal, JwtRegisteredClaimNames.Sub, ClaimTypes.NameIdentifier), "AccessTokenRevoked"]);
         }
         catch
         {
             // OAuth revocation should not leak token validity details.
-            using (ApplicationLogScope.Begin(logger, "Token", clientId, "TokenValidationFailed"))
-            {
-                logger.LogDebug("Access token revocation skipped. Reason={ReasonCode}", "TokenValidationFailed");
-            }
+            logger.LogLuckWarning(
+                "Access token revocation skipped. Reason={ReasonCode} Outcome={Outcome}",
+                ["TokenValidationFailed", "TokenValidationFailed"]);
         }
     }
 
@@ -537,12 +465,9 @@ public class TokenService(
         string reasonCode,
         string error)
     {
-        using (ApplicationLogScope.Begin(logger, "Token", clientId, reasonCode))
-        {
-            logger.LogWarning(
-                "Refresh token operation failed. Reason={ReasonCode}",
-                reasonCode);
-        }
+        logger.LogLuckWarning(
+            "Refresh token operation failed. Reason={ReasonCode} Outcome={Outcome}",
+            [reasonCode, reasonCode]);
 
         return RefreshResult.Failure(error);
     }
@@ -602,7 +527,7 @@ public class TokenService(
                 throw new InvalidOperationException("Requested scopes span multiple audiences. Please request one resource audience per token.");
         }
 
-        return resolved ?? jwtOptions.DefaultAudience;
+        return resolved ?? _jwtOptions.DefaultAudience;
     }
 
     private static bool IsIdentityScope(string scope)

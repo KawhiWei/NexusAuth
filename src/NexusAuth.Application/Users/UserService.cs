@@ -1,4 +1,4 @@
-using NexusAuth.Application.Logging;
+using Luck.Logging.Serilog;
 using NexusAuth.Application.Services.Security;
 using NexusAuth.Application.Services.Tokens;
 using NexusAuth.Application.Services.Sessions;
@@ -46,10 +46,9 @@ public class UserService(
         var user = User.Create(username, rawPassword, nickname, email, phoneNumber, gender, ethnicity);
         await userRepository.AddAsync(user, ct);
 
-        using (ApplicationLogScope.Begin(logger, "Authentication", user.Id.ToString(), "RegistrationSucceeded"))
-        {
-            logger.LogInformation("User registration succeeded. UserId={UserId}", user.Id);
-        }
+        logger.LogLuckInformation(
+            "User registration succeeded. UserId={UserId} Outcome={Outcome}",
+            [user.Id, "RegistrationSucceeded"]);
 
         return user.Id;
     }
@@ -72,10 +71,9 @@ public class UserService(
             // verification path so response timing does not reveal usernames.
             BCrypt.Net.BCrypt.Verify(rawPassword, DummyPasswordHash);
 
-            using (ApplicationLogScope.Begin(logger, "Authentication", outcome: "UserNotFoundOrInactive"))
-            {
-                logger.LogWarning("User authentication failed. Reason={ReasonCode}", "UserNotFoundOrInactive");
-            }
+            logger.LogLuckWarning(
+                "User authentication failed. Reason={ReasonCode} Outcome={Outcome}",
+                ["UserNotFoundOrInactive", "UserNotFoundOrInactive"]);
 
             return null;
         }
@@ -85,10 +83,9 @@ public class UserService(
         {
             BCrypt.Net.BCrypt.Verify(rawPassword, DummyPasswordHash);
 
-            using (ApplicationLogScope.Begin(logger, "Authentication", user.Id.ToString(), "UserLocked"))
-            {
-                logger.LogWarning("User authentication failed. UserId={UserId} Reason={ReasonCode}", user.Id, "UserLocked");
-            }
+            logger.LogLuckWarning(
+                "User authentication failed. UserId={UserId} Reason={ReasonCode} Outcome={Outcome}",
+                [user.Id, "UserLocked", "UserLocked"]);
 
             return null;
         }
@@ -102,20 +99,18 @@ public class UserService(
                 now,
                 ct);
 
-            using (ApplicationLogScope.Begin(logger, "Authentication", user.Id.ToString(), "InvalidPassword"))
-            {
-                logger.LogWarning("User authentication failed. UserId={UserId} Reason={ReasonCode}", user.Id, "InvalidPassword");
-            }
+            logger.LogLuckWarning(
+                "User authentication failed. UserId={UserId} Reason={ReasonCode} Outcome={Outcome}",
+                [user.Id, "InvalidPassword", "InvalidPassword"]);
 
             return null;
         }
 
         await userRepository.ResetLoginFailuresAsync(user.Id, now, ct);
 
-        using (ApplicationLogScope.Begin(logger, "Authentication", user.Id.ToString(), "LoginSucceeded"))
-        {
-            logger.LogInformation("User authentication succeeded. UserId={UserId}", user.Id);
-        }
+        logger.LogLuckInformation(
+            "User authentication succeeded. UserId={UserId} Outcome={Outcome}",
+            [user.Id, "LoginSucceeded"]);
 
         return user;
     }
@@ -142,10 +137,9 @@ public class UserService(
 
         if (!user.VerifyPassword(currentPassword))
         {
-            using (ApplicationLogScope.Begin(logger, "Authentication", user.Id.ToString(), "PasswordChangeCurrentPasswordInvalid"))
-            {
-                logger.LogWarning("Password change rejected. UserId={UserId} Reason={ReasonCode}", user.Id, "PasswordChangeCurrentPasswordInvalid");
-            }
+            logger.LogLuckWarning(
+                "Password change rejected. UserId={UserId} Reason={ReasonCode} Outcome={Outcome}",
+                [user.Id, "PasswordChangeCurrentPasswordInvalid", "PasswordChangeCurrentPasswordInvalid"]);
 
             throw new InvalidOperationException("Current password is incorrect.");
         }
@@ -159,9 +153,8 @@ public class UserService(
         await tokenService.RevokeAllUserTokensAsync(user.Id, ct);
         await sessionService.RevokeAllForUserAsync(user.Id, ct);
 
-        using (ApplicationLogScope.Begin(logger, "Authentication", user.Id.ToString(), "PasswordChanged"))
-        {
-            logger.LogInformation("User password changed. UserId={UserId}", user.Id);
-        }
+        logger.LogLuckInformation(
+            "User password changed. UserId={UserId} Outcome={Outcome}",
+            [user.Id, "PasswordChanged"]);
     }
 }

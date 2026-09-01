@@ -1,26 +1,12 @@
-using Luck.EntityFrameworkCore.DbContexts;
-using Luck.EntityFrameworkCore.Repositories;
-using Luck.Framework.UnitOfWorks;
-using Microsoft.EntityFrameworkCore;
-using NexusAuth.Domain.Entities;
-using NexusAuth.Domain.Repositories;
-
 namespace NexusAuth.Persistence.Repositories;
 
-public class ScimServicePrincipalCredentialRepository
-    : EfCoreEntityRepository<ScimServicePrincipalCredential, Guid>,
+public class ScimServicePrincipalCredentialRepository(IUnitOfWork unitOfWork)
+    : EfCoreEntityRepository<ScimServicePrincipalCredential, Guid>(unitOfWork),
         IScimServicePrincipalCredentialRepository
 {
-    private readonly LuckDbContextBase _dbContext;
-    private readonly IUnitOfWork _unitOfWork;
-
-    public ScimServicePrincipalCredentialRepository(IUnitOfWork unitOfWork)
-        : base(unitOfWork)
-    {
-        _unitOfWork = unitOfWork;
-        _dbContext = unitOfWork.GetLuckDbContext() as LuckDbContextBase
-            ?? throw new InvalidOperationException("Failed to resolve LuckDbContext.");
-    }
+    private readonly LuckDbContextBase _dbContext = unitOfWork.GetLuckDbContext() as LuckDbContextBase
+                                                    ?? throw new InvalidOperationException("Failed to resolve LuckDbContext.");
+    private readonly IUnitOfWork _unitOfWork = unitOfWork;
 
     public async Task<ScimServicePrincipalCredential?> FindByTokenHashAsync(
         string tokenHash,

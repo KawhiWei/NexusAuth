@@ -171,4 +171,5 @@ public class UserRepository : EfCoreAggregateRootRepository<User, Guid>, IUserRe
                     .SetProperty(u => u.UpdatedAt, now),
                 ct);
     }
+
 }

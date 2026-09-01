@@ -1,4 +1,4 @@
-using NexusAuth.Application.Logging;
+using Luck.Logging.Serilog;
 using NexusAuth.Application.Clients;
 using NexusAuth.Application.Services.Security;
 using NexusAuth.Application.Services.OIDC;
@@ -12,12 +12,8 @@ public class AuthorizationService(
     ILogger<AuthorizationService> logger) : IAuthorizationService
 {
     /// <summary>
-    /// 生成并持久化授权码（authorization code）�?
-    /// 主要调用方：AuthorizeController�?
-    /// 主要职责�?
     /// 1. 校验 scope
     /// 2. 解析 claims 参数
-    /// 3. 生成一次�?authorization code 并入�?
     /// </summary>
     public async Task<string> GenerateCodeAsync(
         Guid userId,
@@ -42,7 +38,6 @@ public class AuthorizationService(
 
         if (!string.IsNullOrWhiteSpace(claimsJson))
         {
-            // 中文注释：授权阶段先校验 claims JSON 格式，避免无效请求进入后续流程�?
             try
             {
                 ParseRequestedClaims(claimsJson);
@@ -69,19 +64,14 @@ public class AuthorizationService(
 
         await codeRepository.AddAsync(code.Entity, ct);
 
-        using (ApplicationLogScope.Begin(logger, "AuthorizationCode", clientId, "AuthorizationCodeIssued"))
-        {
-            logger.LogInformation(
-                "Authorization code issued. UserId={UserId} ClientId={ClientId}",
-                userId,
-                clientId);
-        }
+        logger.LogLuckInformation(
+            "Authorization code issued. UserId={UserId} ClientId={ClientId} Outcome={Outcome}",
+            [userId, clientId, "AuthorizationCodeIssued"]);
 
         return code.RawCode;
     }
 
     /// <summary>
-    /// 解析并校�?OIDC claims 参数�?
     /// </summary>
     public OidcRequestedClaims ParseRequestedClaims(string? claimsJson)
     {
@@ -96,10 +86,6 @@ public class AuthorizationService(
     }
 
     /// <summary>
-    /// 校验授权码并消费（一次性使用）�?
-    /// 主要调用方：TokenController �?authorization_code 分支�?
-    /// 主要职责�?
-    /// 1. 校验 code 是否存在、是否过期、是否已被使�?
     /// 2. 校验 redirect_uri
     /// 3. 校验 PKCE
     /// 4. 将授权码标记为已消费
@@ -148,13 +134,9 @@ public class AuthorizationService(
         if (consumedCode is null)
             return ConsumeFailure(clientId, "AuthorizationCodeConsumeRace", "Authorization code has already been used or expired.");
 
-        using (ApplicationLogScope.Begin(logger, "AuthorizationCode", clientId, "AuthorizationCodeConsumed"))
-        {
-            logger.LogInformation(
-                "Authorization code consumed. UserId={UserId} ClientId={ClientId}",
-                consumedCode.UserId,
-                clientId);
-        }
+        logger.LogLuckInformation(
+            "Authorization code consumed. UserId={UserId} ClientId={ClientId} Outcome={Outcome}",
+            [consumedCode.UserId, clientId, "AuthorizationCodeConsumed"]);
 
         return AuthorizationCodeResult.Success(
             consumedCode.UserId,
@@ -168,7 +150,6 @@ public class AuthorizationService(
     }
 
     /// <summary>
-    /// 校验 client_credentials 流程中的客户端与 scope�?
     /// </summary>
     public async Task<ClientCredentialsResult> ValidateClientCredentialsAsync(
         ClientAuthenticationInput authentication,
@@ -207,12 +188,9 @@ public class AuthorizationService(
 
     private void LogAuthorizationFailure(string? clientId, string reasonCode)
     {
-        using (ApplicationLogScope.Begin(logger, "AuthorizationCode", clientId, reasonCode))
-        {
-            logger.LogWarning(
-                "Authorization code operation failed. Reason={ReasonCode}",
-                reasonCode);
-        }
+        logger.LogLuckWarning(
+            "Authorization code operation failed. Reason={ReasonCode} Outcome={Outcome}",
+            [reasonCode, reasonCode]);
     }
 
     private static bool VerifyPkce(string codeVerifier, string codeChallenge, string? codeChallengeMethod)
@@ -227,7 +205,6 @@ public class AuthorizationService(
             return computed == codeChallenge;
         }
 
-        // 中文注释：OAuth 2.1 风格下只接受 S256，这里明确拒�?plain 和其它方法�?
         return false;
     }
 }

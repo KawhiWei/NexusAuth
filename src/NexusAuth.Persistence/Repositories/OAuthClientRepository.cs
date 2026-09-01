@@ -30,7 +30,27 @@ public class OAuthClientRepository : EfCoreAggregateRootRepository<OAuthClient, 
 
     public async Task UpdateAsync(OAuthClient client, CancellationToken ct = default)
     {
-        Update(client);
+        // Clients returned by this repository are tracked. Calling Update on
+        // the aggregate would mark a newly appended OAuthClientSecret as
+        // Modified, so first-time Workbench credential initialization tries
+        // to update a row that does not exist.
+        await _unitOfWork.CommitAsync(ct);
+    }
+
+    public async Task ReplaceSharedSecretAsync(Guid clientId, OAuthClientSecret secret, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(secret);
+        if (secret.ClientId != clientId)
+            throw new ArgumentException("The secret belongs to another OAuth client.", nameof(secret));
+
+        var dbContext = _unitOfWork.GetLuckDbContext() as LuckDbContextBase
+            ?? throw new InvalidOperationException("Failed to resolve LuckDbContext.");
+        await dbContext.Set<OAuthClientSecret>()
+            .Where(item => item.ClientId == clientId
+                && item.Type == OAuthClientSecret.TypeSharedSecret
+                && item.IsActive)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.IsActive, false), ct);
+        dbContext.Add(secret);
         await _unitOfWork.CommitAsync(ct);
     }
 

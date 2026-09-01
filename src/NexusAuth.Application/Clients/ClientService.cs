@@ -1,4 +1,4 @@
-using NexusAuth.Application.Logging;
+using Luck.Logging.Serilog;
 
 namespace NexusAuth.Application.Clients;
 
@@ -492,13 +492,9 @@ public class ClientService(
         OAuthClient client,
         string outcome)
     {
-        using (ApplicationLogScope.Begin(logger, "ClientAuthentication", client.ClientId, outcome))
-        {
-            logger.LogInformation(
-                "Client authentication succeeded. ClientId={ClientId} Outcome={Outcome}",
-                client.ClientId,
-                outcome);
-        }
+        logger.LogLuckInformation(
+            "Client authentication succeeded. ClientId={ClientId} Outcome={Outcome}",
+            [client.ClientId, outcome]);
 
         return ClientAuthenticationResult.Success(client);
     }
@@ -508,12 +504,9 @@ public class ClientService(
         string reasonCode,
         string error)
     {
-        using (ApplicationLogScope.Begin(logger, "ClientAuthentication", clientId, reasonCode))
-        {
-            logger.LogWarning(
-                "Client authentication failed. Reason={ReasonCode}",
-                reasonCode);
-        }
+        logger.LogLuckWarning(
+            "Client authentication failed. Reason={ReasonCode} Outcome={Outcome}",
+            [reasonCode, reasonCode]);
 
         return ClientAuthenticationResult.Failure("invalid_client", error);
     }

@@ -11,6 +11,8 @@ public class DbContext(DbContextOptions options) : LuckDbContextBase(options)
 {
     public DbSet<User> Users => Set<User>();
 
+    public DbSet<UserCredential> UserCredentials => Set<UserCredential>();
+
     public DbSet<OAuthClient> OAuthClients => Set<OAuthClient>();
 
     public DbSet<OAuthClientSecret> OAuthClientSecrets => Set<OAuthClientSecret>();

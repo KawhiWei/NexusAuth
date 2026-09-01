@@ -1,0 +1,6 @@
+* text=auto eol=crlf
+*.cs text working-tree-encoding=UTF-8
+*.csproj text working-tree-encoding=UTF-8
+*.props text working-tree-encoding=UTF-8
+*.targets text working-tree-encoding=UTF-8
+*.md text working-tree-encoding=UTF-8

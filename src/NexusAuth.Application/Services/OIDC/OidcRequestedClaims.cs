@@ -26,7 +26,6 @@ public sealed class OidcRequestedClaims
     }
 
     /// <summary>
-    /// 创建请求 claims 模型�?
     /// </summary>
     public static OidcRequestedClaims Create(IEnumerable<string>? idTokenClaims = null, IEnumerable<string>? userInfoClaims = null)
     {
@@ -40,9 +39,7 @@ public sealed class OidcRequestedClaims
             userInfoMap);
     }
 
-    // 中文注释：OIDC claims 参数�?JSON 对象，这里只提取被请求的 claim 名称�?
     /// <summary>
-    /// 解析 OIDC claims JSON 参数�?
     /// </summary>
     public static OidcRequestedClaims Parse(string? claimsJson)
     {
@@ -59,7 +56,6 @@ public sealed class OidcRequestedClaims
     }
 
     /// <summary>
-    /// 判断是否请求了某�?id_token claim�?
     /// </summary>
     public bool RequestsIdTokenClaim(string claimName)
     {
@@ -67,7 +63,6 @@ public sealed class OidcRequestedClaims
     }
 
     /// <summary>
-    /// 判断是否请求了某�?userinfo claim�?
     /// </summary>
     public bool RequestsUserInfoClaim(string claimName)
     {
@@ -75,8 +70,6 @@ public sealed class OidcRequestedClaims
     }
 
     /// <summary>
-    /// 获取某个 claim 的请求细节，例如 essential、value、values�?
-    /// 主要调用方：id_token / userinfo 组装逻辑，用于更贴近 OIDC claims 参数语义�?
     /// </summary>
     public OidcClaimRequest? GetClaimRequest(string claimName)
     {
@@ -87,8 +80,6 @@ public sealed class OidcRequestedClaims
     }
 
     /// <summary>
-    /// 判断某个 claim 是否在任一 OIDC claims 分组中被显式请求�?
-    /// 主要调用方：id_token �?userinfo 组装逻辑�?
     /// </summary>
     public bool RequestsClaim(string claimName)
     {

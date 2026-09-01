@@ -61,6 +61,84 @@ public sealed class LoginFlowTests
     }
 
     [Fact]
+    public void Remember_me_lifetime_defaults_to_three_days()
+    {
+        Assert.Equal(3, new LoginFlowOptions().RememberMeLifetimeDays);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(31)]
+    public void Login_flow_rejects_an_out_of_range_remember_me_lifetime(int lifetimeDays)
+    {
+        var options = new LoginFlowOptions
+        {
+            RememberMeLifetimeDays = lifetimeDays,
+            Steps =
+            [
+                new() { Type = "password", Requirement = "required" },
+            ],
+        };
+
+        var result = new LoginFlowOptionsValidator().Validate(null, options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void Remembered_authentication_uses_an_absolute_configured_lifetime()
+    {
+        var issuedAt = new DateTimeOffset(2026, 9, 1, 8, 30, 0, TimeSpan.Zero);
+        var options = new LoginFlowOptions
+        {
+            RememberMeLifetimeDays = 3,
+            AllowRememberMe = true,
+        };
+
+        var properties = options.CreateAuthenticationProperties(true, issuedAt);
+
+        Assert.True(properties.IsPersistent);
+        Assert.Equal(issuedAt, properties.IssuedUtc);
+        Assert.Equal(issuedAt.AddDays(3), properties.ExpiresUtc);
+        Assert.Equal(false, properties.AllowRefresh);
+    }
+
+    [Fact]
+    public void Unchecked_remember_me_uses_session_lifetime_and_allows_sliding_refresh()
+    {
+        var issuedAt = new DateTimeOffset(2026, 9, 1, 8, 30, 0, TimeSpan.Zero);
+        var options = new LoginFlowOptions
+        {
+            SessionLifetimeMinutes = 45,
+            AllowRememberMe = true,
+        };
+
+        var properties = options.CreateAuthenticationProperties(false, issuedAt);
+
+        Assert.False(properties.IsPersistent);
+        Assert.Equal(issuedAt, properties.IssuedUtc);
+        Assert.Equal(issuedAt.AddMinutes(45), properties.ExpiresUtc);
+        Assert.Null(properties.AllowRefresh);
+    }
+
+    [Fact]
+    public void Remember_me_is_ignored_when_disabled_by_configuration()
+    {
+        var issuedAt = new DateTimeOffset(2026, 9, 1, 8, 30, 0, TimeSpan.Zero);
+        var options = new LoginFlowOptions
+        {
+            SessionLifetimeMinutes = 45,
+            AllowRememberMe = false,
+        };
+
+        var properties = options.CreateAuthenticationProperties(true, issuedAt);
+
+        Assert.False(properties.IsPersistent);
+        Assert.Equal(issuedAt.AddMinutes(45), properties.ExpiresUtc);
+        Assert.Null(properties.AllowRefresh);
+    }
+
+    [Fact]
     public void Pending_login_state_rejects_tampering()
     {
         var protector = new LoginFlowStateProtector(new EphemeralDataProtectionProvider());

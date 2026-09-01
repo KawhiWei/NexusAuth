@@ -68,6 +68,8 @@ public class LoginModel(
 
     public bool ShowRememberMe => _flowOptions.AllowRememberMe;
 
+    public int RememberMeLifetimeDays => _flowOptions.RememberMeLifetimeDays;
+
     public bool SliderCaptchaEnabled => _sliderCaptchaOptions.Enabled;
 
     public int SliderCaptchaTrackWidthPixels => _sliderCaptchaOptions.TrackWidthPixels;
@@ -229,7 +231,12 @@ public class LoginModel(
         DateTimeOffset authenticatedAt,
         string authenticationMethods)
     {
-        var sessionId = await sessionService.CreateAsync(user.Id, HttpContext.RequestAborted);
+        var issuedAt = DateTimeOffset.UtcNow;
+        var authProperties = _flowOptions.CreateAuthenticationProperties(rememberMe, issuedAt);
+        var sessionId = await sessionService.CreateAsync(
+            user.Id,
+            authProperties.ExpiresUtc!.Value - issuedAt,
+            HttpContext.RequestAborted);
         Username = user.Username;
         await RecordLoginAsync(user.Id, true, null);
 
@@ -249,13 +256,6 @@ public class LoginModel(
 
         var identity = new ClaimsIdentity(claims, AppWebModule.AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);
-
-        var authProperties = new AuthenticationProperties
-        {
-            IsPersistent = _flowOptions.AllowRememberMe && rememberMe,
-            IssuedUtc = DateTimeOffset.UtcNow,
-            ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(_flowOptions.SessionLifetimeMinutes),
-        };
 
         await HttpContext.SignInAsync(
             AppWebModule.AuthenticationScheme,

@@ -129,18 +129,18 @@ NexusAuth Host 支持使用带 `NEXUSAUTH_` 前缀的单下划线环境变量覆
 ```bash
 NEXUSAUTH_JWT_ISSUER=https://sso.example.com
 NEXUSAUTH_LOGIN_PAGE_MARKETING_DESCRIPTION="OAuth 2.1 和 OIDC · 授权码 + PKCE · SCIM 2.0 标准协议"
+NEXUSAUTH_LOGIN_FLOW_REMEMBER_ME_LIFETIME_DAYS=3
 NEXUSAUTH_CONNECTION_STRINGS_DEFAULT="Host=db;Port=5432;Database=nexusauth;Username=nexusauth;Password=REPLACE_WITH_A_SECRET"
 NEXUSAUTH_WORKBENCH_AUTH_AUTHORITY=https://sso.example.com
 ```
 
-Host 的登录页、JWT、数据库连接和 Workbench API 配置均可通过对应的 `NEXUSAUTH_...` 单下划线变量设置。
+Host 的登录页、登录流程、JWT、数据库连接和 Workbench API 配置均可通过对应的 `NEXUSAUTH_...` 单下划线变量设置。`NEXUSAUTH_LOGIN_FLOW_REMEMBER_ME_LIFETIME_DAYS` 控制勾选“几天内免登录”后的固定有效期，默认 `3`，范围为 `1`–`30`；修改后重启 Provider 生效。
 
 `demo/seed.sql` 不再由 Compose 自动执行。需要演示客户端与示例用户时，可以在本地开发数据库中手动执行该脚本。
 
 ### 数据库脚本职责
 
 - [production-init.sql](./production-init.sql)：仅用于全新、空的 `nexusauth` 数据库，定义当前最终 schema；不删库、不含 `ALTER TABLE`，也不创建用户。
-- `production-init.sql`：唯一的数据库初始化脚本，用于空数据库。
 - `admin/src/NexusAuth.Workbench.Api/seed.sql`：登记 Workbench 所需的 scope 和 OAuth 客户端；通过 psql 变量 `workbench_client_secret` 写入 `WORKBENCH_CLIENT_SECRET` 的 BCrypt 哈希。
 - `demo/seed.sql`：只用于本地演示客户端和示例用户，禁止用于生产。
 

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 
 namespace NexusAuth.Host.Authentication;
@@ -9,6 +10,8 @@ public sealed class LoginFlowOptions
     public int PendingStateLifetimeMinutes { get; set; } = 5;
 
     public int SessionLifetimeMinutes { get; set; } = 1440;
+
+    public int RememberMeLifetimeDays { get; set; } = 3;
 
     public bool AllowRememberMe { get; set; } = true;
 
@@ -37,6 +40,22 @@ public sealed class LoginFlowOptions
 
     public LoginFlowStepOptions? FindStep(string type) =>
         Steps.FirstOrDefault(step => string.Equals(step.Type, type, StringComparison.OrdinalIgnoreCase));
+
+    public AuthenticationProperties CreateAuthenticationProperties(bool rememberMe, DateTimeOffset issuedAt)
+    {
+        var useRememberMe = AllowRememberMe && rememberMe;
+        var lifetime = useRememberMe
+            ? TimeSpan.FromDays(RememberMeLifetimeDays)
+            : TimeSpan.FromMinutes(SessionLifetimeMinutes);
+
+        return new AuthenticationProperties
+        {
+            IsPersistent = useRememberMe,
+            IssuedUtc = issuedAt,
+            ExpiresUtc = issuedAt.Add(lifetime),
+            AllowRefresh = useRememberMe ? false : null,
+        };
+    }
 }
 
 public sealed class LoginFlowStepOptions
@@ -68,6 +87,9 @@ public sealed class LoginFlowOptionsValidator : IValidateOptions<LoginFlowOption
 
         if (options.SessionLifetimeMinutes is < 5 or > 1440)
             errors.Add("LoginFlow:SessionLifetimeMinutes must be between 5 and 1440.");
+
+        if (options.RememberMeLifetimeDays is < 1 or > 30)
+            errors.Add("LoginFlow:RememberMeLifetimeDays must be between 1 and 30.");
 
         if (options.Steps is null || options.Steps.Count == 0)
         {

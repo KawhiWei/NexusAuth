@@ -134,14 +134,14 @@ psql -U nexusauth -d nexusauth -f admin/src/NexusAuth.Workbench.Api/seed.sql
 
 ## Test 时间设置
 
-为了方便本地测试 refresh token，当前默认配置已调短：
+Demo 的 BFF Cookie 生命周期已调短为 3 分钟，便于观察登录与会话行为；Provider 的令牌生命周期仍以 `src/NexusAuth.Host/appsettings.json` 或其环境变量覆盖值为准。
 
 ### Host
 
 文件：`src/NexusAuth.Host/appsettings.json`
 
-- `AccessTokenLifetimeMinutes = 1`
-- `RefreshTokenLifetimeMinutes = 3`
+- `AccessTokenLifetimeMinutes = 60`
+- `RefreshTokenLifetimeMinutes = 43200`
 - `DeviceCodeLifetimeMinutes = 15`
 
 ### BFF Cookie Session
@@ -153,8 +153,8 @@ psql -U nexusauth -d nexusauth -f admin/src/NexusAuth.Workbench.Api/seed.sql
 - `CookieLifetimeMinutes = 3`
 
 **说明：**
-- access token 1 分钟后过期
-- refresh token 3 分钟后过期
+- access token 默认 60 分钟后过期
+- refresh token 默认 43200 分钟后过期
 - Cookie 会话 3 分钟有效
 
 这样既能测到 refresh，又不会因为 Cookie 过短导致会话先失效。

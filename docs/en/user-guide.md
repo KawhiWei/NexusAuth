@@ -75,6 +75,8 @@ Bootstrap is idempotent: if the username does not exist, NexusAuth creates it an
 
 After Dashboard sign-in, the browser holds only the protected Workbench BFF cookie. OAuth client secrets, access tokens, and refresh tokens must not be placed in browser storage or frontend build artifacts.
 
+The Provider sign-in page's "stay signed in for 3 days" option is configured with `NEXUSAUTH_LOGIN_FLOW_REMEMBER_ME_LIFETIME_DAYS`. It defaults to 3 days and accepts values from 1 through 30; for example, `NEXUSAUTH_LOGIN_FLOW_REMEMBER_ME_LIFETIME_DAYS=7`. When selected, the persistent cookie and server-side SSO session expire together at the fixed deadline and are not renewed by continued activity. Restart the Provider after changing the variable.
+
 ## 4. Administration Console
 
 The console contains users, API resources, applications, and SCIM credentials. Resource names, client IDs, callback URIs, and credentials are security boundaries. Confirm the dependent applications before changing them.
@@ -220,11 +222,11 @@ Current limitations: only the User resource is supported; SCIM Bulk, sorting, an
 
 ## 7. Production Release Checklist
 
-1. Set the public HTTPS `NEXUSAUTH_ISSUER` and ensure the Provider, discovery document, client callbacks, and reverse proxy agree.
+1. Set the public HTTPS `NEXUSAUTH_JWT_ISSUER` and ensure the Provider, discovery document, client callbacks, and reverse proxy agree.
 2. Explicitly configure the bootstrap-administrator variables and `WORKBENCH_CLIENT_SECRET`; do not use Compose fallback values.
-3. Provide a managed X.509 PFX: set `NEXUSAUTH_SSO_ENVIRONMENT=Production`, `NEXUSAUTH_SIGNING_MODE=Certificate`, `NEXUSAUTH_SIGNING_CERTIFICATE_PATH`, and the password secret. Production does not generate a signing certificate automatically.
+3. Provide a managed X.509 PFX: set `NEXUSAUTH_SSO_ENVIRONMENT=Production`, `NEXUSAUTH_JWT_SIGNING_MODE=Certificate`, `NEXUSAUTH_JWT_SIGNING_CERTIFICATE_PATH`, and the password secret. Production does not generate a signing certificate automatically.
 4. Share a Data Protection key ring across Provider and Workbench replicas, and persist PostgreSQL data.
-5. For an empty database, run [production-init.sql](../../production-init.sql). Upgrade an existing database only by applying [database migrations](../../database) `001_*.sql` through `006_*.sql` in order; do not rerun the final initialization script.
+5. For an empty database, run [production-init.sql](../../production-init.sql). The current deployment model does not provide incremental upgrade scripts for an existing database; back up the data, initialize a new database, and plan the data migration before upgrading.
 6. Confirm the database account can use `pgcrypto`. When managed PostgreSQL prohibits `CREATE EXTENSION`, ask the DBA to enable it beforehand.
 7. Supply `WORKBENCH_CLIENT_SECRET` to both database initialization and Workbench API. At API startup, NexusAuth checks and synchronizes the hash for this built-in client. When rotating the secret, update the secret first and then roll the Workbench deployment.
 8. Configure trusted forwarded headers, explicit `AllowedHosts`, HTTPS cookies, log retention, monitoring, backups, and recovery drills.
@@ -235,14 +237,15 @@ Current limitations: only the User resource is supported; SCIM Bulk, sorting, an
 | Variable | Description |
 |---|---|
 | `ConnectionStrings__Default` | PostgreSQL connection string for both Provider and Workbench API. |
-| `NEXUSAUTH_ISSUER` / `Jwt__Issuer` | Public Provider URL; must use HTTPS in production. |
+| `NEXUSAUTH_JWT_ISSUER` / `Jwt__Issuer` | Public Provider URL; must use HTTPS in production. |
 | `NEXUSAUTH_BOOTSTRAP_ADMIN_*` | Bootstrap system-administrator profile. |
 | `WORKBENCH_CLIENT_SECRET` | Sole secret source for the `nexusauth.workbench` system client. |
 | `NEXUSAUTH_SSO_ENVIRONMENT` | Set to `Production` in production. |
-| `NEXUSAUTH_SIGNING_MODE` | `Certificate` is recommended for new deployments. |
-| `NEXUSAUTH_SIGNING_CERTIFICATE_PATH` / `...PASSWORD` | Production PFX path and password. |
+| `NEXUSAUTH_JWT_SIGNING_MODE` | `Certificate` is recommended for new deployments. |
+| `NEXUSAUTH_JWT_SIGNING_CERTIFICATE_PATH` / `...PASSWORD` | Production PFX path and password. |
 | `NEXUSAUTH_ACCESS_TOKEN_LIFETIME_MINUTES` | Access-token lifetime; defaults to 60 minutes. |
 | `NEXUSAUTH_REFRESH_TOKEN_LIFETIME_MINUTES` | Absolute refresh-token lifetime; defaults to 43200 minutes. |
+| `NEXUSAUTH_LOGIN_FLOW_REMEMBER_ME_LIFETIME_DAYS` | Fixed lifetime for the sign-in page's stay-signed-in option; defaults to 3 days and accepts 1-30. The cookie and server-side SSO session expire together without sliding renewal. |
 
 ## 9. Troubleshooting
 
@@ -253,6 +256,7 @@ Current limitations: only the User resource is supported; SCIM Bulk, sorting, an
 | `invalid_scope` | The scope is allowed for the client, the API resource is enabled, and standard-scope and resource names are correct. |
 | `invalid_grant` | Authorization code reuse or expiry, callback URI, and PKCE verifier. |
 | Sign-in redirect loop | Workbench Authority, callback URI, Cookie/Data Protection settings, and reverse-proxy HTTPS headers. |
+| Stay-signed-in lifetime is unexpected | Confirm `NEXUSAUTH_LOGIN_FLOW_REMEMBER_ME_LIFETIME_DAYS` is an integer from 1 through 30 and that the Provider was restarted. Existing cookies are not extended by a configuration change. |
 | SCIM 401/403 | Bearer token validity, revocation, and expiry; grant `scim:read` for reads and `scim:write` for writes. |
 | Provider startup failure | Database connectivity, schema, signing certificate path/password, and production environment variables. |
 

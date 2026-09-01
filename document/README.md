@@ -35,7 +35,7 @@ PAR、JAR、JARM、DPoP、OAuth mTLS/证书绑定令牌、动态客户端注册�
 | [12 使用手册](./12-使用手册.md) | 管理员、应用接入方和运维人员的完整主手册。 |
 | [01 快速开始](./01-快速开始.md) | 启动 Provider、数据库和 Workbench |
 | [02 环境准备](./02-环境准备.md) | .NET、Node.js、PostgreSQL 和 Docker |
-| [03 数据库配置](./03-数据库配置.md) | 初始化数据库和升级已有数据 |
+| [03 数据库配置](./03-数据库配置.md) | 初始化空数据库与历史数据升级方案 |
 | [04 启动 Provider](./04-启动NexusAuth.Provider.md) | 单独运行 SSO 服务 |
 | [05 配置 OAuth 客户端](./05-配置OAuth客户端.md) | 客户端字段、PKCE、认证、curl 和 BFF 示例 |
 | [06 对接 Workbench](./06-对接NexusAuth.Workbench.md) | Workbench API 的 OIDC 登录 |

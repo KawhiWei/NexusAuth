@@ -228,7 +228,7 @@ Current limitations: only the User resource is supported; SCIM Bulk, sorting, an
 4. Share a Data Protection key ring across Provider and Workbench replicas, and persist PostgreSQL data.
 5. For an empty database, run [production-init.sql](../../production-init.sql). The current deployment model does not provide incremental upgrade scripts for an existing database; back up the data, initialize a new database, and plan the data migration before upgrading.
 6. Confirm the database account can use `pgcrypto`. When managed PostgreSQL prohibits `CREATE EXTENSION`, ask the DBA to enable it beforehand.
-7. Supply `WORKBENCH_CLIENT_SECRET` to both database initialization and Workbench API. At API startup, NexusAuth checks and synchronizes the hash for this built-in client. When rotating the secret, update the secret first and then roll the Workbench deployment.
+7. Supply `WORKBENCH_CLIENT_SECRET` and the complete `NEXUSAUTH_WORKBENCH_AUTH_*` and `NEXUSAUTH_WORKBENCH_BOOTSTRAP_*` configuration to Workbench API. At startup, NexusAuth creates or synchronizes the built-in client, resource, and secret. When rotating the secret, update it and roll the Workbench deployment.
 8. Configure trusted forwarded headers, explicit `AllowedHosts`, HTTPS cookies, log retention, monitoring, backups, and recovery drills.
 9. Do not run `demo/seed.sql` in production, and never commit real secrets, PFX files, private keys, tokens, or production database exports.
 
@@ -239,7 +239,7 @@ Current limitations: only the User resource is supported; SCIM Bulk, sorting, an
 | `ConnectionStrings__Default` | PostgreSQL connection string for both Provider and Workbench API. |
 | `NEXUSAUTH_JWT_ISSUER` / `Jwt__Issuer` | Public Provider URL; must use HTTPS in production. |
 | `NEXUSAUTH_BOOTSTRAP_ADMIN_*` | Bootstrap system-administrator profile. |
-| `WORKBENCH_CLIENT_SECRET` | Sole secret source for the `nexusauth.workbench` system client. |
+| `WORKBENCH_CLIENT_SECRET` | Sole secret source for the Workbench OAuth client, synchronized by the API startup bootstrapper. |
 | `NEXUSAUTH_SSO_ENVIRONMENT` | Set to `Production` in production. |
 | `NEXUSAUTH_JWT_SIGNING_MODE` | `Certificate` is recommended for new deployments. |
 | `NEXUSAUTH_JWT_SIGNING_CERTIFICATE_PATH` / `...PASSWORD` | Production PFX path and password. |

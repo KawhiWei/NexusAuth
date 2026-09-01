@@ -403,6 +403,7 @@ const ScimCredentialManagementPage = () => {
           data={credentials}
           verticalAlign="middle"
           tableLayout="fixed"
+          resizable
           loading={loading}
           maxHeight={Math.max(window.innerHeight - 200, 260)}
         />

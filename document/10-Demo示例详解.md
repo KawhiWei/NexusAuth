@@ -21,7 +21,7 @@ Compose 默认启动 Provider、Workbench API、Dashboard 和 PostgreSQL，但�
 
 ## 2. 初始化 Demo 数据
 
-`production-init.sql` 只创建空库的最终 schema；`admin/src/NexusAuth.Workbench.Api/seed.sql` 登记 Workbench 客户端和资源；`demo/seed.sql` 才包含 Demo 客户端、API resources 和测试用户。
+`production-init.sql` 只创建空库的最终 schema；Workbench API 启动时从环境变量登记自身客户端和资源；`demo/seed.sql` 才包含 Demo 客户端、API resources 和测试用户。
 
 ### 使用本地 PostgreSQL
 
@@ -32,20 +32,11 @@ psql -U nexusauth -d nexusauth -v ON_ERROR_STOP=1 -f production-init.sql
 psql -U nexusauth -d nexusauth -v ON_ERROR_STOP=1 -f demo/seed.sql
 ```
 
-Workbench seed 需要在同一个 psql 会话中设置 schema：
-
-```bash
-psql -U nexusauth -d nexusauth -v ON_ERROR_STOP=1 <<'SQL'
-SET search_path TO nexusauth;
-\i admin/src/NexusAuth.Workbench.Api/seed.sql
-SQL
-```
-
 如果是全新数据库，先执行 `production-init.sql`；不要把它重复执行到已有数据的数据库上。脚本不会创建 PostgreSQL 数据库或角色。
 
 ### 使用 Docker Compose 数据库
 
-Compose 的新数据卷会自动执行 `production-init.sql` 和 Workbench seed，但不会执行 `demo/seed.sql`。服务启动后可从仓库根目录手动导入 Demo seed：
+Compose 的新数据卷会自动执行 `production-init.sql`，Workbench API 随后初始化自身 OAuth 数据，但不会执行 `demo/seed.sql`。服务启动后可从仓库根目录手动导入 Demo seed：
 
 ```bash
 docker compose exec -T db psql -U nexusauth -d nexusauth -v ON_ERROR_STOP=1 < demo/seed.sql

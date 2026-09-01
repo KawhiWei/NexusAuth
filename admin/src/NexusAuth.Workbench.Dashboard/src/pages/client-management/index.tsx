@@ -176,7 +176,7 @@ const ClientManagementPage = () => {
   };
 
   const columns: TableProps<Client>['columns'] = [
-    { colKey: 'clientId', title: 'Client ID', width: 180 },
+    { colKey: 'clientId', title: 'Client ID', width: 280, ellipsis: true },
     { colKey: 'clientName', title: '名称', minWidth: 150, ellipsis: true },
     {
       colKey: 'isActive',
@@ -259,7 +259,7 @@ const ClientManagementPage = () => {
 
       <div className="page-table-section">
         <div ref={tableWrapRef}>
-          <Table rowKey="id" columns={columns} data={sourceData} verticalAlign="middle" maxHeight={tableMaxHeight} tableLayout="fixed" loading={loading} />
+          <Table rowKey="id" columns={columns} data={sourceData} verticalAlign="middle" maxHeight={tableMaxHeight} tableLayout="fixed" resizable loading={loading} />
         </div>
 
         <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>

@@ -294,6 +294,7 @@ const ProductConfigPage = () => {
             verticalAlign="middle"
             maxHeight={tableMaxHeight}
             tableLayout="fixed"
+            resizable
             expandedRowKeys={expandedRowKeys}
             onExpandChange={(keys) => setExpandedRowKeys(keys)}
             expandedRow={({ row }) => {

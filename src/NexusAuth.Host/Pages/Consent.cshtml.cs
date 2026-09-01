@@ -118,16 +118,11 @@ public class ConsentModel(
             return Page();
         }
 
-        var responseMode = ResolveResponseMode(ResponseMode) ?? "query";
-        return BuildAuthorizationResponse(
-            RedirectUri,
-            responseMode,
-            new Dictionary<string, string?>
-            {
-                ["error"] = "access_denied",
-                ["error_description"] = "The resource owner denied the request.",
-                ["state"] = State,
-            });
+        return RedirectToPage("/OAuthError", new
+        {
+            error = "access_denied",
+            error_description = "The resource owner denied the request.",
+        });
     }
 
     private async Task<ClientValidationResult> ValidateAuthorizeRequestAsync(CancellationToken ct)

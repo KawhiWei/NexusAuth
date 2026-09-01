@@ -119,7 +119,7 @@ const LoginAuditManagementPage = () => {
       </div>
       <div className="page-table-section">
         <div ref={tableWrapRef}>
-          <Table rowKey="id" columns={columns} data={sourceData} verticalAlign="middle" maxHeight={tableMaxHeight} tableLayout="fixed" loading={loading} />
+          <Table rowKey="id" columns={columns} data={sourceData} verticalAlign="middle" maxHeight={tableMaxHeight} tableLayout="fixed" resizable loading={loading} />
         </div>
         <div className="login-audit-management-pagination">
           <Pagination total={total} current={current} pageSize={pageSize} pageSizeOptions={[10, 20, 50]} showPageSize showJumper onCurrentChange={setCurrent} onPageSizeChange={(size) => { setPageSize(Number(size)); setCurrent(1); }} />

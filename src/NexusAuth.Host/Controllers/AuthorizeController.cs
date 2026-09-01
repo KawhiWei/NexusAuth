@@ -52,10 +52,10 @@ public class AuthorizeController(
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(clientId))
-            return BadRequest(new { error = "invalid_request", error_description = "client_id is required." });
+            return AuthorizationError("invalid_request", "client_id is required.");
 
         if (string.IsNullOrWhiteSpace(redirectUri))
-            return BadRequest(new { error = "invalid_request", error_description = "redirect_uri is required." });
+            return AuthorizationError("invalid_request", "redirect_uri is required.");
 
         // Establish the trusted callback boundary before any redirect. Invalid client or
         // redirect_uri requests are always handled locally and never become open redirects.
@@ -63,7 +63,9 @@ public class AuthorizeController(
 
         if (!redirectValidation.IsSuccess)
         {
-            return BadRequest(new { error = redirectValidation.ErrorCode, error_description = redirectValidation.Error });
+            return AuthorizationError(
+                redirectValidation.ErrorCode ?? "invalid_request",
+                redirectValidation.Error ?? "The authorization request is invalid.");
         }
 
         var normalizedResponseMode = ResolveResponseMode(responseMode);
@@ -124,7 +126,7 @@ public class AuthorizeController(
         if (!scopeValidation.IsSuccess)
         {
             if (string.Equals(scopeValidation.ErrorCode, "invalid_client", StringComparison.Ordinal))
-                return BadRequest(new { error = "invalid_client", error_description = scopeValidation.Error });
+                return AuthorizationError("invalid_client", scopeValidation.Error ?? "Client not found or inactive.");
 
             return AuthorizationError(
                 redirectUri,
@@ -219,7 +221,7 @@ public class AuthorizeController(
         // User is authenticated — extract user ID from cookie claims
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrWhiteSpace(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-            return BadRequest(new { error = "server_error", error_description = "Unable to identify the authenticated user." });
+            return AuthorizationError("server_error", "Unable to identify the authenticated user.");
 
         var authenticatedAt = GetAuthenticatedAt();
         if (maxAge.HasValue)
@@ -311,22 +313,24 @@ public class AuthorizeController(
     }
 
     private IActionResult AuthorizationError(
+        string error,
+        string description)
+    {
+        return RedirectToPage("/OAuthError", new
+        {
+            error,
+            error_description = description,
+        });
+    }
+
+    private IActionResult AuthorizationError(
         string redirectUri,
         string? responseMode,
         string error,
         string description,
         string? state)
     {
-        var mode = ResolveResponseMode(responseMode) ?? "query";
-        return BuildAuthorizationResponse(
-            redirectUri,
-            mode,
-            new Dictionary<string, string?>
-            {
-                ["error"] = error,
-                ["error_description"] = description,
-                ["state"] = state,
-            });
+        return AuthorizationError(error, description);
     }
 
     private IActionResult BuildAuthorizationResponse(

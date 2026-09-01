@@ -6,13 +6,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-nexusauth}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexusauth_dev_password}
       POSTGRES_DB: postgres
-      # Development-only fallback. Production must explicitly set this value.
-      WORKBENCH_CLIENT_SECRET: ${WORKBENCH_CLIENT_SECRET:-c57cf0e110c54ad2ac5591b99801b852}
     volumes:
       - nexusauth-db-data:/var/lib/postgresql/data
       - ./docker/postgres-init.sh:/docker-entrypoint-initdb.d/000-postgres-init.sh:ro
       - ./production-init.sql:/opt/nexusauth-init/production-init.sql:ro
-      - ./admin/src/NexusAuth.Workbench.Api/seed.sql:/opt/nexusauth-init/admin-seed.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
       interval: 5s
@@ -85,10 +82,16 @@ services:
       NEXUSAUTH_WORKBENCH_AUTH_CLIENT_SECRET: ${WORKBENCH_CLIENT_SECRET:-c57cf0e110c54ad2ac5591b99801b852}
       NEXUSAUTH_WORKBENCH_AUTH_REDIRECT_URI: http://localhost:5051/signin-oidc
       NEXUSAUTH_WORKBENCH_AUTH_POST_LOGOUT_REDIRECT_URI: http://localhost:5273/
-      NEXUSAUTH_WORKBENCH_AUTH_SCOPE: openid profile workbench offline_access
-      NEXUSAUTH_WORKBENCH_AUTH_AUDIENCE: workbench
+      NEXUSAUTH_WORKBENCH_AUTH_SCOPE: ${NEXUSAUTH_WORKBENCH_AUTH_SCOPE:-openid profile ${NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_NAME:-nexusauth.workbench.api} offline_access}
+      NEXUSAUTH_WORKBENCH_AUTH_AUDIENCE: nexusauth.workbench.api
       NEXUSAUTH_WORKBENCH_AUTH_REQUIRE_HTTPS_METADATA: "false"
       NEXUSAUTH_WORKBENCH_AUTH_SIGN_OUT_PROVIDER: "true"
+      NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_NAME: ${NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_NAME:-nexusauth.workbench.api}
+      NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_DISPLAY_NAME: ${NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_DISPLAY_NAME:-NexusAuth Workbench API}
+      NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_DESCRIPTION: ${NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_DESCRIPTION:-NexusAuth Workbench API scope}
+      NEXUSAUTH_WORKBENCH_BOOTSTRAP_ALLOWED_SCOPES: ${NEXUSAUTH_WORKBENCH_BOOTSTRAP_ALLOWED_SCOPES:-}
+      NEXUSAUTH_WORKBENCH_BOOTSTRAP_CLIENT_NAME: ${NEXUSAUTH_WORKBENCH_BOOTSTRAP_CLIENT_NAME:-NexusAuth Workbench}
+      NEXUSAUTH_WORKBENCH_BOOTSTRAP_CLIENT_DESCRIPTION: ${NEXUSAUTH_WORKBENCH_BOOTSTRAP_CLIENT_DESCRIPTION:-NexusAuth Workbench Dashboard and API (client_secret_basic)}
     depends_on:
       db:
         condition: service_healthy

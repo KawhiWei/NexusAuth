@@ -9,16 +9,7 @@ Workbench API 使用授权码 + PKCE 接入 NexusAuth。浏览器只持有 Workb
 
 ## 1. 启动内置 Workbench
 
-推荐先按 [快速开始](./01-快速开始.md) 使用 Compose 启动全部服务。若分别运行进程，请确保 Provider 已启动、数据库已初始化，并先执行 Workbench seed：
-
-```bash
-psql -h localhost -U nexusauth -d nexusauth -v ON_ERROR_STOP=1 <<'SQL'
-SET search_path TO nexusauth;
-\i admin/src/NexusAuth.Workbench.Api/seed.sql
-SQL
-```
-
-`seed.sql` 会登记 `openid`、`profile`、`workbench` API resource，以及 `nexusauth.workbench` OAuth client。它不写入共享密钥，也不创建用户。Workbench API 启动时会从 `Auth:ClientSecret` 读取密钥，并为该客户端创建或同步 BCrypt 保护的凭据。
+推荐先按 [快速开始](./01-快速开始.md) 使用 Compose 启动全部服务。若分别运行进程，请确保 Provider 已启动、数据库已初始化，并设置下面的 Workbench 环境变量。Workbench API 启动时会幂等登记 `openid`、`profile`、Workbench API resource、OAuth client、关联和 BCrypt 保护的客户端密钥，不需要执行额外 seed SQL。
 
 在仓库根目录启动 API：
 
@@ -46,8 +37,8 @@ API 默认监听 http://localhost:5051。Swagger 位于 http://localhost:5051/sw
     "ClientSecret": "REPLACE_WITH_WORKBENCH_CLIENT_SECRET",
     "RedirectUri": "http://localhost:5051/signin-oidc",
     "PostLogoutRedirectUri": "http://localhost:5273/",
-    "Scope": "openid profile workbench offline_access",
-    "Audience": "workbench",
+    "Scope": "openid profile nexusauth.workbench.api offline_access",
+    "Audience": "nexusauth.workbench.api",
     "RequireHttpsMetadata": false,
     "SignOutProvider": true
   }
@@ -61,18 +52,22 @@ API 默认监听 http://localhost:5051。Swagger 位于 http://localhost:5051/sw
 | `ConnectionStrings:Default` | 与 Provider 共用的 `nexusauth` 数据库连接字符串。 |
 | `Auth:Authority` | 浏览器和公开 OIDC 地址；必须与 Provider 的 `Jwt:Issuer` 完全一致。 |
 | `Auth:BackchannelAuthority` | API 到 Provider 的内部地址。容器内访问时可设为 `http://sso:8080`；留空时使用 `Authority`。 |
-| `Auth:ClientId` | 已由 seed 登记的 OAuth client ID。 |
+| `Auth:ClientId` | 要由启动初始化器管理的 OAuth client ID。 |
 | `Auth:ClientSecret` | 该 client 的共享密钥。API 启动时会创建或同步它。 |
-| `Auth:RedirectUri` | Provider 授权回调，必须登记为 `http://localhost:5051/signin-oidc` 或对应生产 HTTPS 地址。 |
-| `Auth:PostLogoutRedirectUri` | Provider 登出回调和 Dashboard 公共地址，必须登记且通常以 `/` 结尾。 |
-| `Auth:Scope` | 内置 client 请求的 scope；默认包含 `offline_access` 以支持 refresh token。 |
-| `Auth:Audience` | Bearer access token 的 audience。应与 API resource 的 audience 一致；内置 seed 使用 `workbench`。 |
+| `Auth:RedirectUri` | Provider 授权回调；启动初始化器会登记该 URI。 |
+| `Auth:PostLogoutRedirectUri` | Provider 登出回调和 Dashboard 公共地址；启动初始化器会登记该 URI，通常以 `/` 结尾。 |
+| `Auth:Scope` | 内置 client 的 OIDC 请求 scope；启动时会自动补入 Workbench resource 的 audience。 |
+| `Auth:Audience` | Bearer access token 的 audience；启动初始化器会写入 Workbench resource。 |
 | `Auth:RequireHttpsMetadata` | 是否要求 HTTPS Discovery 元数据。开发 HTTP 为 `false`，生产 HTTPS 应为 `true`。 |
 | `Auth:SignOutProvider` | 是否在 Workbench 登出时生成 Provider 的 RP-Initiated Logout 地址。 |
+| `Bootstrap:AllowedScopes` | 需要建立 client-resource 关联的服务 Scope；初始化器会查询已创建资源并按其 GUID 建立关联。留空时只关联当前 Workbench 服务资源。 |
+| 其他 `Bootstrap:*` | 由启动初始化器管理的 Workbench resource 与 client 的名称、显示名称和说明。 |
 
 ### 环境变量
 
 Workbench API 的 `Program.cs` 显式支持以下单下划线变量：
+
+`Bootstrap` 初始化数据不写入 `appsettings.json`，必须通过以下环境变量提供。
 
 | 环境变量 | 配置项 |
 |----------|--------|
@@ -87,8 +82,16 @@ Workbench API 的 `Program.cs` 显式支持以下单下划线变量：
 | `NEXUSAUTH_WORKBENCH_AUTH_AUDIENCE` | `Auth:Audience` |
 | `NEXUSAUTH_WORKBENCH_AUTH_REQUIRE_HTTPS_METADATA` | `Auth:RequireHttpsMetadata` |
 | `NEXUSAUTH_WORKBENCH_AUTH_SIGN_OUT_PROVIDER` | `Auth:SignOutProvider` |
+| `NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_NAME` | `Bootstrap:ResourceName` |
+| `NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_DISPLAY_NAME` | `Bootstrap:ResourceDisplayName` |
+| `NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_DESCRIPTION` | `Bootstrap:ResourceDescription` |
+| `NEXUSAUTH_WORKBENCH_BOOTSTRAP_ALLOWED_SCOPES` | `Bootstrap:AllowedScopes` |
+| `NEXUSAUTH_WORKBENCH_BOOTSTRAP_CLIENT_NAME` | `Bootstrap:ClientName` |
+| `NEXUSAUTH_WORKBENCH_BOOTSTRAP_CLIENT_DESCRIPTION` | `Bootstrap:ClientDescription` |
 
-Compose 使用容器内的 `NEXUSAUTH_WORKBENCH_AUTH_BACKCHANNEL_AUTHORITY=http://sso:8080`，而对浏览器公开的 `Authority` 仍是 `http://localhost:5100`。部署到域名后，`Authority`、Provider `NEXUSAUTH_JWT_ISSUER`、回调地址和 seed 中的 URI 必须一起更新。
+Compose 使用容器内的 `NEXUSAUTH_WORKBENCH_AUTH_BACKCHANNEL_AUTHORITY=http://sso:8080`，而对浏览器公开的 `Authority` 仍是 `http://localhost:5100`。部署到域名后，`Authority`、Provider `NEXUSAUTH_JWT_ISSUER`、回调地址、Audience 和 Bootstrap resource 名称必须一起校验。
+
+`openid`、`profile` 与 `offline_access` 是代码内置的标准 Scope，只会写入 client 的 `AllowedScopes`，不会作为 API resource 初始化或建立关联。启动初始化只创建 Workbench 服务资源；`Bootstrap:AllowedScopes` 中的服务 Scope 必须对应已存在的资源，否则启动失败。
 
 ## 3. 登录流程
 
@@ -164,9 +167,9 @@ services.AddNexusAuth(options =>
 
 ## 6. 常见问题
 
-- API 启动提示 OAuth client 不存在：先执行 `seed.sql`，并确认连接字符串的 `Search Path` 为 `nexusauth`。
+- API 启动初始化失败：确认连接字符串的 `Search Path` 为 `nexusauth`，并检查 `Auth` 与 `Bootstrap` 配置值是否完整。
 - 登录回调后又回到登录页：检查 `Authority`、`BackchannelAuthority`、`RedirectUri`、`PostLogoutRedirectUri` 和 Provider `Issuer` 是否分别对应浏览器与容器网络。
-- 管理 API 返回 401：确认 Dashboard 请求带有 `withCredentials: true`，并检查 `Auth:Audience` 是否为 `workbench`；Compose 已设置该值。
+- 管理 API 返回 401：确认 Dashboard 请求带有 `withCredentials: true`，并检查 `Auth:Audience` 是否为 `nexusauth.workbench.api`；Compose 已设置该值。
 - 令牌刷新失败：确认客户端允许 `refresh_token` grant 和 `offline_access` scope，且 API 配置的 client secret 与 Provider 数据库中的当前凭据一致。
 - 多实例登录偶发 `invalid_callback`：默认内存流程状态无法跨实例共享，需实现分布式 `IFlowStateStore` 并共享 Data Protection keys。
 

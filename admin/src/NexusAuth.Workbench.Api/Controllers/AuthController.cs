@@ -66,10 +66,10 @@ public class AuthController : ControllerBase
         var state = Request.Query["state"].ToString();
         var error = Request.Query["error"].ToString();
 
-        var frontendBase = _oidcService.PostLogoutRedirectUri.TrimEnd('/');
-
         if (!string.IsNullOrWhiteSpace(error))
-            return Redirect($"{frontendBase}/login?error={Uri.EscapeDataString(error)}");
+            return RedirectToProviderError(error, Request.Query["error_description"].ToString());
+
+        var frontendBase = _oidcService.PostLogoutRedirectUri.TrimEnd('/');
 
         if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(state))
             return Redirect($"{frontendBase}/login?error=invalid_callback");
@@ -112,6 +112,15 @@ public class AuthController : ControllerBase
         {
             return Redirect($"{frontendBase}/login?error=token_exchange_failed");
         }
+    }
+
+    private IActionResult RedirectToProviderError(string error, string? description)
+    {
+        var providerErrorUrl = $"{_oidcService.Authority.TrimEnd('/')}/oauth/error?error={Uri.EscapeDataString(error)}";
+        if (!string.IsNullOrWhiteSpace(description))
+            providerErrorUrl += $"&error_description={Uri.EscapeDataString(description)}";
+
+        return Redirect(providerErrorUrl);
     }
 
     [HttpGet("/api/auth/me")]

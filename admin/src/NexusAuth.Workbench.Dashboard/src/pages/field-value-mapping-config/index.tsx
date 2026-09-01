@@ -208,6 +208,7 @@ const FieldValueMappingConfigPage = () => {
             verticalAlign="middle"
             maxHeight={tableMaxHeight}
             tableLayout="fixed"
+            resizable
           />
         </div>
 

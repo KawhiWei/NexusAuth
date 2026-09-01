@@ -110,7 +110,7 @@ docker compose up --build
 - Workbench API：<http://localhost:5051>
 - NexusAuth Provider：<http://localhost:5100>
 
-Workbench 会跳转到 Provider 登录页，登录成功后回到 Dashboard。空数据库首次启动时，SQL 只创建数据库结构并登记 Workbench 默认客户端；SSO 随后根据环境变量幂等创建初始管理员，不会在重复启动时覆盖已有密码。
+Workbench 会跳转到 Provider 登录页，登录成功后回到 Dashboard。空数据库首次启动时，SQL 只创建数据库结构；Workbench API 随后根据环境变量幂等创建自身的 OAuth resource 和 client，SSO 则创建初始管理员，重复启动均不会覆盖已有用户密码。
 
 Compose 的本地默认管理员来自环境变量回退值：`admin / wzw0126..`。这仅用于本地开发；部署前必须显式配置以下变量，生产环境不得保留回退密码：
 
@@ -122,7 +122,7 @@ NEXUSAUTH_BOOTSTRAP_ADMIN_EMAIL=admin@example.com
 WORKBENCH_CLIENT_SECRET=REPLACE_WITH_A_LONG_RANDOM_SECRET
 ```
 
-`WORKBENCH_CLIENT_SECRET` 是 `nexusauth.workbench` 系统 OAuth 客户端的唯一密钥来源。首次初始化数据库时会以该值生成 BCrypt 哈希，Workbench API 运行时也使用同一值认证；生产环境必须显式设置它。Compose 中的回退值仅用于本地开发，不能用于生产。
+`WORKBENCH_CLIENT_SECRET` 是 Workbench OAuth 客户端的唯一密钥来源。Workbench API 启动时使用它创建或轮换 BCrypt 保护的密钥；生产环境必须显式设置它。Compose 中的回退值仅用于本地开发，不能用于生产。
 
 NexusAuth Host 支持使用带 `NEXUSAUTH_` 前缀的单下划线环境变量覆盖配置。Docker Compose 将配置路径平铺为这种命名格式，不再使用 .NET 默认的双下划线配置键，例如：
 
@@ -132,6 +132,7 @@ NEXUSAUTH_LOGIN_PAGE_MARKETING_DESCRIPTION="OAuth 2.1 和 OIDC · 授权码 + PK
 NEXUSAUTH_LOGIN_FLOW_REMEMBER_ME_LIFETIME_DAYS=3
 NEXUSAUTH_CONNECTION_STRINGS_DEFAULT="Host=db;Port=5432;Database=nexusauth;Username=nexusauth;Password=REPLACE_WITH_A_SECRET"
 NEXUSAUTH_WORKBENCH_AUTH_AUTHORITY=https://sso.example.com
+NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_NAME=nexusauth.workbench.api
 ```
 
 Host 的登录页、登录流程、JWT、数据库连接和 Workbench API 配置均可通过对应的 `NEXUSAUTH_...` 单下划线变量设置。`NEXUSAUTH_LOGIN_FLOW_REMEMBER_ME_LIFETIME_DAYS` 控制勾选“几天内免登录”后的固定有效期，默认 `3`，范围为 `1`–`30`；修改后重启 Provider 生效。
@@ -141,7 +142,7 @@ Host 的登录页、登录流程、JWT、数据库连接和 Workbench API 配置
 ### 数据库脚本职责
 
 - [production-init.sql](./production-init.sql)：仅用于全新、空的 `nexusauth` 数据库，定义当前最终 schema；不删库、不含 `ALTER TABLE`，也不创建用户。
-- `admin/src/NexusAuth.Workbench.Api/seed.sql`：登记 Workbench 所需的 scope 和 OAuth 客户端；通过 psql 变量 `workbench_client_secret` 写入 `WORKBENCH_CLIENT_SECRET` 的 BCrypt 哈希。
+- Workbench API 启动初始化器：根据 `NEXUSAUTH_WORKBENCH_AUTH_*` 与 `NEXUSAUTH_WORKBENCH_BOOTSTRAP_*` 环境变量登记 Workbench 所需的 scope、OAuth 客户端、关联和 BCrypt 客户端密钥。
 - `demo/seed.sql`：只用于本地演示客户端和示例用户，禁止用于生产。
 
 本地 Compose 默认使用 Development 环境自动生成并持久化开发签名证书。生产环境必须设置 `NEXUSAUTH_SSO_ENVIRONMENT=Production`，挂载由证书管理系统提供的 PFX，并通过 `NEXUSAUTH_JWT_SIGNING_CERTIFICATE_PATH` 和 Secret 配置证书密码。生产环境不会自动生成开发证书。

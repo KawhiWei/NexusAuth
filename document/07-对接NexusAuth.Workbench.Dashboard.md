@@ -146,7 +146,7 @@ sequenceDiagram
 - 页面一直回到登录页：确认 `/api` 代理目标是 5051、请求使用 `withCredentials: true`，并检查浏览器是否拦截了 Cookie。
 - 回调地址 404：Provider client 的 `redirect_uris` 必须登记 Workbench API 的 `/signin-oidc`，并确保该地址被 API 暴露。
 - 回调后登录失败：查看 Workbench API 日志，重点检查 `Auth:Authority`、`Auth:BackchannelAuthority`、client secret 和 Provider Discovery。
-- 管理 API 返回 401：确认用户 Cookie 尚未过期，并检查 Workbench API 的 `Auth:Audience` 与内置 `workbench` API resource audience 一致。
+- 管理 API 返回 401：确认用户 Cookie 尚未过期，并检查 Workbench API 的 `Auth:Audience` 与内置 `nexusauth.workbench.api` API resource audience 一致。
 - Compose 修改配置不生效：执行 `docker compose up -d --force-recreate` 让服务按新环境变量重建；仅 `docker compose restart` 不会重新套用 Compose 文件中的变量。
 
 更多 API/BFF 配置见 [对接 NexusAuth.Workbench](./06-对接NexusAuth.Workbench.md)。

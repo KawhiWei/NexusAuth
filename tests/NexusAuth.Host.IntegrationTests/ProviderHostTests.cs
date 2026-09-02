@@ -39,4 +39,20 @@ public sealed class ProviderHostTests : IClassFixture<WebApplicationFactory<AppW
         Assert.Equal(System.Net.HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal("/account/login", response.Headers.Location?.AbsolutePath);
     }
+
+    [Fact]
+    public async Task Invalid_authorization_request_is_displayed_on_the_provider_error_page()
+    {
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+        });
+
+        var response = await client.GetAsync("/connect/authorize?response_type=code");
+
+        Assert.Equal(System.Net.HttpStatusCode.Redirect, response.StatusCode);
+        var location = response.Headers.Location?.ToString();
+        Assert.StartsWith("/oauth/error", location);
+        Assert.Contains("error=invalid_request", location);
+    }
 }

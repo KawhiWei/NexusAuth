@@ -316,4 +316,34 @@ CREATE UNIQUE INDEX ix_scim_service_principal_credentials_name
 CREATE UNIQUE INDEX ix_scim_service_principal_credentials_token_hash
     ON nexusauth.scim_service_principal_credentials (token_hash);
 
+-- ============================================================
+-- open_api_credentials
+-- Machine bearer credentials for the read-only Open API. The raw token is
+-- shown once at creation; only SHA-256(raw token), Base64Url encoded, remains.
+-- target_type intentionally keeps application and service-resource consumers
+-- separate so a credential cannot read both directory surfaces.
+-- ============================================================
+CREATE TABLE nexusauth.open_api_credentials (
+    id           uuid         NOT NULL,
+    name         varchar(128) NOT NULL,
+    token_hash   varchar(43)  NOT NULL,
+    target_type  varchar(32)  NOT NULL,
+    scopes       jsonb        NOT NULL DEFAULT '[]'::jsonb,
+    is_active    boolean      NOT NULL DEFAULT true,
+    expires_at   timestamptz,
+    last_used_at timestamptz,
+    created_at   timestamptz  NOT NULL,
+    revoked_at   timestamptz,
+    CONSTRAINT pk_open_api_credentials PRIMARY KEY (id),
+    CONSTRAINT ck_open_api_credentials_target_type
+        CHECK (target_type IN ('application', 'service_resource')),
+    CONSTRAINT ck_open_api_credentials_token_hash_base64url
+        CHECK (token_hash ~ '^[A-Za-z0-9_-]{43}$')
+);
+
+CREATE UNIQUE INDEX ix_open_api_credentials_name
+    ON nexusauth.open_api_credentials (name);
+CREATE UNIQUE INDEX ix_open_api_credentials_token_hash
+    ON nexusauth.open_api_credentials (token_hash);
+
 COMMIT;

@@ -27,8 +27,12 @@ public class WorkbenchApiModule : LuckAppModule
         var clientSecret = configuration["Auth:ClientSecret"];
         var redirectUri = configuration["Auth:RedirectUri"];
         var postLogoutRedirectUri = configuration["Auth:PostLogoutRedirectUri"];
-        var scope = configuration["Auth:Scope"];
+        var scope = EnsureWorkbenchResourceScope(
+            configuration["Auth:Scope"],
+            configuration["Auth:Audience"]);
         var audience = configuration["Auth:Audience"];
+        var signOutProvider = !bool.TryParse(configuration["Auth:SignOutProvider"], out var parsedSignOutProvider)
+            || parsedSignOutProvider;
         var requireHttpsMetadata = bool.TryParse(configuration["Auth:RequireHttpsMetadata"], out var parsedRequireHttpsMetadata)
             && parsedRequireHttpsMetadata;
         var requiredAuthConfiguration = RequireAuthConfiguration(
@@ -50,6 +54,7 @@ public class WorkbenchApiModule : LuckAppModule
             options.RedirectUri = requiredAuthConfiguration.RedirectUri;
             options.PostLogoutRedirectUri = requiredAuthConfiguration.PostLogoutRedirectUri;
             options.Scope = requiredAuthConfiguration.Scope;
+            options.SignOutProvider = signOutProvider;
         });
         services.AddScoped<WorkbenchCookieAuthenticationEvents>();
 
@@ -120,6 +125,7 @@ public class WorkbenchApiModule : LuckAppModule
             });
 
         services.AddAuthorization();
+        services.Configure<WorkbenchBootstrapOptions>(configuration.GetSection(WorkbenchBootstrapOptions.SectionName));
         services.AddHostedService<WorkbenchClientCredentialHostedService>();
 
         base.ConfigureServices(context);
@@ -157,6 +163,20 @@ public class WorkbenchApiModule : LuckAppModule
             redirectUri ?? throw new InvalidOperationException("RedirectUri is required."),
             postLogoutRedirectUri ?? throw new InvalidOperationException("PostLogoutRedirectUri is required."),
             scope ?? throw new InvalidOperationException("Scope is required."));
+    }
+
+    private static string? EnsureWorkbenchResourceScope(string? scope, string? resourceName)
+    {
+        if (string.IsNullOrWhiteSpace(scope) || string.IsNullOrWhiteSpace(resourceName))
+            return scope;
+
+        var scopes = scope
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+        if (!scopes.Contains(resourceName.Trim(), StringComparer.Ordinal))
+            scopes.Add(resourceName.Trim());
+
+        return string.Join(' ', scopes);
     }
 
     private sealed record RequiredAuthConfiguration(

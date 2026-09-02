@@ -538,6 +538,7 @@ const UserManagementPage = () => {
             verticalAlign="middle"
             maxHeight={tableMaxHeight}
             tableLayout="fixed"
+            resizable
             loading={loading}
           />
         </div>

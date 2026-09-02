@@ -2,6 +2,8 @@
 @model NexusAuth.Host.Pages.Account.LoginModel
 @{
     Layout = null;
+    var logoUrlSeparator = Model.LoginPage.BrandLogoUrl.Contains('?') ? "&" : "?";
+    var loginBrandLogoUrl = $"{Model.LoginPage.BrandLogoUrl}{logoUrlSeparator}v=2";
 }
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -50,9 +52,9 @@
         .auth-shell { min-height: 100dvh; display: grid; grid-template-columns: minmax(0, 58.854%) minmax(0, 41.146%); background: var(--page-bg); }
         .visual-panel { position: relative; min-height: 100dvh; overflow: hidden; color: var(--tech-foreground); background-color: var(--panel-bg); background-image: linear-gradient(to right, var(--grid) 1px, transparent 1px), linear-gradient(to bottom, var(--grid) 1px, transparent 1px); background-position: 70px 0, 0 92px; background-size: 120px 100%, 100% 120px; }
         .visual-panel::after { position: absolute; inset: 0; background: linear-gradient(90deg, transparent 0 82%, color-mix(in srgb, var(--panel-bg) 55%, transparent)); content: ""; pointer-events: none; }
-        .brand-lockup { position: absolute; top: 6.85%; left: 8.15%; z-index: 2; display: flex; align-items: center; gap: 13px; color: var(--tech-foreground); text-decoration: none; }
-        .brand-mark-shell { display: grid; width: 34px; height: 34px; place-items: center; overflow: hidden; border-radius: 7px; background: var(--brand-blue); }
-        .brand-mark-shell img { width: 42px; height: 42px; filter: saturate(.9) brightness(1.08); }
+        .brand-lockup { position: absolute; top: 6.85%; left: 8.15%; z-index: 2; display: flex; align-items: center; gap: 13px; color: var(--tech-foreground); }
+        .brand-mark-shell { display: grid; width: 50px; height: 50px; place-items: center; overflow: hidden; }
+        .brand-mark-shell img { width: 50px; height: 50px; }
         .brand-word { font-family: Geist, Inter, sans-serif; font-size: 19px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
         .system-label { position: absolute; top: 26.1%; left: 8.3%; z-index: 2; display: flex; align-items: center; gap: 8px; color: var(--tech-muted); font-size: 11px; font-weight: 700; letter-spacing: 1.3px; }
         .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #6beeb1; box-shadow: 0 0 12px #6beeb199; }
@@ -127,7 +129,7 @@
             .auth-shell { display: block; } .visual-panel { display: none; }
             .form-panel { min-height: 100dvh; padding: 0 24px; } .utility-row { top: 24px; right: 24px; }
             .mobile-brand { position: absolute; top: 24px; left: 24px; display: flex; align-items: center; gap: 11px; color: var(--form-heading); text-decoration: none; }
-            .mobile-brand .brand-word { font-size: 17px; } .mobile-brand .brand-mark-shell { width: 32px; height: 32px; }
+            .mobile-brand .brand-word { font-size: 17px; }
             .login-content { width: min(100%, 560px); padding: 150px 0 56px; }
         }
         @@media (max-width: 600px) {
@@ -142,7 +144,7 @@
 <body>
     <div class="auth-shell">
         <aside class="visual-panel" aria-label="NexusAuth product overview">
-            <a class="brand-lockup" href="/" aria-label="@Model.LoginPage.BrandName"><span class="brand-mark-shell"><img src="@Model.LoginPage.BrandLogoUrl" alt="" /></span><span class="brand-word">@Model.LoginPage.BrandName</span></a>
+            <div class="brand-lockup"><span class="brand-mark-shell"><img src="@loginBrandLogoUrl" alt="" /></span><span class="brand-word">@Model.LoginPage.BrandName</span></div>
             <div class="system-label"><span class="live-dot"></span><span>OAUTH 2.1 / OPENID CONNECT</span></div>
             <div class="hero-copy"><h1>@Model.LoginPage.MarketingHeading</h1><p>@Model.LoginPage.MarketingDescription</p></div>
             <div class="network" aria-hidden="true"><span class="orbit outer"></span><span class="orbit inner"></span><span class="signal-core"></span><span class="orbit-node node-one"></span><span class="orbit-node node-two"></span><span class="orbit-node node-three"></span><span class="orbit-node node-four"></span></div>
@@ -150,7 +152,7 @@
             <div class="panel-footer"><span>AUTHORIZATION CODE / PKCE</span><span>NEXUSAUTH SSO</span></div>
         </aside>
         <main class="form-panel">
-            <a class="mobile-brand" href="/" aria-label="@Model.LoginPage.BrandName"><span class="brand-mark-shell"><img src="@Model.LoginPage.BrandLogoUrl" alt="" /></span><span class="brand-word">@Model.LoginPage.BrandName</span></a>
+            <div class="mobile-brand"><span class="brand-mark-shell"><img src="@loginBrandLogoUrl" alt="" /></span><span class="brand-word">@Model.LoginPage.BrandName</span></div>
             <div class="utility-row"><button id="theme-toggle" type="button" class="theme-toggle" aria-label="切换主题" title="切换主题"><span class="theme-icon sun" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg></span><span class="theme-icon moon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg></span></button></div>
             <section class="login-content" aria-labelledby="login-title">
                 <p class="eyebrow">@Model.LoginPage.BrandName</p>

@@ -19,9 +19,7 @@
 - Node.js 和 npm（仅本地运行 Dashboard 需要）；
 - PostgreSQL 16，或仓库根目录的 Docker Compose；
 - 已执行当前版本的 `production-init.sql`；
-- 已登记 `nexusauth.workbench` 客户端和 `workbench` API resource。
-
-Workbench seed 位于 `admin/src/NexusAuth.Workbench.Api/seed.sql`。它只登记客户端元数据和资源，不写入共享密钥明文；Workbench API 启动时从配置读取密钥并同步 BCrypt 哈希。
+- 为 Workbench API 设置完整的 OAuth 与 Bootstrap 环境变量；它会在启动时登记自身客户端和 resource。
 
 ## 本地启动
 
@@ -62,8 +60,8 @@ Compose 会启动 PostgreSQL、Provider、Workbench API 和 Nginx Dashboard；De
     "ClientSecret": "从 Secret 注入",
     "RedirectUri": "https://api.example.com/signin-oidc",
     "PostLogoutRedirectUri": "https://console.example.com/",
-    "Scope": "openid profile workbench offline_access",
-    "Audience": "workbench",
+    "Scope": "openid profile nexusauth.workbench.api offline_access",
+    "Audience": "nexusauth.workbench.api",
     "RequireHttpsMetadata": true,
     "SignOutProvider": true
   }
@@ -74,16 +72,16 @@ Compose 会启动 PostgreSQL、Provider、Workbench API 和 Nginx Dashboard；De
 |---|---|
 | `Authority` | Provider 的公开 Issuer，用于浏览器跳转和 JWT issuer 校验 |
 | `BackchannelAuthority` | API 从网络内部访问 Discovery、token、introspection 等端点的地址；Compose 内为 `http://sso:8080` |
-| `ClientId` | Workbench OAuth 客户端，固定为 `nexusauth.workbench`（除非重新登记） |
+| `ClientId` | Workbench OAuth 客户端 ID；启动初始化器会创建或更新它。 |
 | `ClientSecret` | Workbench API 兑换授权码、刷新和 introspection 所需的机密；必须与 Provider 数据库中的客户端密钥一致 |
 | `RedirectUri` | Provider 登记的 OIDC 回调，必须逐字符匹配 |
 | `PostLogoutRedirectUri` | Provider 登记的登出回调，必须逐字符匹配 |
-| `Scope` | Workbench 申请的 scope，通常包含 `openid profile workbench offline_access` |
+| `Scope` | Workbench 申请的 scope，通常包含 `openid profile nexusauth.workbench.api offline_access` |
 | `Audience` | Bearer access token 的 audience；应与 API resource 的 `audience` 一致 |
 | `RequireHttpsMetadata` | 是否强制 Discovery 元数据使用 HTTPS；生产应为 `true` |
 | `SignOutProvider` | 是否在 Workbench 登出后继续跳 Provider 完成全局登出 |
 
-上面的 `Audience=workbench` 与当前 Workbench seed 中 API resource 的 `audience` 对齐。如果自定义 resource 或本地配置仍使用 `workbench-api`，必须让 seed、签发 token 和 API 验证三者使用同一个值，否则 Bearer 请求会被拒绝。
+上面的 `Audience=nexusauth.workbench.api` 与启动初始化器创建的 API resource 对齐。如果自定义 resource 或使用其他 audience，必须让 Bootstrap resource、签发 token 和 API 验证三者使用同一个值，否则 Bearer 请求会被拒绝。
 
 ### 环境变量
 
@@ -97,24 +95,30 @@ NEXUSAUTH_WORKBENCH_AUTH_CLIENT_ID=nexusauth.workbench
 NEXUSAUTH_WORKBENCH_AUTH_CLIENT_SECRET=REPLACE_WITH_A_LONG_RANDOM_SECRET
 NEXUSAUTH_WORKBENCH_AUTH_REDIRECT_URI=https://api.example.com/signin-oidc
 NEXUSAUTH_WORKBENCH_AUTH_POST_LOGOUT_REDIRECT_URI=https://console.example.com/
-NEXUSAUTH_WORKBENCH_AUTH_SCOPE="openid profile workbench offline_access"
-NEXUSAUTH_WORKBENCH_AUTH_AUDIENCE=workbench
+NEXUSAUTH_WORKBENCH_AUTH_SCOPE="openid profile nexusauth.workbench.api offline_access"
+NEXUSAUTH_WORKBENCH_AUTH_AUDIENCE=nexusauth.workbench.api
 NEXUSAUTH_WORKBENCH_AUTH_REQUIRE_HTTPS_METADATA=true
 NEXUSAUTH_WORKBENCH_AUTH_SIGN_OUT_PROVIDER=true
+NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_NAME=nexusauth.workbench.api
+NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_DISPLAY_NAME="Workbench API"
+NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_DESCRIPTION="NexusAuth Workbench API scope"
+NEXUSAUTH_WORKBENCH_BOOTSTRAP_ALLOWED_SCOPES="nexusauth.workbench.api"
+NEXUSAUTH_WORKBENCH_BOOTSTRAP_CLIENT_NAME="NexusAuth Workbench"
+NEXUSAUTH_WORKBENCH_BOOTSTRAP_CLIENT_DESCRIPTION="NexusAuth Workbench Dashboard and API (client_secret_basic)"
 ```
 
-Compose 中的 `WORKBENCH_CLIENT_SECRET` 同时用于数据库初始化流程和 API 的 `Auth:ClientSecret`。变更密钥时，先更新 Secret，再按部署策略重新初始化/同步客户端并滚动重启 API；不要把真实密钥提交到 `appsettings.json`、SQL 或前端环境变量。
+Compose 中的 `WORKBENCH_CLIENT_SECRET` 仅注入 Workbench API 的 `Auth:ClientSecret`。变更密钥时，先更新 Secret，再滚动重启 API；启动初始化器会同步密钥，不需要重建数据库。不要把真实密钥提交到 `appsettings.json`、SQL 或前端环境变量。
 
-### 数据库 seed
+### 启动初始化
 
-`admin/src/NexusAuth.Workbench.Api/seed.sql` 会登记：
+Workbench API 启动时会根据 `Auth` 与 `Bootstrap` 配置登记：
 
 - `nexusauth.workbench` OAuth 客户端；
-- `openid`、`profile`、`workbench` API resources；
+- Workbench API resource；
 - 客户端与 API resource 的映射；
 - authorization code + PKCE 和 refresh token grant 的允许范围。
 
-它不会写入客户端共享密钥。`WorkbenchClientCredentialHostedService` 在 API 启动时读取 `Auth:ClientSecret`，找不到客户端、密钥为空或同步失败会阻止 API 正常启动。
+`openid`、`profile`、`offline_access` 是客户端静态 AllowScope，不会创建为 API resource。初始化器会先创建或更新 Workbench 服务资源，再读取 `Bootstrap:AllowedScopes` 查询资源 GUID 并建立关联；留空时只关联当前 Workbench 服务资源。最后会写入或轮换 `Auth:ClientSecret`。配置不完整、服务 Scope 未对应资源或同步失败会阻止 API 正常启动。
 
 ## 登录、会话与登出
 

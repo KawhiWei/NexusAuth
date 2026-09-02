@@ -214,6 +214,7 @@ const DictionaryConfigPage = () => {
             verticalAlign="middle"
             maxHeight={tableMaxHeight}
             tableLayout="fixed"
+            resizable
           />
         </div>
 

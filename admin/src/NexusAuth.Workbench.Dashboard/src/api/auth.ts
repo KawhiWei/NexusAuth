@@ -69,6 +69,17 @@ export const getMenuList = () => {
                     children: [],
                 },
                 {
+                    id: 'oauth-open-api-credential',
+                    route: '/oauth/open-api-credential-management',
+                    componentPath: '/open-api-credential-management/index.tsx',
+                    name: '开放 API 凭据',
+                    show: true,
+                    iconName: null,
+                    parentId: 'oauth',
+                    parentPaths: Array<string>,
+                    children: [],
+                },
+                {
                     id: 'oauth-user',
                     route: '/oauth/user-management',
                     componentPath: '/user-management/index.tsx',

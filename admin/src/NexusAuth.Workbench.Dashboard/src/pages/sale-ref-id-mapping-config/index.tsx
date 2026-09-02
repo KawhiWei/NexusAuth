@@ -206,6 +206,7 @@ const SaleRefIdMappingConfigPage = () => {
             verticalAlign="middle"
             maxHeight={tableMaxHeight}
             tableLayout="fixed"
+            resizable
           />
         </div>
 

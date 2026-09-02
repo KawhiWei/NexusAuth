@@ -36,6 +36,8 @@ public class DbContext(DbContextOptions options) : LuckDbContextBase(options)
     public DbSet<ScimServicePrincipalCredential> ScimServicePrincipalCredentials =>
         Set<ScimServicePrincipalCredential>();
 
+    public DbSet<OpenApiCredential> OpenApiCredentials => Set<OpenApiCredential>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

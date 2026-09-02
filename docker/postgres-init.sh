@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-: "${WORKBENCH_CLIENT_SECRET:?WORKBENCH_CLIENT_SECRET must be set before initializing the Workbench OAuth client}"
-
 psql_args=(
   --username "$POSTGRES_USER"
   --no-password
@@ -19,14 +17,11 @@ fi
 psql "${psql_args[@]}" --dbname=nexusauth \
   --file=/opt/nexusauth-init/production-init.sql
 
-# Register the Workbench client and fixed local-only SCIM integration-test
-# credentials. Production initialization does not execute this Docker hook.
+# Register fixed local-only SCIM integration-test credentials. The Workbench
+# OAuth resource and client are provisioned by the Workbench API at startup.
 psql "${psql_args[@]}" \
-  --set "workbench_client_secret=$WORKBENCH_CLIENT_SECRET" \
   --dbname=nexusauth <<'SQL'
 SET search_path TO nexusauth;
-\i /opt/nexusauth-init/admin-seed.sql
-
 INSERT INTO scim_service_principal_credentials
     (id, name, token_hash, scopes, is_active, expires_at, last_used_at, created_at, revoked_at)
 VALUES

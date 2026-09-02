@@ -55,7 +55,7 @@ PAR、JAR、JARM、DPoP、OAuth mTLS/证书绑定令牌、动态客户端注册�
 
 Provider 和 Workbench API 共用 `nexusauth` PostgreSQL 数据库及 `nexusauth` schema。`production-init.sql` 是全新数据库的当前最终 schema：它创建表、索引和 `pgcrypto` 扩展，但不会创建数据库、默认用户或 Demo 数据。
 
-Docker Compose 仅在全新的 PostgreSQL 数据卷上执行数据库初始化，并额外执行 Workbench 的 `seed.sql`。Workbench seed 登记 API resource 和 OAuth client，不写入 client secret；Workbench API 启动时从 `Auth:ClientSecret` 同步该凭据。
+Docker Compose 仅在全新的 PostgreSQL 数据卷上执行数据库初始化。Workbench API 在数据库和 Provider 就绪后，从环境变量幂等登记 API resource、OAuth client、关联及客户端密钥；不再使用 Workbench seed SQL。
 
 当前仓库不提供历史数据库的增量迁移脚本。升级前应备份数据，并根据 [03 数据库配置](./03-数据库配置.md) 的边界在新实例完成初始化和数据迁移。
 

@@ -1,0 +1,34 @@
+@page "/oauth/error"
+@model NexusAuth.Host.Pages.OAuthErrorModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>授权请求失败 - NexusAuth</title>
+    <link rel="icon" type="image/svg+xml" href="/brand/nexusauth-logo.svg" />
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f3f6fb; color: #172033; }
+        .panel { width: min(100%, 560px); background: #fff; border: 1px solid #e4eaf3; border-radius: 8px; box-shadow: 0 16px 40px rgba(15, 23, 42, .08); padding: 32px; }
+        .brand { display: flex; align-items: center; gap: 10px; color: #2754c5; font-weight: 700; }
+        .brand img { width: 28px; height: 28px; }
+        h1 { margin: 28px 0 10px; font-size: 24px; }
+        p { margin: 0; color: #53627a; line-height: 1.65; }
+        .code { margin-top: 24px; padding: 12px 14px; border-radius: 6px; background: #fff2f2; color: #b42318; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+        a { display: inline-block; margin-top: 28px; color: #2754c5; text-decoration: none; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <main class="panel">
+        <div class="brand"><img src="/brand/nexusauth-logo.svg" alt="" />NexusAuth</div>
+        <h1>授权请求未完成</h1>
+        <p>@Model.Description</p>
+        <div class="code">@Model.Error</div>
+        <a href="/">返回 NexusAuth</a>
+    </main>
+</body>
+</html>

@@ -81,6 +81,10 @@ The Provider sign-in page's "stay signed in for 3 days" option is configured wit
 
 The console contains users, API resources, applications, and SCIM credentials. Resource names, client IDs, callback URIs, and credentials are security boundaries. Confirm the dependent applications before changing them.
 
+### Open API Directory Credentials
+
+The Host exposes read-only application and service-resource directory APIs under `/openapi/v1`. Create their bearer credentials in Workbench, not in a browser-facing application. An `application` credential grants only `GET /openapi/v1/applications`; a `service_resource` credential grants only `GET /openapi/v1/service-resources`. Raw tokens are returned once, stored hashed, and can be expired or revoked. See [Open API](../../document/10-开放API.md).
+
 ### 4.1 User Management
 
 Use **User Management** to search users, edit display information, enable or disable accounts, and reset passwords. The management UI presents username, nickname, email, phone number, status, and SCIM profile fields as business information. The internal user ID is for APIs and audit correlation only, not routine administration.

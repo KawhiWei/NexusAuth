@@ -5,6 +5,12 @@ import { KeyIcon, PoweroffIcon, UserIcon } from 'tdesign-icons-react';
 import { setCachedAuthStatus } from '../../../router/auth';
 import { getConfig, logout } from '../../../api/login';
 
+const TABS_STORAGE_KEY = 'nexus-auth-layout-tabs';
+
+const clearLayoutTabs = () => {
+  window.localStorage.removeItem(TABS_STORAGE_KEY);
+};
+
 const AvatarComponent = () => {
   const iconStyle: React.CSSProperties = {
     marginRight: 8,
@@ -66,6 +72,7 @@ const AvatarComponent = () => {
       try {
         const result: { logoutUrl: string } = await logout();
         setCachedAuthStatus(false);
+        clearLayoutTabs();
         if (result.logoutUrl) {
           window.location.href = result.logoutUrl;
         } else {
@@ -73,6 +80,7 @@ const AvatarComponent = () => {
         }
       } catch {
         setCachedAuthStatus(false);
+        clearLayoutTabs();
         window.location.replace('/login');
       }
     }

@@ -39,6 +39,9 @@ public class AppWebModule : LuckAppModule
         services.AddOptions<LoginPageOptions>()
             .Bind(configuration.GetSection(LoginPageOptions.SectionName))
             .ValidateOnStart();
+        services.AddOptions<SelfRegistrationOptions>()
+            .Bind(configuration.GetSection(SelfRegistrationOptions.SectionName))
+            .ValidateOnStart();
         services.AddSingleton<LoginFlowStateProtector>();
         services.AddOptions<SliderCaptchaOptions>()
             .Bind(configuration.GetSection(SliderCaptchaOptions.SectionName))
@@ -144,6 +147,9 @@ public class AppWebModule : LuckAppModule
     {
         if (path.StartsWithSegments("/account/login"))
             return ("login", 10);
+
+        if (path.StartsWithSegments("/account/register"))
+            return ("registration", 5);
 
         if (path.StartsWithSegments("/connect/token"))
             return ("token", 60);

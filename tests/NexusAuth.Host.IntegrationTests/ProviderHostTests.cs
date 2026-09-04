@@ -41,6 +41,82 @@ public sealed class ProviderHostTests : IClassFixture<WebApplicationFactory<AppW
     }
 
     [Fact]
+    public async Task Registration_page_returns_not_found_when_self_registration_is_disabled()
+    {
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/account/register");
+
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Login_page_hides_registration_link_when_self_registration_is_disabled()
+    {
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/account/login");
+
+        response.EnsureSuccessStatusCode();
+        var page = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("/Account/Register", page);
+        Assert.DoesNotContain("创建账号", page);
+    }
+
+    [Fact]
+    public async Task Registration_post_returns_not_found_when_self_registration_is_disabled()
+    {
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+        });
+
+        var response = await client.PostAsync(
+            "/account/register",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["Username"] = "disabled-user",
+                ["Nickname"] = "Disabled User",
+                ["Email"] = "disabled@example.com",
+                ["Password"] = "Password123!",
+                ["ConfirmPassword"] = "Password123!",
+            }));
+
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Registration_page_is_available_to_anonymous_users_when_self_registration_is_enabled()
+    {
+        using var enabledFactory = factory.WithWebHostBuilder(builder => builder
+            .UseSetting("SelfRegistration:Enabled", "true"));
+        using var client = enabledFactory.CreateClient();
+
+        var response = await client.GetAsync("/account/register");
+
+        response.EnsureSuccessStatusCode();
+        var page = await response.Content.ReadAsStringAsync();
+        Assert.Contains("创建账号", page);
+        Assert.Contains("登录账号", page);
+        Assert.Contains("确认密码", page);
+    }
+
+    [Fact]
+    public async Task Login_page_shows_registration_link_when_self_registration_is_enabled()
+    {
+        using var enabledFactory = factory.WithWebHostBuilder(builder => builder
+            .UseSetting("SelfRegistration:Enabled", "true"));
+        using var client = enabledFactory.CreateClient();
+
+        var response = await client.GetAsync("/account/login");
+
+        response.EnsureSuccessStatusCode();
+        var page = await response.Content.ReadAsStringAsync();
+        Assert.Contains("/Account/Register", page);
+        Assert.Contains("创建账号", page);
+    }
+
+    [Fact]
     public async Task Invalid_authorization_request_is_displayed_on_the_provider_error_page()
     {
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions

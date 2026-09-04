@@ -25,7 +25,8 @@ public class LoginModel(
     SliderCaptchaChallengeProtector sliderCaptchaChallengeProtector,
     IOptions<SliderCaptchaOptions> sliderCaptchaOptions,
     IOptions<LoginFlowOptions> flowOptions,
-    IOptions<LoginPageOptions> loginPageOptions) : PageModel
+    IOptions<LoginPageOptions> loginPageOptions,
+    IOptions<SelfRegistrationOptions> selfRegistrationOptions) : PageModel
 {
     private const string AuthTimeClaimType = "auth_time";
     private const string AmrClaimType = "amr";
@@ -33,8 +34,11 @@ public class LoginModel(
 
     private readonly LoginFlowOptions _flowOptions = flowOptions.Value;
     private readonly SliderCaptchaOptions _sliderCaptchaOptions = sliderCaptchaOptions.Value;
+    private readonly SelfRegistrationOptions _selfRegistrationOptions = selfRegistrationOptions.Value;
 
     public LoginPageOptions LoginPage { get; } = loginPageOptions.Value;
+
+    public bool SelfRegistrationEnabled => _selfRegistrationOptions.Enabled;
 
     [BindProperty(SupportsGet = true)]
     public string? ReturnUrl { get; set; }

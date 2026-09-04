@@ -60,6 +60,7 @@ static void AddSingleUnderscoreEnvironmentVariables(ConfigurationManager configu
         ["NEXUSAUTH_LOGIN_PAGE_MARKETING_DESCRIPTION"] = "LoginPage:MarketingDescription",
         ["NEXUSAUTH_LOGIN_PAGE_LOGIN_TITLE"] = "LoginPage:LoginTitle",
         ["NEXUSAUTH_LOGIN_PAGE_LOGIN_SUBTITLE"] = "LoginPage:LoginSubtitle",
+        ["NEXUSAUTH_SELF_REGISTRATION_ENABLED"] = "SelfRegistration:Enabled",
         ["NEXUSAUTH_BOOTSTRAP_ADMIN_USERNAME"] = "BootstrapAdmin:Username",
         ["NEXUSAUTH_BOOTSTRAP_ADMIN_PASSWORD"] = "BootstrapAdmin:Password",
         ["NEXUSAUTH_BOOTSTRAP_ADMIN_NICKNAME"] = "BootstrapAdmin:Nickname",

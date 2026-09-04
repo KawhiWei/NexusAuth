@@ -108,7 +108,10 @@
         .totp-help { margin: 0; color: var(--form-muted); font-size: 13px; line-height: 1.5; }
         .restart-link { color: var(--brand-blue); font-size: 13px; font-weight: 600; text-align: center; text-decoration: none; }
         .client-name { margin-top: 28px; color: var(--form-muted); font-size: 12px; text-align: center; } .client-name strong { color: var(--form-heading); }
-        :where(.theme-toggle, .password-toggle, .login-submit, .restart-link, .captcha-close, .captcha-handle):focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 3px; }
+        .register-prompt { margin: 24px 0 0; color: var(--form-muted); font-size: 13px; text-align: center; }
+        .register-prompt a { color: var(--brand-blue); font-weight: 600; text-decoration: none; }
+        .register-prompt a:hover { text-decoration: underline; }
+        :where(.theme-toggle, .password-toggle, .login-submit, .restart-link, .register-prompt a, .captcha-close, .captcha-handle):focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 3px; }
         .slider-captcha-dialog { position: fixed; inset: 0; z-index: 2147483647; display: flex; align-items: center; justify-content: center; padding: 16px; background: #000000a6; }
         .slider-captcha-dialog.hidden { display: none; }
         .captcha-card { width: min(100%, 420px); padding: 24px; border: 1px solid var(--border); border-radius: 8px; background: var(--page-bg); box-shadow: 0 24px 60px #0006; }
@@ -188,6 +191,10 @@
                         }
                         <button class="login-submit" type="submit"><span>@Model.LoginPage.LoginTitle</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
                     </form>
+                    @if (Model.SelfRegistrationEnabled)
+                    {
+                        <p class="register-prompt">还没有账号？<a asp-page="/Account/Register" asp-route-returnUrl="@Model.ReturnUrl">创建账号</a></p>
+                    }
                     @if (Model.SliderCaptchaEnabled)
                     {
                         <div id="slider-captcha-dialog" class="slider-captcha-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="slider-captcha-title">

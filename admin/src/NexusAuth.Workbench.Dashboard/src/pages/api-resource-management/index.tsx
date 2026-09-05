@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AxiosError } from 'axios';
-import { Button, Dialog, Drawer, Form, Input, MessagePlugin, Pagination, Select, Space, Switch, Table, Textarea, Tooltip, type TableProps } from 'tdesign-react';
+import { Button, Card, Dialog, Drawer, Empty, Form, Input, Loading, MessagePlugin, Pagination, Select, Space, Switch, Textarea, Tooltip } from 'tdesign-react';
 import { AddIcon, DeleteIcon, EditIcon, ErrorCircleFilledIcon, RefreshIcon, SearchIcon, ViewListIcon } from 'tdesign-icons-react';
 import {
   createApiResource,
@@ -14,6 +14,7 @@ import {
   type UpdateApiResourceRequest,
 } from '../../api/api-resource';
 import './style.less';
+import '../management-card.less';
 
 type FilterState = {
   keyword: string;
@@ -72,8 +73,6 @@ const ApiResourceManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [sourceData, setSourceData] = useState<ApiResource[]>([]);
   const [total, setTotal] = useState(0);
-  const [tableMaxHeight, setTableMaxHeight] = useState(() => Math.max(window.innerHeight - 200, 260));
-  const tableWrapRef = useRef<HTMLDivElement | null>(null);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [editingResource, setEditingResource] = useState<ApiResource | null>(null);
   const [formData, setFormData] = useState<DialogFormData>(defaultFormData);
@@ -132,28 +131,6 @@ const ApiResourceManagementPage = () => {
       isActive: formData.isActive,
     });
   }, [dialogVisible, loadingDetail, formData]);
-
-  useEffect(() => {
-    const updateTableMaxHeight = () => {
-      const baseHeight = Math.max(window.innerHeight - 200, 260);
-      if (!tableWrapRef.current) {
-        setTableMaxHeight(baseHeight);
-        return;
-      }
-      const top = tableWrapRef.current.getBoundingClientRect().top;
-      const next = Math.max(Math.floor(window.innerHeight - top - 110), 260);
-      setTableMaxHeight(next);
-    };
-
-    updateTableMaxHeight();
-    const frame = window.requestAnimationFrame(updateTableMaxHeight);
-    window.addEventListener('resize', updateTableMaxHeight);
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener('resize', updateTableMaxHeight);
-    };
-  }, []);
 
   const handleQuery = () => {
     setAppliedFilters(filters);
@@ -312,66 +289,8 @@ const ApiResourceManagementPage = () => {
     }
   };
 
-  const columns: TableProps<ApiResource>['columns'] = useMemo(
-    () => [
-      {
-        colKey: 'name',
-        title: '服务唯一标识',
-        minWidth: 210,
-        cell: ({ row }) => <code className="api-resource-code" title={row.name}>{row.name}</code>,
-      },
-      {
-        colKey: 'displayName',
-        title: '显示名称',
-        minWidth: 180,
-        ellipsis: true,
-        cell: ({ row }) => <span className="api-resource-display-name" title={row.displayName}>{row.displayName}</span>,
-      },
-      {
-        colKey: 'audience',
-        title: 'Audience',
-        minWidth: 190,
-        cell: ({ row }) => <code className="api-resource-code" title={row.audience}>{row.audience}</code>,
-      },
-      {
-        colKey: 'isActive',
-        title: '状态',
-        width: 125,
-        cell: ({ row }) => (
-          <Switch
-            value={row.isActive}
-            loading={togglingId === row.id}
-            label={({ value }) => value ? '启用' : '禁用'}
-            onChange={() => void handleToggleActive(row)}
-          />
-        ),
-      },
-      { colKey: 'description', title: '描述', minWidth: 220, ellipsis: true, cell: ({ row }) => row.description || '-' },
-      {
-        colKey: 'action',
-        title: '操作',
-        width: 160,
-        fixed: 'right',
-        cell: ({ row }) => (
-          <Space direction="vertical" size={4} style={{ alignItems: 'flex-start' }}>
-            <Button variant="text" theme="primary" icon={<ViewListIcon />} onClick={() => handleView(row)}>
-              详情
-            </Button>
-            <Button variant="text" theme="primary" icon={<EditIcon />} onClick={() => handleEdit(row)}>
-              编辑
-            </Button>
-            <Button variant="text" theme="danger" icon={<DeleteIcon />} onClick={() => void handleDelete(row)}>
-              删除
-            </Button>
-          </Space>
-        ),
-      },
-    ],
-    [togglingId]
-  );
-
   return (
-    <div className="api-resource-page">
+    <div className="api-resource-page management-card-page">
       <Dialog
         visible={Boolean(deleteTarget)}
         header="删除服务资源"
@@ -480,7 +399,7 @@ const ApiResourceManagementPage = () => {
         </div>
       </Drawer>
 
-      <div className="page-filter-bar">
+      <div className="management-card-page__toolbar">
         <Form layout="inline" className="api-resource-filter-form">
           <Form.FormItem label="关键词">
             <Input
@@ -510,7 +429,7 @@ const ApiResourceManagementPage = () => {
               <Button theme="primary" icon={<SearchIcon />} onClick={handleQuery}>
                 查询
               </Button>
-              <Button variant="base" icon={<RefreshIcon />} onClick={handleReset}>
+              <Button variant="outline" icon={<RefreshIcon />} onClick={handleReset}>
                 重置
               </Button>
               <Button theme="primary" icon={<AddIcon />} onClick={showDialog}>
@@ -521,21 +440,44 @@ const ApiResourceManagementPage = () => {
         </Form>
       </div>
 
-      <div className="page-table-section">
-        <div ref={tableWrapRef}>
-          <Table
-            rowKey="id"
-            columns={columns}
-            data={sourceData}
-            verticalAlign="middle"
-            maxHeight={tableMaxHeight}
-            tableLayout="fixed"
-            resizable
-            loading={loading}
-          />
-        </div>
+      <Loading loading={loading} className="management-card-page__loading">
+        {sourceData.length ? (
+          <div className="management-card-grid management-card-grid--resources">
+            {sourceData.map((resource) => (
+              <Card key={resource.id} className="management-card management-card--resource" bordered>
+                <div className="management-card__header">
+                  <div className="management-card__heading">
+                    <span className="management-card__title">{resource.displayName}</span>
+                    <code className="management-card__identifier">{resource.name}</code>
+                  </div>
+                  <Switch value={resource.isActive} loading={togglingId === resource.id} onChange={() => void handleToggleActive(resource)} />
+                </div>
+                <div className="management-card__section management-card__section--primary">
+                  <span>Scope（唯一标识）</span>
+                  <code className="management-card__scope">{resource.name}</code>
+                </div>
+                <div className="management-card__section">
+                  <span>Audience</span>
+                  <code>{resource.audience}</code>
+                </div>
+                <div className="management-card__section management-card__section--description">
+                  <span>描述</span>
+                  <p>{resource.description || '未填写描述'}</p>
+                </div>
+                <div className="management-card__footer">
+                  <Space size="small">
+                    <Button variant="text" theme="primary" icon={<ViewListIcon />} onClick={() => handleView(resource)}>详情</Button>
+                    <Button variant="text" theme="primary" icon={<EditIcon />} onClick={() => handleEdit(resource)}>编辑</Button>
+                    <Button variant="text" theme="danger" icon={<DeleteIcon />} onClick={() => void handleDelete(resource)}>删除</Button>
+                  </Space>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : <Empty description="暂无服务资源" />}
+      </Loading>
 
-        <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
+      <div className="management-card-page__pagination">
           <Pagination
             total={total}
             current={current}
@@ -549,7 +491,6 @@ const ApiResourceManagementPage = () => {
               setCurrent(1);
             }}
           />
-        </div>
       </div>
     </div>
   );

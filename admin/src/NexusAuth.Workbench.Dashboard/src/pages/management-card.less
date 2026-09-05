@@ -1,0 +1,236 @@
+.management-card-page {
+  min-width: 0;
+  color: var(--app-text);
+}
+
+.management-card-page__toolbar {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface);
+}
+
+.management-card-page__toolbar .t-form {
+  row-gap: 8px;
+}
+
+.management-card-page__toolbar .t-form__item {
+  margin-bottom: 0;
+}
+
+.management-card-page__loading {
+  min-height: 220px;
+}
+
+.management-card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.management-card {
+  min-width: 0;
+  border-color: var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface);
+}
+
+.management-card .t-card__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 252px;
+  padding: 14px;
+}
+
+.management-card--resource .t-card__body {
+  min-height: 234px;
+}
+
+.management-card__header,
+.management-card__footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.management-card__heading {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
+}
+
+.management-card__header > .t-tag {
+  display: inline-flex;
+  flex: 0 0 48px;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  white-space: nowrap;
+}
+
+.management-card__status {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.management-card__status .t-tag {
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+.management-card__header > .t-tag .t-tag__text {
+  overflow-wrap: normal;
+  word-break: keep-all;
+  white-space: nowrap;
+}
+
+.management-card__title {
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 14px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.management-card__identifier,
+.management-card code {
+  overflow: hidden;
+  color: var(--app-text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.management-card__meta-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--app-border);
+}
+
+.management-card__meta-grid > div,
+.management-card__section {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+}
+
+.management-card__meta-grid > div > span,
+.management-card__section > span {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.management-card__section {
+  margin-top: 11px;
+}
+
+.management-card__section--primary {
+  margin-top: 14px;
+}
+
+.management-card__scope {
+  color: var(--app-accent) !important;
+  font-size: 15px !important;
+  font-weight: 650;
+}
+
+.management-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.management-card__tags .t-tag {
+  max-width: 100%;
+}
+
+.management-card__empty {
+  color: var(--app-text-muted);
+  font-size: 12px;
+}
+
+.management-card__section--uri code {
+  display: block;
+}
+
+.management-card__section--description {
+  min-height: 42px;
+}
+
+.management-card__section--description p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--app-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.management-card__footer {
+  align-items: center;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--app-border);
+}
+
+.management-card__footer .t-space {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+.management-card__footer .t-button {
+  white-space: nowrap;
+}
+
+.management-card-page__pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--app-border);
+}
+
+@media (max-width: 1360px) {
+  .management-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 1024px) {
+  .management-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .management-card-page__toolbar .t-form {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .management-card-page__toolbar .t-form__item,
+  .management-card-page__toolbar .t-input,
+  .management-card-page__toolbar .t-select {
+    width: 100% !important;
+  }
+
+  .management-card-grid { grid-template-columns: 1fr; }
+
+  .management-card__footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

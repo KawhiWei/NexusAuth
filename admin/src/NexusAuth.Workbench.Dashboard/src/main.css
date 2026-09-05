@@ -36,7 +36,7 @@ html[theme-mode='light'] {
   --td-line-height-body-large: 25px;
   --td-comp-size-xs: 28px;
   --td-comp-size-s: 32px;
-  --td-comp-size-m: 36px;
+  --td-comp-size-m: var(--td-comp-size-s);
   --td-comp-size-l: 40px;
 
   --td-bg-color-page: var(--app-page);
@@ -250,12 +250,6 @@ select {
   font-size: var(--td-font-size-body-medium);
 }
 
-.t-button {
-  border-radius: 6px;
-  font-size: var(--td-font-size-body-medium);
-  font-weight: 500;
-}
-
 .t-table {
   overflow: visible;
   border: 1px solid var(--app-border);
@@ -390,7 +384,7 @@ select {
 
 .t-tag {
   border-radius: 4px;
-  font-size: var(--td-font-size-body-small);
+  font-size: var(--td-font-size-body-medium);
 }
 
 .t-tabs__nav-item {

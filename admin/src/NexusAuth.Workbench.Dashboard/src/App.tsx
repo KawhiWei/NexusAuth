@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
+import { ConfigProvider } from 'tdesign-react';
 import RootRouterProvider from '../src/router/provider';
 import { setCachedAuthStatus, checkAuthenticated } from '../src/router/auth';
+
+const globalConfig = {
+  table: {
+    size: 'small' as const,
+  },
+};
 
 const App = () => {
   const [initialized, setInitialized] = useState(false);
@@ -17,9 +24,9 @@ const App = () => {
   }
 
   return (
-    <>
+    <ConfigProvider globalConfig={globalConfig}>
       <RootRouterProvider></RootRouterProvider>
-    </>
+    </ConfigProvider>
   )
 }
 

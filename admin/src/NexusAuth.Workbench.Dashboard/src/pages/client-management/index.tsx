@@ -1,36 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { AxiosError } from 'axios';
-import { Button, Form, Input, MessagePlugin, Pagination, Select, Space, Table, Tag, type TableProps } from 'tdesign-react';
-import {
-  deleteClient,
-  getClients,
-  resetClientCredential,
-  type Client,
-} from '../../api/client';
+import { AddIcon, DeleteIcon, EditIcon, RefreshIcon, SearchIcon } from 'tdesign-icons-react';
+import { Button, Card, Empty, Form, Input, Loading, MessagePlugin, Pagination, Select, Space, Tag } from 'tdesign-react';
+import { deleteClient, getClients, resetClientCredential, type Client } from '../../api/client';
+import { getAllApiResources } from '../../api/api-resource';
+import './style.less';
+import '../management-card.less';
 
-type FilterState = {
-  keyword: string;
-  isActive: '' | boolean;
-};
+type FilterState = { keyword: string; isActive: '' | boolean };
 
-const defaultFilters: FilterState = {
-  keyword: '',
-  isActive: true,
-};
-
-const statusOptions = [
-  { label: '全部状态', value: '' },
-  { label: '启用', value: true },
-  { label: '禁用', value: false },
-];
+const defaultFilters: FilterState = { keyword: '', isActive: true };
+const statusOptions = [{ label: '全部状态', value: '' }, { label: '启用', value: true }, { label: '禁用', value: false }];
 
 const getRequestErrorMessage = (error: unknown, fallback: string) => {
   const axiosError = error as AxiosError<{ title?: string; detail?: string; message?: string }>;
-  return axiosError.response?.data?.detail
-    || axiosError.response?.data?.message
-    || axiosError.response?.data?.title
-    || fallback;
+  return axiosError.response?.data?.detail || axiosError.response?.data?.message || axiosError.response?.data?.title || fallback;
 };
 
 const ClientManagementPage = () => {
@@ -43,8 +28,7 @@ const ClientManagementPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [sourceData, setSourceData] = useState<Client[]>([]);
   const [total, setTotal] = useState(0);
-  const [tableMaxHeight, setTableMaxHeight] = useState(() => Math.max(window.innerHeight - 200, 260));
-  const tableWrapRef = useRef<HTMLDivElement | null>(null);
+  const [resourceNamesById, setResourceNamesById] = useState<Record<string, string>>({});
 
   const fetchData = async () => {
     try {
@@ -63,63 +47,24 @@ const ClientManagementPage = () => {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [appliedFilters, current, pageSize]);
+  useEffect(() => { void fetchData(); }, [appliedFilters, current, pageSize]);
 
   useEffect(() => {
-    const updateTableMaxHeight = () => {
-      const baseHeight = Math.max(window.innerHeight - 200, 260);
-      if (!tableWrapRef.current) {
-        setTableMaxHeight(baseHeight);
-        return;
-      }
-      const top = tableWrapRef.current.getBoundingClientRect().top;
-      const next = Math.max(Math.floor(window.innerHeight - top - 110), 260);
-      setTableMaxHeight(next);
-    };
-
-    updateTableMaxHeight();
-    const frame = window.requestAnimationFrame(updateTableMaxHeight);
-    window.addEventListener('resize', updateTableMaxHeight);
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener('resize', updateTableMaxHeight);
-    };
+    void getAllApiResources()
+      .then((resources) => setResourceNamesById(Object.fromEntries(resources.map((resource) => [resource.id, resource.name]))))
+      .catch((error) => console.error('Failed to fetch API resources for client cards:', error));
   }, []);
 
-  const getResettableAuthMethod = (client: Client) => {
-    return client.tokenEndpointAuthMethod === 'private_key_jwt' ? undefined : client.tokenEndpointAuthMethod;
-  };
+  const getResettableAuthMethod = (client: Client) => client.tokenEndpointAuthMethod === 'private_key_jwt' ? undefined : client.tokenEndpointAuthMethod;
+  const handleQuery = () => { setAppliedFilters(filters); setCurrent(1); };
+  const handleReset = () => { setFilters(defaultFilters); setAppliedFilters(defaultFilters); setCurrent(1); };
+  const handleAdd = () => navigate('/oauth/client-management/create');
+  const handleEdit = (client: Client) => navigate(`/oauth/client-management/edit/${client.id}`);
 
-  const handleQuery = () => {
-    setAppliedFilters(filters);
-    setCurrent(1);
-  };
-
-  const handleReset = () => {
-    setFilters(defaultFilters);
-    setAppliedFilters(defaultFilters);
-    setCurrent(1);
-  };
-
-  const handleAdd = () => {
-    navigate('/oauth/client-management/create');
-  };
-
-  const handleEdit = (row: Client) => {
-    navigate(`/oauth/client-management/edit/${row.id}`);
-  };
-
-  const handleDelete = async (row: Client) => {
-    const confirmed = window.confirm(`确定要删除客户端 "${row.clientName}" 吗？`);
-    if (!confirmed) {
-      return;
-    }
-
+  const handleDelete = async (client: Client) => {
+    if (!window.confirm(`确定要删除客户端 "${client.clientName}" 吗？`)) return;
     try {
-      await deleteClient(row.id);
+      await deleteClient(client.id);
       MessagePlugin.success('删除成功');
       await fetchData();
     } catch (error) {
@@ -130,22 +75,12 @@ const ClientManagementPage = () => {
 
   const handleResetCredential = async (client: Client) => {
     const method = getResettableAuthMethod(client);
-    if (!method) {
-      MessagePlugin.error('当前客户端没有可重置的共享凭据');
-      return;
-    }
-
-    const confirmed = window.confirm('Client Secret 只会展示一次，重置后旧 Secret 将失效。确定要继续吗？');
-    if (!confirmed) {
-      return;
-    }
-
+    if (!method || !window.confirm('Client Secret 只会展示一次，重置后旧 Secret 将失效。确定要继续吗？')) return;
     try {
       setSubmitting(true);
       const result = await resetClientCredential(client.id, { tokenEndpointAuthMethod: method });
-      const secret = result.generatedCredential?.clientSecret;
-      if (secret) {
-        await navigator.clipboard.writeText(secret);
+      if (result.generatedCredential?.clientSecret) {
+        await navigator.clipboard.writeText(result.generatedCredential.clientSecret);
         MessagePlugin.success('Secret 已生成并复制，请立即安全保存');
       } else {
         MessagePlugin.success('凭据已重置');
@@ -159,125 +94,35 @@ const ClientManagementPage = () => {
     }
   };
 
-  const renderArrayTags = (values?: string[]) => {
-    if (!values?.length) {
-      return '-';
-    }
-
-    return (
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {values.map((value) => (
-          <Tag key={value} variant="light-outline">
-            {value}
-          </Tag>
-        ))}
-      </div>
-    );
-  };
-
-  const columns: TableProps<Client>['columns'] = [
-    { colKey: 'clientId', title: 'Client ID', width: 280, ellipsis: true },
-    { colKey: 'clientName', title: '名称', minWidth: 150, ellipsis: true },
-    {
-      colKey: 'isActive',
-      title: '状态',
-      width: 100,
-      cell: ({ row }) => <Tag theme={row.isActive ? 'success' : 'default'}>{row.isActive ? '启用' : '禁用'}</Tag>,
-    },
-    {
-      colKey: 'requirePkce',
-      title: 'PKCE',
-      width: 80,
-      cell: ({ row }) => (row.requirePkce ? '是' : '否'),
-    },
-    {
-      colKey: 'tokenEndpointAuthMethod',
-      title: '认证方式',
-      minWidth: 180,
-      cell: ({ row }) => <Tag theme="primary" variant="light-outline">{row.tokenEndpointAuthMethod}</Tag>,
-    },
-    {
-      colKey: 'redirectUris',
-      title: '回调地址',
-      minWidth: 260,
-      cell: ({ row }) => renderArrayTags(row.redirectUris),
-    },
-    {
-      colKey: 'action',
-      title: '操作',
-      width: 160,
-      fixed: 'right',
-      cell: ({ row }) => (
-        <Space direction="vertical" size={4} style={{ alignItems: 'flex-start' }}>
-          <Button variant="text" theme="primary" type="button" onClick={() => handleEdit(row)}>编辑</Button>
-          {getResettableAuthMethod(row) && (
-            <Button variant="text" theme="primary" type="button" loading={submitting} onClick={() => handleResetCredential(row)}>重置 Secret</Button>
-          )}
-          <Button variant="text" theme="danger" type="button" onClick={() => handleDelete(row)}>删除</Button>
-        </Space>
-      ),
-    },
-  ];
+  const renderTags = (values?: string[], theme: 'primary' | 'default' = 'default') => values?.length ? (
+    <div className="management-card__tags">
+      {values.map((value) => <Tag key={value} theme={theme} variant="light-outline" size="small">{value}</Tag>)}
+    </div>
+  ) : <span className="management-card__empty">未配置</span>;
 
   return (
-    <div>
-      <div className="page-filter-bar">
+    <div className="management-card-page">
+      <div className="management-card-page__toolbar">
         <Form layout="inline">
-          <Form.FormItem label="关键词">
-            <Input
-              clearable
-              value={filters.keyword}
-              placeholder="请输入 Client ID 或名称"
-              style={{ width: 260 }}
-              onChange={(value) => setFilters((prev) => ({ ...prev, keyword: value }))}
-            />
-          </Form.FormItem>
-
-          <Form.FormItem label="状态">
-            <Select
-              value={filters.isActive}
-              style={{ width: 140 }}
-              options={statusOptions}
-              onChange={(value) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  isActive: value === true || value === false ? value : '',
-                }))
-              }
-            />
-          </Form.FormItem>
-
-          <Form.FormItem>
-            <Space>
-              <Button theme="primary" type="button" onClick={handleQuery}>查询</Button>
-              <Button variant="base" type="button" onClick={handleReset}>重置</Button>
-              <Button theme="primary" type="button" onClick={handleAdd}>新增</Button>
-            </Space>
-          </Form.FormItem>
+          <Form.FormItem label="关键词"><Input clearable prefixIcon={<SearchIcon />} value={filters.keyword} placeholder="请输入 Client ID 或名称" style={{ width: 280 }} onChange={(value) => setFilters((prev) => ({ ...prev, keyword: value }))} /></Form.FormItem>
+          <Form.FormItem label="状态"><Select value={filters.isActive} style={{ width: 140 }} options={statusOptions} onChange={(value) => setFilters((prev) => ({ ...prev, isActive: value === true || value === false ? value : '' }))} /></Form.FormItem>
+          <Form.FormItem><Space><Button theme="primary" icon={<SearchIcon />} onClick={handleQuery}>查询</Button><Button variant="outline" icon={<RefreshIcon />} onClick={handleReset}>重置</Button><Button theme="primary" icon={<AddIcon />} onClick={handleAdd}>新增应用</Button></Space></Form.FormItem>
         </Form>
       </div>
 
-      <div className="page-table-section">
-        <div ref={tableWrapRef}>
-          <Table rowKey="id" columns={columns} data={sourceData} verticalAlign="middle" maxHeight={tableMaxHeight} tableLayout="fixed" resizable loading={loading} />
-        </div>
-
-        <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
-          <Pagination
-            total={total}
-            current={current}
-            pageSize={pageSize}
-            pageSizeOptions={[10, 20, 50]}
-            showPageSize
-            showJumper
-            onCurrentChange={(next) => setCurrent(next)}
-            onPageSizeChange={(size) => {
-              setPageSize(Number(size));
-              setCurrent(1);
-            }}
-          />
-        </div>
-      </div>
+      <Loading loading={loading} className="management-card-page__loading">
+        {sourceData.length ? <div className="management-card-grid management-card-grid--clients">
+          {sourceData.map((client) => <Card key={client.id} className="management-card" bordered>
+            <div className="management-card__header"><div className="management-card__heading"><span className="management-card__title">{client.clientName}</span><code className="management-card__identifier">{client.clientId}</code></div><div className="management-card__status"><Tag theme={client.isActive ? 'success' : 'default'} variant="light" size="small">{client.isActive ? '启用' : '禁用'}</Tag><Tag theme={client.requirePkce ? 'success' : 'default'} variant="light-outline" size="small">PKCE {client.requirePkce ? '· S256' : '· 未启用'}</Tag></div></div>
+            <div className="management-card__meta-grid"><div><span>认证方式</span><code>{client.tokenEndpointAuthMethod}</code></div><div><span>授权方式</span>{renderTags(client.allowedGrantTypes, 'primary')}</div></div>
+            <div className="management-card__section"><span>授权 Scope</span>{renderTags(client.allowedScopes, 'primary')}</div>
+            <div className="management-card__section"><span>关联服务资源</span>{renderTags(client.apiResourceIds?.map((resourceId) => resourceNamesById[resourceId] || resourceId))}</div>
+            <div className="management-card__section management-card__section--uri"><span>回调地址</span>{client.redirectUris?.length ? <code title={client.redirectUris[0]}>{client.redirectUris[0]}</code> : <span className="management-card__empty">未配置</span>}</div>
+            <div className="management-card__footer"><Space size="small"><Button variant="text" theme="primary" icon={<EditIcon />} onClick={() => handleEdit(client)}>编辑</Button>{getResettableAuthMethod(client) && <Button variant="text" theme="primary" loading={submitting} onClick={() => void handleResetCredential(client)}>重置 Secret</Button>}<Button variant="text" theme="danger" icon={<DeleteIcon />} onClick={() => void handleDelete(client)}>删除</Button></Space></div>
+          </Card>)}
+        </div> : <Empty description="暂无应用" />}
+      </Loading>
+      <div className="management-card-page__pagination"><Pagination total={total} current={current} pageSize={pageSize} pageSizeOptions={[10, 20, 50]} showPageSize showJumper onCurrentChange={(next) => setCurrent(next)} onPageSizeChange={(size) => { setPageSize(Number(size)); setCurrent(1); }} /></div>
     </div>
   );
 };

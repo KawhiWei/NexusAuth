@@ -74,10 +74,27 @@
       background: transparent;
     }
 
-    .t-button {
-      color: var(--app-text-secondary);
+    .layout-header-action.t-button {
+      width: 32px;
+      min-width: 32px;
+      height: 32px;
+      padding: 0;
+      border: 0;
+      color: var(--app-text);
+      background: transparent;
+
+      .t-icon {
+        display: block;
+        flex-shrink: 0;
+        color: inherit;
+      }
 
       &:hover {
+        color: var(--app-accent);
+        background: var(--app-accent-soft);
+      }
+
+      &:focus-visible {
         color: var(--app-accent);
         background: var(--app-accent-soft);
       }

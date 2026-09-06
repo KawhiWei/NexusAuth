@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, Input, Space, Tooltip } from 'tdesign-react';
-import { FullscreenExitIcon, FullscreenIcon, MoonIcon, SearchIcon, SunnyIcon } from 'tdesign-icons-react';
+import { Fullscreen1Icon, FullscreenExit1Icon, MoonIcon, SearchIcon, SunnyIcon } from 'tdesign-icons-react';
 
 interface PublicHeaderProps {
   theme: 'light' | 'dark';
@@ -46,9 +46,14 @@ const PublicHeader = ({ theme, onChangeTheme }: PublicHeaderProps) => {
                   content={`点击切换为${theme === 'light' ? '暗黑' : '亮色'}模式`}
                 >
                   <Button
+                    className="layout-header-action"
                     size="small"
                     shape="circle"
-                    icon={theme === 'light' ? <MoonIcon /> : <SunnyIcon />}
+                    theme="default"
+                    variant="text"
+                    type="button"
+                    aria-label={theme === 'light' ? '切换到暗黑模式' : '切换到亮色模式'}
+                    icon={theme === 'light' ? <MoonIcon size="20px" /> : <SunnyIcon size="20px" />}
                     onClick={onChangeTheme}
                   />
                 </Tooltip>
@@ -58,9 +63,14 @@ const PublicHeader = ({ theme, onChangeTheme }: PublicHeaderProps) => {
                   content={isFullscreen ? '退出全屏' : '全屏显示'}
                 >
                   <Button
+                    className="layout-header-action"
                     size="small"
                     shape="circle"
-                    icon={isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+                    theme="default"
+                    variant="text"
+                    type="button"
+                    aria-label={isFullscreen ? '退出全屏' : '全屏显示'}
+                    icon={isFullscreen ? <FullscreenExit1Icon size="20px" /> : <Fullscreen1Icon size="20px" />}
                     onClick={() => {
                       void handleToggleFullscreen();
                     }}

@@ -8,6 +8,13 @@ using Microsoft.Extensions.Options;
 
 namespace NexusAuth.Extension;
 
+/// <summary>
+/// 中文：实现 Workbench 所需的 OpenID Connect 授权码、PKCE、刷新令牌和令牌内省操作。
+/// English: Implements the OpenID Connect authorization-code, PKCE, token-refresh, and token-introspection operations used by Workbench.
+/// </summary>
+/// <param name="httpClientFactory">中文：用于创建访问 Provider 的 HTTP 客户端工厂。English: The factory used to create HTTP clients for Provider requests.</param>
+/// <param name="flowStateStore">中文：用于保存授权流程临时安全状态的存储服务。English: The store used to retain temporary authorization-flow security state.</param>
+/// <param name="authOptions">中文：Workbench OIDC 客户端配置。English: The Workbench OIDC client configuration.</param>
 public class OidcWorkbenchService(
     IHttpClientFactory httpClientFactory,
     IFlowStateStore flowStateStore,
@@ -16,24 +23,40 @@ public class OidcWorkbenchService(
     private readonly FrontendOptions _frontendOptions = new();
     private readonly WorkbenchAuthOptions _options = authOptions.Value;
 
+    /// <summary>
+    /// 中文：获取移除末尾斜杠后的前端基础地址。
+    /// English: Gets the frontend base URL with its trailing slash removed.
+    /// </summary>
     public string FrontendBaseUrl => _frontendOptions.BaseUrl.TrimEnd('/');
 
+    /// <inheritdoc />
     public string Authority => _options.Authority;
 
+    /// <inheritdoc />
     public string ClientId => _options.ClientId;
 
+    /// <summary>
+    /// 中文：获取配置的机密客户端凭据。
+    /// English: Gets the configured confidential client credential.
+    /// </summary>
     public string? ClientSecret => _options.ClientSecret;
 
+    /// <inheritdoc />
     public string RedirectUri => _options.RedirectUri;
 
+    /// <inheritdoc />
     public string PostLogoutRedirectUri => _options.PostLogoutRedirectUri;
 
+    /// <inheritdoc />
     public string Scope => _options.Scope;
 
+    /// <inheritdoc />
     public bool SignOutProvider => _options.SignOutProvider;
 
+    /// <inheritdoc />
     public IFlowStateStore FlowStateStore { get; } = flowStateStore;
 
+    /// <inheritdoc />
     public async Task<DiscoveryDocument> FetchDiscoveryAsync(CancellationToken ct)
     {
         var client = httpClientFactory.CreateClient();
@@ -44,6 +67,7 @@ public class OidcWorkbenchService(
             ?? throw new InvalidOperationException("Unable to load OpenID Connect discovery document.");
     }
 
+    /// <inheritdoc />
     public string GenerateCodeVerifier()
     {
         var bytes = RandomNumberGenerator.GetBytes(32);
@@ -53,6 +77,12 @@ public class OidcWorkbenchService(
             .Replace('/', '_');
     }
 
+    /// <summary>
+    /// 中文：根据 PKCE code_verifier 计算 S256 code_challenge。
+    /// English: Computes an S256 PKCE code_challenge from a code_verifier.
+    /// </summary>
+    /// <param name="codeVerifier">中文：要进行 SHA-256 摘要计算的 PKCE 验证码。English: The PKCE verifier to hash with SHA-256.</param>
+    /// <returns>中文：Base64 URL 编码的 S256 挑战值。English: The Base64 URL-encoded S256 challenge.</returns>
     public string GenerateCodeChallenge(string codeVerifier)
     {
         var hash = SHA256.HashData(Encoding.ASCII.GetBytes(codeVerifier));
@@ -62,6 +92,7 @@ public class OidcWorkbenchService(
             .Replace('/', '_');
     }
 
+    /// <inheritdoc />
     public (string codeChallenge, string codeVerifier) GeneratePkce()
     {
         var codeVerifier = GenerateCodeVerifier();
@@ -69,6 +100,7 @@ public class OidcWorkbenchService(
         return (codeChallenge, codeVerifier);
     }
 
+    /// <inheritdoc />
     public async Task<WorkbenchTokenResult> ExchangeCodeAsync(string code, string codeVerifier, CancellationToken ct)
     {
         var discovery = await FetchDiscoveryAsync(ct);
@@ -94,6 +126,7 @@ public class OidcWorkbenchService(
         return ParseTokenResponse(json, requireIdToken: true);
     }
 
+    /// <inheritdoc />
     public async Task<WorkbenchTokenResult> RefreshTokensAsync(string refreshToken, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(refreshToken))
@@ -120,9 +153,7 @@ public class OidcWorkbenchService(
         return ParseTokenResponse(json, requireIdToken: false);
     }
 
-    /// <summary>
-    /// Validates an access token with the Provider using this BFF's confidential client credentials.
-    /// </summary>
+    /// <inheritdoc />
     public async Task<AccessTokenIntrospectionResult> IntrospectAccessTokenAsync(string accessToken, CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(accessToken);
@@ -152,6 +183,13 @@ public class OidcWorkbenchService(
         return new AccessTokenIntrospectionResult(active, subject, clientId);
     }
 
+    /// <summary>
+    /// 中文：解析并校验令牌端点返回的 JSON 载荷。
+    /// English: Parses and validates the JSON payload returned by the token endpoint.
+    /// </summary>
+    /// <param name="json">中文：令牌端点返回的 JSON 文本。English: The JSON text returned by the token endpoint.</param>
+    /// <param name="requireIdToken">中文：是否要求响应必须包含 ID Token。English: Whether the response must contain an ID token.</param>
+    /// <returns>中文：经过校验的令牌结果。English: The validated token result.</returns>
     private static WorkbenchTokenResult ParseTokenResponse(string json, bool requireIdToken)
     {
         using var doc = JsonDocument.Parse(json);
@@ -180,6 +218,11 @@ public class OidcWorkbenchService(
         return new WorkbenchTokenResult(accessToken, refreshToken, idToken, expiresIn);
     }
 
+    /// <summary>
+    /// 中文：获取服务端反向通道使用的 Provider 基础地址。
+    /// English: Gets the Provider base URL used for server-side backchannel requests.
+    /// </summary>
+    /// <returns>中文：不包含末尾斜杠的反向通道地址。English: The backchannel URL without a trailing slash.</returns>
     private string GetBackchannelAuthority()
     {
         var authority = string.IsNullOrWhiteSpace(_options.BackchannelAuthority)
@@ -189,6 +232,12 @@ public class OidcWorkbenchService(
         return authority.TrimEnd('/');
     }
 
+    /// <summary>
+    /// 中文：将发现文档中的公开端点映射到可选的反向通道地址。
+    /// English: Maps a public endpoint from the discovery document to the optional backchannel authority.
+    /// </summary>
+    /// <param name="endpoint">中文：发现文档提供的绝对端点地址。English: The absolute endpoint URL supplied by the discovery document.</param>
+    /// <returns>中文：服务端应调用的端点地址。English: The endpoint URL that the server should call.</returns>
     private Uri ResolveBackchannelEndpoint(string endpoint)
     {
         if (string.IsNullOrWhiteSpace(_options.BackchannelAuthority))
@@ -201,6 +250,13 @@ public class OidcWorkbenchService(
         return new Uri(authority, endpointUri.PathAndQuery.TrimStart('/'));
     }
 
+    /// <summary>
+    /// 中文：使用 HTTP Basic 方式把当前客户端凭据添加到 HTTP 客户端。
+    /// English: Adds the current client credentials to an HTTP client using HTTP Basic authentication.
+    /// </summary>
+    /// <param name="client">中文：要配置认证请求头的 HTTP 客户端。English: The HTTP client whose authentication header is configured.</param>
+    /// <returns>中文：表示配置完成的任务。English: A task representing completion of the configuration.</returns>
+    /// <exception cref="InvalidOperationException">中文：未配置客户端密钥。English: The client secret has not been configured.</exception>
     public Task ApplyClientAuthenticationAsync(HttpClient client)
     {
         var actualClientId = ClientId;
@@ -214,9 +270,23 @@ public class OidcWorkbenchService(
     }
 }
 
+/// <summary>
+/// 中文：配置 Workbench 前端应用的访问地址。
+/// English: Configures the URL used to access the Workbench frontend application.
+/// </summary>
 public class FrontendOptions
 {
+    /// <summary>
+    /// 中文：获取或设置 Workbench 前端基础地址。
+    /// English: Gets or sets the Workbench frontend base URL.
+    /// </summary>
     public string BaseUrl { get; set; } = "http://localhost:5273";
 }
 
+/// <summary>
+/// 中文：表示一组 PKCE 验证码和挑战值。
+/// English: Represents a PKCE verifier and challenge pair.
+/// </summary>
+/// <param name="CodeVerifier">中文：随机生成的原始 PKCE 验证码。English: The original randomly generated PKCE verifier.</param>
+/// <param name="CodeChallenge">中文：由验证码计算得到的 S256 挑战值。English: The S256 challenge derived from the verifier.</param>
 public record PkcePair(string CodeVerifier, string CodeChallenge);

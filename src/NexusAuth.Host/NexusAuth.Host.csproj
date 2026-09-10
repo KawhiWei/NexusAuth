@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
     <ItemGroup>
+        <PackageReference Include="Fido2" />
         <PackageReference Include="Luck.AutoDependencyInjection" />
         <PackageReference Include="Luck.AspNetCore" />
     </ItemGroup>

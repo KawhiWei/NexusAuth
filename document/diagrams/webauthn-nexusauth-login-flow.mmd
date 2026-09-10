@@ -1,0 +1,69 @@
+%%{init: {"theme": "base", "themeVariables": {"background": "#ffffff", "primaryTextColor": "#173f35", "lineColor": "#596773", "fontSize": "15px"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 34, "rankSpacing": 48}}}%%
+flowchart LR
+    subgraph Browser["浏览器 / 设备认证器"]
+        RegisterForm["注册表单<br/>账号、密码、昵称、邮箱"]
+        EnrollPage["创建 Passkey 页面"]
+        DeviceCreate["navigator.credentials.create<br/>指纹 / 面容 / 屏幕锁"]
+        LoginPage["登录页<br/>密码输入或 Sign in with a passkey"]
+        DeviceGet["navigator.credentials.get<br/>发现凭据并签名"]
+        App["OIDC 客户端应用"]
+    end
+
+    subgraph Provider["WebAuthnNexusAuth Provider"]
+        Register["POST /Account/Register<br/>创建本地账号"]
+        EnrollmentToken["签发 15 分钟<br/>enrollment token"]
+        RegOptions["POST PasskeyEnrollment?handler=Options<br/>生成 CredentialCreateOptions"]
+        RegVerify["POST PasskeyEnrollment?handler=Verify<br/>验证 attestation"]
+        LoginPwd["POST /account/login<br/>校验密码 / 可选 TOTP"]
+        AuthOptions["POST login?handler=PasskeyOptions<br/>生成 AssertionOptions"]
+        AuthVerify["POST login?handler=PasskeyVerify<br/>验证 assertion"]
+        SignIn["创建 SSO Session<br/>签发认证 Cookie"]
+        Oidc["/connect/authorize<br/>OIDC 授权码流程"]
+    end
+
+    subgraph Database["WebAuthnNexusAuth PostgreSQL"]
+        Users[("nexusauth.users")]
+        Credentials[("webauthn_credentials")]
+        Challenges[("webauthn_challenges<br/>选项 + token SHA-256 + 过期时间")]
+        Sessions[("SSO sessions")]
+    end
+
+    RegisterForm --> Register
+    Register --> Users
+    Register --> EnrollmentToken
+    EnrollmentToken --> EnrollPage
+    EnrollPage -->|含防伪令牌| RegOptions
+    RegOptions -->|写入一次性 challenge| Challenges
+    RegOptions -->|publicKey + flowToken| EnrollPage
+    EnrollPage --> DeviceCreate
+    DeviceCreate -->|attestation| EnrollPage
+    EnrollPage -->|含防伪令牌| RegVerify
+    RegVerify -->|原子消费 challenge| Challenges
+    RegVerify -->|验证成功后保存公钥与计数器| Credentials
+    RegVerify -->|登录页| LoginPage
+
+    LoginPage -->|账号密码| LoginPwd
+    LoginPwd --> Users
+    LoginPwd --> SignIn
+    LoginPage -->|点击 Passkey| AuthOptions
+    AuthOptions -->|写入一次性 challenge| Challenges
+    AuthOptions -->|publicKey + flowToken| LoginPage
+    LoginPage --> DeviceGet
+    DeviceGet -->|assertion| LoginPage
+    LoginPage -->|含防伪令牌| AuthVerify
+    AuthVerify -->|原子消费 challenge| Challenges
+    AuthVerify -->|查询 credential / user| Credentials
+    AuthVerify --> Users
+    AuthVerify -->|更新 signCount、last_used_at| Credentials
+    AuthVerify --> SignIn
+    SignIn --> Sessions
+    SignIn -->|Cookie, amr=webauthn| App
+    App -->|/connect/authorize| Oidc
+    Oidc -->|授权码 / ID Token| App
+
+    class RegisterForm,EnrollPage,DeviceCreate,LoginPage,DeviceGet,App client
+    class Register,EnrollmentToken,RegOptions,RegVerify,LoginPwd,AuthOptions,AuthVerify,SignIn,Oidc gateway
+    class Users,Credentials,Challenges,Sessions storage
+    classDef client fill:#e9f6f1,stroke:#2f6f5e,color:#173f35,stroke-width:1.5px
+    classDef gateway fill:#eaf2ff,stroke:#3567a7,color:#1d3b66,stroke-width:1.5px
+    classDef storage fill:#fff4d6,stroke:#8a6a1d,color:#4d3b0e,stroke-width:1.5px

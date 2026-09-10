@@ -190,6 +190,12 @@
                             <div class="remember-row"><label class="remember-label"><input asp-for="RememberMe" type="checkbox" />@Model.RememberMeLifetimeDays 天内免登录</label></div>
                         }
                         <button class="login-submit" type="submit"><span>@Model.LoginPage.LoginTitle</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+                        @if (Model.PasskeyEnabled)
+                        {
+                            <div style="display:flex;align-items:center;gap:12px;color:var(--form-muted);font-size:12px;"><span style="height:1px;flex:1;background:var(--border);"></span><span>or</span><span style="height:1px;flex:1;background:var(--border);"></span></div>
+                            <button id="passkey-login" class="login-submit" style="border:1px solid var(--border);color:var(--form-heading);background:var(--field-bg);" type="button">Sign in with a passkey</button>
+                            <p id="passkey-error" class="auth-error" style="display:none;margin:0;" role="alert"></p>
+                        }
                     </form>
                     @if (Model.SelfRegistrationEnabled)
                     {
@@ -280,6 +286,64 @@
             });
             close.addEventListener('click', closeDialog);
             window.addEventListener('resize', function () { if (!dialog.classList.contains('hidden')) prepare(); });
+        })();
+    </script>
+    <script>
+        (function () {
+            const button = document.getElementById('passkey-login');
+            const error = document.getElementById('passkey-error');
+            if (!button) return;
+            const returnUrl = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ReturnUrl));
+            function decode(value) {
+                const padded = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
+                const binary = atob(padded);
+                return Uint8Array.from(binary, character => character.charCodeAt(0));
+            }
+            function encode(buffer) {
+                const bytes = new Uint8Array(buffer); let binary = '';
+                bytes.forEach(value => binary += String.fromCharCode(value));
+                return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+            }
+            function requestOptions(options) {
+                options.challenge = decode(options.challenge);
+                if (options.allowCredentials) options.allowCredentials.forEach(item => item.id = decode(item.id));
+                return options;
+            }
+            function serializeAssertion(credential) {
+                return {
+                    id: credential.id, rawId: encode(credential.rawId), type: credential.type,
+                    response: {
+                        authenticatorData: encode(credential.response.authenticatorData),
+                        clientDataJSON: encode(credential.response.clientDataJSON),
+                        signature: encode(credential.response.signature),
+                        userHandle: credential.response.userHandle ? encode(credential.response.userHandle) : null
+                    },
+                    clientExtensionResults: credential.getClientExtensionResults()
+                };
+            }
+            async function post(url, body) {
+                const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'RequestVerificationToken': token }, body: JSON.stringify(body) });
+                const responseText = await response.text();
+                let payload;
+                try { payload = responseText ? JSON.parse(responseText) : null; } catch (_) { payload = null; }
+                if (!response.ok) throw new Error(payload?.error_description || `Passkey sign-in failed (${response.status}). Reload this page and try again.`);
+                if (!payload) throw new Error('Passkey sign-in returned an empty response. Reload this page and try again.');
+                return payload;
+            }
+            button.addEventListener('click', async () => {
+                if (!window.PublicKeyCredential) { error.textContent = '当前浏览器不支持 Passkey。'; error.style.display = 'block'; return; }
+                button.disabled = true; error.style.display = 'none';
+                try {
+                    const rememberMe = document.getElementById('RememberMe')?.checked === true;
+                    const start = await post('/account/login?handler=PasskeyOptions', { returnUrl, rememberMe });
+                    const credential = await navigator.credentials.get({ publicKey: requestOptions(start.publicKey) });
+                    const complete = await post('/account/login?handler=PasskeyVerify', { flowToken: start.flowToken, credential: serializeAssertion(credential) });
+                    window.location.assign(complete.redirectUrl);
+                } catch (exception) {
+                    error.textContent = exception.message || '无法使用 Passkey 登录。'; error.style.display = 'block'; button.disabled = false;
+                }
+            });
         })();
     </script>
 </body>

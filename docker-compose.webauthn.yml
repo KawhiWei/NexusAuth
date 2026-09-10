@@ -1,0 +1,67 @@
+name: webauthnnexusauth
+
+services:
+  webauthn-nexusauth-db:
+    image: postgres:16-alpine
+    environment:
+      TZ: Asia/Shanghai
+      POSTGRES_USER: ${WEBAUTHN_NEXUSAUTH_POSTGRES_USER:-webauthnnexusauth}
+      POSTGRES_PASSWORD: ${WEBAUTHN_NEXUSAUTH_POSTGRES_PASSWORD:-webauthnnexusauth_dev_password}
+      POSTGRES_DB: postgres
+      WEBAUTHN_NEXUSAUTH_DATABASE: WebAuthnNexusAuth
+    volumes:
+      - webauthnnexusauth-db-data:/var/lib/postgresql/data
+      - ./docker/webauthn-nexusauth-postgres-init.sh:/docker-entrypoint-initdb.d/000-webauthn-nexusauth-init.sh:ro
+      - ./production-init.sql:/opt/webauthn-nexusauth-init/production-init.sql:ro
+      - ./webauthn-production-init.sql:/opt/webauthn-nexusauth-init/webauthn-production-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d WebAuthnNexusAuth"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    ports:
+      - "127.0.0.1:56783:5432"
+    restart: unless-stopped
+
+  webauthn-nexusauth-sso:
+    build:
+      context: .
+      dockerfile: src/NexusAuth.Host/Dockerfile
+    environment:
+      TZ: Asia/Shanghai
+      ASPNETCORE_ENVIRONMENT: ${WEBAUTHN_NEXUSAUTH_ENVIRONMENT:-Development}
+      NEXUSAUTH_CONNECTION_STRINGS_DEFAULT: Host=webauthn-nexusauth-db;Port=5432;Database=WebAuthnNexusAuth;Username=${WEBAUTHN_NEXUSAUTH_POSTGRES_USER:-webauthnnexusauth};Password=${WEBAUTHN_NEXUSAUTH_POSTGRES_PASSWORD:-webauthnnexusauth_dev_password};Search Path=nexusauth
+      NEXUSAUTH_JWT_ISSUER: ${WEBAUTHN_NEXUSAUTH_ISSUER:-http://localhost:5200}
+      NEXUSAUTH_JWT_SIGNING_MODE: Certificate
+      NEXUSAUTH_JWT_DEVELOPMENT_SIGNING_CERTIFICATE_PATH: App_Data/development-signing-certificate.pfx
+      NEXUSAUTH_JWT_DEVELOPMENT_SIGNING_CERTIFICATE_PASSWORD: ${WEBAUTHN_NEXUSAUTH_SIGNING_CERTIFICATE_PASSWORD:-webauthnnexusauth-compose-dev}
+      NEXUSAUTH_SELF_REGISTRATION_ENABLED: "true"
+      NEXUSAUTH_WEBAUTHN_ENABLED: ${WEBAUTHN_NEXUSAUTH_ENABLED:-true}
+      NEXUSAUTH_WEBAUTHN_RP_ID: ${WEBAUTHN_NEXUSAUTH_RP_ID:-localhost}
+      NEXUSAUTH_WEBAUTHN_RP_NAME: ${WEBAUTHN_NEXUSAUTH_RP_NAME:-WebAuthn NexusAuth}
+      NEXUSAUTH_WEBAUTHN_ORIGIN: ${WEBAUTHN_NEXUSAUTH_ORIGIN:-http://localhost:5200}
+      NEXUSAUTH_WEBAUTHN_CHALLENGE_LIFETIME_SECONDS: ${WEBAUTHN_NEXUSAUTH_CHALLENGE_LIFETIME_SECONDS:-300}
+      NEXUSAUTH_BOOTSTRAP_ADMIN_USERNAME: ${WEBAUTHN_NEXUSAUTH_BOOTSTRAP_ADMIN_USERNAME:-}
+      NEXUSAUTH_BOOTSTRAP_ADMIN_PASSWORD: ${WEBAUTHN_NEXUSAUTH_BOOTSTRAP_ADMIN_PASSWORD:-}
+    volumes:
+      - webauthnnexusauth-signing-key:/app/App_Data
+      - webauthnnexusauth-data-protection-keys:/root/.aspnet/DataProtection-Keys
+      - ./logs/webauthn-nexusauth:/app/logs
+    depends_on:
+      webauthn-nexusauth-db:
+        condition: service_healthy
+    ports:
+      - "5200:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  webauthnnexusauth-db-data:
+  webauthnnexusauth-signing-key:
+  webauthnnexusauth-data-protection-keys:

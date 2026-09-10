@@ -13,6 +13,10 @@ public class DbContext(DbContextOptions options) : LuckDbContextBase(options)
 
     public DbSet<UserCredential> UserCredentials => Set<UserCredential>();
 
+    public DbSet<WebAuthnCredential> WebAuthnCredentials => Set<WebAuthnCredential>();
+
+    public DbSet<WebAuthnChallenge> WebAuthnChallenges => Set<WebAuthnChallenge>();
+
     public DbSet<OAuthClient> OAuthClients => Set<OAuthClient>();
 
     public DbSet<OAuthClientSecret> OAuthClientSecrets => Set<OAuthClientSecret>();

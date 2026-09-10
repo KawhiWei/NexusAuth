@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1000" viewBox="0 0 1800 1000" role="img" aria-labelledby="title desc">
+  <title id="title">WebAuthnNexusAuth Web 登录与注册流程</title>
+  <desc id="desc">从普通注册到创建 Passkey，以及密码或 Passkey 登录后建立 SSO 会话并进入 OIDC 授权的完整流程。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto"><path d="M0,0 L10,5.5 L0,11 Z" fill="#596773"/></marker>
+    <style>
+      .group{fill:#fff;stroke:#9aa8b5;stroke-width:2}.client{fill:#e9f6f1;stroke:#2f6f5e}.service{fill:#eaf2ff;stroke:#3567a7}.store{fill:#fff4d6;stroke:#8a6a1d}.node{stroke-width:2;rx:8}.h{font:700 22px Arial,"PingFang SC","Microsoft YaHei",sans-serif;fill:#303b44}.t{font:600 18px Arial,"PingFang SC","Microsoft YaHei",sans-serif;fill:#173f35}.s{font:16px Arial,"PingFang SC","Microsoft YaHei",sans-serif;fill:#4b5a67}.edge{fill:none;stroke:#596773;stroke-width:2.5;marker-end:url(#arrow)}.dash{stroke-dasharray:8 6}.label{font:15px Arial,"PingFang SC","Microsoft YaHei",sans-serif;fill:#4b5a67}
+    </style>
+  </defs>
+  <rect width="1800" height="1000" fill="#fff"/>
+  <rect class="group" x="25" y="45" width="460" height="900" rx="10"/>
+  <text class="h" x="55" y="85">浏览器 / 设备认证器</text>
+  <rect class="group" x="535" y="45" width="720" height="900" rx="10"/>
+  <text class="h" x="565" y="85">WebAuthnNexusAuth Provider</text>
+  <rect class="group" x="1305" y="45" width="470" height="900" rx="10"/>
+  <text class="h" x="1335" y="85">WebAuthnNexusAuth PostgreSQL</text>
+  <text class="h" x="55" y="135">注册后创建 Passkey</text>
+  <rect class="node client" x="65" y="165" width="180" height="90"/><text class="t" x="155" y="202" text-anchor="middle">注册表单</text><text class="s" x="155" y="230" text-anchor="middle">账号、密码、邮箱</text>
+  <rect class="node client" x="285" y="165" width="165" height="90"/><text class="t" x="367" y="202" text-anchor="middle">创建页</text><text class="s" x="367" y="230" text-anchor="middle">enrollment token</text>
+  <rect class="node client" x="65" y="320" width="385" height="105"/><text class="t" x="257" y="358" text-anchor="middle">navigator.credentials.create</text><text class="s" x="257" y="388" text-anchor="middle">指纹、面容或屏幕锁确认</text>
+  <rect class="node service" x="575" y="165" width="195" height="90"/><text class="t" x="672" y="202" text-anchor="middle">注册账号</text><text class="s" x="672" y="230" text-anchor="middle">/Account/Register</text>
+  <rect class="node service" x="825" y="165" width="190" height="90"/><text class="t" x="920" y="202" text-anchor="middle">签发 enrollment</text><text class="s" x="920" y="230" text-anchor="middle">token，15 分钟</text>
+  <rect class="node service" x="1060" y="165" width="155" height="90"/><text class="t" x="1137" y="202" text-anchor="middle">注册选项</text><text class="s" x="1137" y="230" text-anchor="middle">Options</text>
+  <rect class="node service" x="800" y="335" width="170" height="100"/><text class="t" x="885" y="373" text-anchor="middle">验证 attestation</text><text class="s" x="885" y="403" text-anchor="middle">Verify</text>
+  <rect class="node store" x="1350" y="165" width="170" height="90"/><text class="t" x="1435" y="202" text-anchor="middle">users</text><text class="s" x="1435" y="230" text-anchor="middle">账号资料</text>
+  <rect class="node store" x="1570" y="165" width="170" height="90"/><text class="t" x="1655" y="202" text-anchor="middle">challenges</text><text class="s" x="1655" y="230" text-anchor="middle">单次 challenge</text>
+  <rect class="node store" x="1460" y="365" width="170" height="90"/><text class="t" x="1545" y="402" text-anchor="middle">credentials</text><text class="s" x="1545" y="430" text-anchor="middle">公钥、计数器</text>
+  <path class="edge" d="M245 210H570"/><path class="edge" d="M770 210H820"/><path class="edge" d="M1015 210H1055"/><path class="edge" d="M920 255V300H367V265"/><path class="edge" d="M257 255V315"/><path class="edge" d="M450 372H795"/><path class="edge" d="M770 210H1345"/><path class="edge dash" d="M1215 210H1565"/><path class="edge dash" d="M970 385H1455"/>
+  <text class="label" x="1015" y="292">publicKey + flow token</text><text class="label" x="560" y="358">attestation + 防伪令牌</text>
+  <line x1="55" y1="500" x2="1745" y2="500" stroke="#c5ced6" stroke-width="2"/>
+  <text class="h" x="55" y="550">登录与 SSO / OIDC</text>
+  <rect class="node client" x="65" y="590" width="385" height="100"/><text class="t" x="257" y="628" text-anchor="middle">登录页</text><text class="s" x="257" y="658" text-anchor="middle">密码输入或 Sign in with a passkey</text>
+  <rect class="node client" x="65" y="755" width="385" height="100"/><text class="t" x="257" y="793" text-anchor="middle">navigator.credentials.get</text><text class="s" x="257" y="823" text-anchor="middle">选择发现凭据并签名</text>
+  <rect class="node service" x="575" y="590" width="180" height="100"/><text class="t" x="665" y="628" text-anchor="middle">密码登录</text><text class="s" x="665" y="658" text-anchor="middle">密码 / 可选 TOTP</text>
+  <rect class="node service" x="805" y="590" width="185" height="100"/><text class="t" x="897" y="628" text-anchor="middle">断言选项</text><text class="s" x="897" y="658" text-anchor="middle">PasskeyOptions</text>
+  <rect class="node service" x="1040" y="590" width="175" height="100"/><text class="t" x="1127" y="628" text-anchor="middle">验证 assertion</text><text class="s" x="1127" y="658" text-anchor="middle">PasskeyVerify</text>
+  <rect class="node service" x="800" y="785" width="200" height="100"/><text class="t" x="900" y="823" text-anchor="middle">创建 SSO 会话</text><text class="s" x="900" y="853" text-anchor="middle">认证 Cookie</text>
+  <rect class="node store" x="1350" y="590" width="170" height="100"/><text class="t" x="1435" y="628" text-anchor="middle">credentials</text><text class="s" x="1435" y="658" text-anchor="middle">公钥、signCount</text>
+  <rect class="node store" x="1570" y="590" width="170" height="100"/><text class="t" x="1655" y="628" text-anchor="middle">challenges</text><text class="s" x="1655" y="658" text-anchor="middle">一次性消费</text>
+  <rect class="node store" x="1350" y="785" width="170" height="100"/><text class="t" x="1435" y="823" text-anchor="middle">SSO sessions</text><text class="s" x="1435" y="853" text-anchor="middle">sid</text>
+  <rect class="node client" x="1570" y="785" width="170" height="100"/><text class="t" x="1655" y="823" text-anchor="middle">OIDC 客户端</text><text class="s" x="1655" y="853" text-anchor="middle">authorize / code</text>
+  <path class="edge" d="M450 640H570"/><path class="edge" d="M450 640H800"/><path class="edge dash" d="M990 640H1565"/><path class="edge" d="M897 690V725H257V750"/><path class="edge" d="M450 805H1035"/><path class="edge" d="M755 640V735H900V780"/><path class="edge" d="M1215 640H1345"/><path class="edge dash" d="M1215 640H1345"/><path class="edge" d="M1127 690V735H900V780"/><path class="edge" d="M1000 835H1345"/><path class="edge" d="M1000 835H1565"/>
+  <text class="label" x="505" y="620">账号密码</text><text class="label" x="580" y="725">publicKey + flow token</text><text class="label" x="560" y="792">assertion + 防伪令牌</text><text class="label" x="1110" y="820">Cookie / amr=webauthn</text>
+</svg>

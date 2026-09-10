@@ -14,9 +14,12 @@ namespace NexusAuth.Host.Pages.Account;
 public sealed class RegisterModel(
     IUserService userService,
     IAntiforgery antiforgery,
-    IOptions<SelfRegistrationOptions> selfRegistrationOptions) : PageModel
+    WebAuthnEnrollmentStateProtector enrollmentStateProtector,
+    IOptions<SelfRegistrationOptions> selfRegistrationOptions,
+    IOptions<WebAuthnOptions> webAuthnOptions) : PageModel
 {
     private readonly SelfRegistrationOptions selfRegistration = selfRegistrationOptions.Value;
+    private readonly WebAuthnOptions webAuthn = webAuthnOptions.Value;
 
     [BindProperty]
     [Required(ErrorMessage = "请输入登录账号。")]
@@ -88,14 +91,21 @@ public sealed class RegisterModel(
 
         try
         {
-            await userService.RegisterAsync(
+            var userId = await userService.RegisterAsync(
                 Username.Trim(),
                 Password,
                 Nickname.Trim(),
                 Email.Trim(),
                 ct: ct);
 
-            return RedirectToPage("/Account/Login", new { ReturnUrl, registered = "1" });
+            // Passkey 关闭时账号注册已经完成，直接回到原授权流程或登录页。
+            if (!webAuthn.Enabled)
+                return GetPostRegistrationRedirect();
+
+            var enrollmentToken = enrollmentStateProtector.Protect(
+                new WebAuthnEnrollmentState(userId, ReturnUrl),
+                TimeSpan.FromMinutes(15));
+            return RedirectToPage("/Account/PasskeyEnrollment", new { token = enrollmentToken });
         }
         catch (InvalidOperationException exception)
         {
@@ -116,6 +126,11 @@ public sealed class RegisterModel(
             ? returnUrl
             : null;
     }
+
+    private IActionResult GetPostRegistrationRedirect() =>
+        !string.IsNullOrWhiteSpace(ReturnUrl)
+            ? Redirect(ReturnUrl)
+            : RedirectToPage("/Account/Login", new { registered = 1 });
 
     private void ClearPasswords()
     {

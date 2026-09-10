@@ -1,4 +1,7 @@
 using System.Security.Claims;
+using System.Text.Json;
+using Fido2NetLib;
+using Fido2NetLib.Objects;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -6,9 +9,11 @@ using Microsoft.Extensions.Options;
 using NexusAuth.Application.Services;
 using NexusAuth.Application.Services.LoginAudits;
 using NexusAuth.Application.Services.Security;
+using NexusAuth.Application.Services.WebAuthn;
 using NexusAuth.Application.Users;
 using NexusAuth.Host.Authentication;
 using NexusAuth.Domain.AggregateRoots.Users;
+using NexusAuth.Domain.Entities;
 using NexusAuth.Domain.Repositories;
 
 namespace NexusAuth.Host.Pages.Account;
@@ -26,7 +31,10 @@ public class LoginModel(
     IOptions<SliderCaptchaOptions> sliderCaptchaOptions,
     IOptions<LoginFlowOptions> flowOptions,
     IOptions<LoginPageOptions> loginPageOptions,
-    IOptions<SelfRegistrationOptions> selfRegistrationOptions) : PageModel
+    IOptions<SelfRegistrationOptions> selfRegistrationOptions,
+    Fido2 fido2,
+    IWebAuthnService webAuthnService,
+    IOptions<WebAuthnOptions> webAuthnOptions) : PageModel
 {
     private const string AuthTimeClaimType = "auth_time";
     private const string AmrClaimType = "amr";
@@ -35,10 +43,13 @@ public class LoginModel(
     private readonly LoginFlowOptions _flowOptions = flowOptions.Value;
     private readonly SliderCaptchaOptions _sliderCaptchaOptions = sliderCaptchaOptions.Value;
     private readonly SelfRegistrationOptions _selfRegistrationOptions = selfRegistrationOptions.Value;
+    private readonly WebAuthnOptions _webAuthnOptions = webAuthnOptions.Value;
 
     public LoginPageOptions LoginPage { get; } = loginPageOptions.Value;
 
     public bool SelfRegistrationEnabled => _selfRegistrationOptions.Enabled;
+
+    public bool PasskeyEnabled => _webAuthnOptions.Enabled;
 
     [BindProperty(SupportsGet = true)]
     public string? ReturnUrl { get; set; }
@@ -87,6 +98,8 @@ public class LoginModel(
     /// </summary>
     public async Task<IActionResult> OnGetAsync()
     {
+        Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+        Response.Headers.Pragma = "no-cache";
         // If user is already authenticated, redirect back immediately
         if (User.Identity?.IsAuthenticated == true)
         {
@@ -229,6 +242,97 @@ public class LoginModel(
         return await CompleteLoginAsync(user, flowState.RememberMe, authenticatedAt, "pwd otp");
     }
 
+    public async Task<IActionResult> OnPostPasskeyOptionsAsync(
+        [FromBody] PasskeyAuthenticationOptionsRequest request,
+        CancellationToken ct)
+    {
+        if (!PasskeyEnabled)
+            return NotFound();
+
+        var options = fido2.GetAssertionOptions(new GetAssertionOptionsParams
+        {
+            // Empty allowCredentials requests a discoverable credential and
+            // lets the platform picker identify the account.
+            AllowedCredentials = [],
+            UserVerification = _webAuthnOptions.UserVerification,
+        });
+        var flowToken = await webAuthnService.CreateAuthenticationChallengeAsync(
+            JsonSerializer.Serialize(options),
+            GetLocalReturnUrl(request.ReturnUrl),
+            request.RememberMe && _flowOptions.AllowRememberMe,
+            DateTimeOffset.UtcNow.AddSeconds(_webAuthnOptions.ChallengeLifetimeSeconds),
+            ct);
+
+        return new JsonResult(new { flowToken, publicKey = options });
+    }
+
+    public async Task<IActionResult> OnPostPasskeyVerifyAsync(
+        [FromBody] PasskeyAuthenticationVerificationRequest request,
+        CancellationToken ct)
+    {
+        if (!PasskeyEnabled)
+            return NotFound();
+
+        var state = await webAuthnService.ConsumeAuthenticationChallengeAsync(
+            request.FlowToken,
+            DateTimeOffset.UtcNow,
+            ct);
+        if (state is null)
+            return BadRequest(new { error = "invalid_challenge", error_description = "The passkey request expired or was already used." });
+
+        var credential = await webAuthnService.FindCredentialAsync(request.Credential.RawId, ct);
+        if (credential is null || !credential.IsEnabled)
+            return JsonUnauthorized("This passkey is unavailable.");
+
+        var user = await userService.FindByIdAsync(credential.UserId, ct);
+        if (user is null || !user.IsActive || !securityPolicyService.CheckUser(user).IsSuccess)
+            return JsonUnauthorized("This passkey is unavailable.");
+
+        var options = JsonSerializer.Deserialize<AssertionOptions>(state.OptionsJson);
+        if (options is null)
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "server_error" });
+
+        try
+        {
+            var result = await fido2.MakeAssertionAsync(new MakeAssertionParams
+            {
+                AssertionResponse = request.Credential,
+                OriginalOptions = options,
+                StoredPublicKey = credential.PublicKeyCose,
+                StoredSignatureCounter = credential.SignatureCounter,
+                IsUserHandleOwnerOfCredentialIdCallback = (input, _) => Task.FromResult(
+                    input.UserHandle.SequenceEqual(user.Id.ToByteArray())
+                    && input.CredentialId.SequenceEqual(credential.CredentialId)),
+            }, ct);
+
+            await webAuthnService.CompleteAuthenticationAsync(
+                state,
+                credential,
+                result.SignCount,
+                result.IsBackedUp,
+                DateTimeOffset.UtcNow,
+                ct);
+        }
+        catch (Fido2VerificationException exception)
+        {
+            Username = user.Username;
+            await RecordLoginAsync(user.Id, false, "InvalidPasskey");
+            return JsonUnauthorized(exception.Message);
+        }
+        catch (InvalidOperationException)
+        {
+            Username = user.Username;
+            await RecordLoginAsync(user.Id, false, "PasskeyCounterRegression");
+            return JsonUnauthorized("The passkey could not be verified.");
+        }
+
+        ReturnUrl = state.ReturnUrl;
+        Username = user.Username;
+        var resultRedirect = await CompleteLoginAsync(user, state.RememberMe, DateTimeOffset.UtcNow, "webauthn");
+        var redirectUrl = resultRedirect is RedirectResult redirect ? redirect.Url : "/account";
+        return new JsonResult(new { redirectUrl });
+    }
+
     private async Task<IActionResult> CompleteLoginAsync(
         User user,
         bool rememberMe,
@@ -253,9 +357,11 @@ public class LoginModel(
             // 中文注释：记录认证时间与认证方式，供 OIDC 的 max_age、auth_time、amr、acr 扩展使用。
             new(AuthTimeClaimType, authenticatedAt.ToUnixTimeSeconds().ToString()),
             new(AmrClaimType, authenticationMethods),
-            new(AcrClaimType, authenticationMethods.Contains("otp", StringComparison.Ordinal)
-                ? "urn:nexusauth:acr:mfa"
-                : "urn:nexusauth:acr:pwd"),
+            new(AcrClaimType, authenticationMethods.Contains("webauthn", StringComparison.Ordinal)
+                ? "urn:nexusauth:acr:webauthn-uv"
+                : authenticationMethods.Contains("otp", StringComparison.Ordinal)
+                    ? "urn:nexusauth:acr:mfa"
+                    : "urn:nexusauth:acr:pwd"),
         };
 
         var identity = new ClaimsIdentity(claims, AppWebModule.AuthenticationScheme);
@@ -353,4 +459,14 @@ public class LoginModel(
             return null;
         }
     }
+
+    private string? GetLocalReturnUrl(string? returnUrl) => !string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl)
+        ? returnUrl
+        : null;
+
+    private static JsonResult JsonUnauthorized(string description) => new(
+        new { error = "invalid_credential", error_description = description })
+    {
+        StatusCode = StatusCodes.Status401Unauthorized,
+    };
 }

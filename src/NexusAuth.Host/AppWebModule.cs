@@ -10,6 +10,7 @@ using NexusAuth.Host.Authentication;
 using Microsoft.Extensions.Options;
 using NexusAuth.Application.Users;
 using System.Threading.RateLimiting;
+using Fido2NetLib;
 
 namespace NexusAuth.Host;
 
@@ -36,6 +37,10 @@ public class AppWebModule : LuckAppModule
             .PostConfigure(options => options.ApplyDefaults())
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<LoginFlowOptions>, LoginFlowOptionsValidator>();
+        services.AddOptions<WebAuthnOptions>()
+            .Bind(configuration.GetSection(WebAuthnOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<WebAuthnOptions>, WebAuthnOptionsValidator>();
         services.AddOptions<LoginPageOptions>()
             .Bind(configuration.GetSection(LoginPageOptions.SectionName))
             .ValidateOnStart();
@@ -43,6 +48,18 @@ public class AppWebModule : LuckAppModule
             .Bind(configuration.GetSection(SelfRegistrationOptions.SectionName))
             .ValidateOnStart();
         services.AddSingleton<LoginFlowStateProtector>();
+        services.AddSingleton<WebAuthnEnrollmentStateProtector>();
+        services.AddScoped<IWebSignInService, WebSignInService>();
+        services.AddSingleton<Fido2>(serviceProvider =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<WebAuthnOptions>>().Value;
+            return new Fido2(new Fido2Configuration
+            {
+                ServerDomain = options.RelyingPartyId,
+                ServerName = options.RelyingPartyName,
+                Origins = options.Origins.ToHashSet(StringComparer.OrdinalIgnoreCase),
+            });
+        });
         services.AddOptions<SliderCaptchaOptions>()
             .Bind(configuration.GetSection(SliderCaptchaOptions.SectionName))
             .ValidateOnStart();
@@ -147,6 +164,9 @@ public class AppWebModule : LuckAppModule
     {
         if (path.StartsWithSegments("/account/login"))
             return ("login", 10);
+
+        if (path.StartsWithSegments("/account/passkey"))
+            return ("passkey", 10);
 
         if (path.StartsWithSegments("/account/register"))
             return ("registration", 5);

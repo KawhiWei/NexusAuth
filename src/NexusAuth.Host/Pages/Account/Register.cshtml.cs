@@ -13,10 +13,14 @@ namespace NexusAuth.Host.Pages.Account;
 [IgnoreAntiforgeryToken]
 public sealed class RegisterModel(
     IUserService userService,
+    IWebSignInService webSignInService,
     IAntiforgery antiforgery,
-    IOptions<SelfRegistrationOptions> selfRegistrationOptions) : PageModel
+    WebAuthnEnrollmentStateProtector enrollmentStateProtector,
+    IOptions<SelfRegistrationOptions> selfRegistrationOptions,
+    IOptions<WebAuthnOptions> webAuthnOptions) : PageModel
 {
     private readonly SelfRegistrationOptions selfRegistration = selfRegistrationOptions.Value;
+    private readonly WebAuthnOptions webAuthn = webAuthnOptions.Value;
 
     [BindProperty]
     [Required(ErrorMessage = "请输入登录账号。")]
@@ -88,14 +92,33 @@ public sealed class RegisterModel(
 
         try
         {
-            await userService.RegisterAsync(
+            var userId = await userService.RegisterAsync(
                 Username.Trim(),
                 Password,
                 Nickname.Trim(),
                 Email.Trim(),
                 ct: ct);
 
-            return RedirectToPage("/Account/Login", new { ReturnUrl, registered = "1" });
+            var user = await userService.FindByIdAsync(userId, ct)
+                ?? throw new InvalidOperationException("The registered account could not be loaded.");
+
+            // 注册表单已经验证了用户设置的密码，因此直接建立登录会话，无需再次输入密码。
+            await webSignInService.SignInAsync(
+                HttpContext,
+                user,
+                rememberMe: false,
+                DateTimeOffset.UtcNow,
+                authenticationMethods: "pwd",
+                ct);
+
+            // Passkey 关闭时账号注册已经完成，直接回到原授权流程或账号页。
+            if (!webAuthn.Enabled)
+                return GetPostRegistrationRedirect();
+
+            var enrollmentToken = enrollmentStateProtector.Protect(
+                new WebAuthnEnrollmentState(userId, ReturnUrl),
+                TimeSpan.FromMinutes(15));
+            return RedirectToPage("/Account/PasskeyEnrollment", new { token = enrollmentToken });
         }
         catch (InvalidOperationException exception)
         {
@@ -116,6 +139,11 @@ public sealed class RegisterModel(
             ? returnUrl
             : null;
     }
+
+    private IActionResult GetPostRegistrationRedirect() =>
+        !string.IsNullOrWhiteSpace(ReturnUrl)
+            ? Redirect(ReturnUrl)
+            : Redirect("/account");
 
     private void ClearPasswords()
     {

@@ -20,7 +20,7 @@ public sealed class OpenApiCredentialService(IOpenApiCredentialRepository creden
     {
         if (expiresAt is { } expiry && expiry <= DateTimeOffset.UtcNow) throw new ArgumentException("expiresAt must be in the future.");
         if (await credentialRepository.FindByNameAsync(name, ct) is not null) throw new InvalidOperationException("An Open API credential with this name already exists.");
-        var created = OpenApiCredential.Create(name, targetType, expiresAt);
+        var created = OpenApiCredential.Create(name, targetType, ToUtc(expiresAt));
         await credentialRepository.AddAsync(created.Entity, ct);
         return new(Map(created.Entity), created.Token);
     }
@@ -33,7 +33,7 @@ public sealed class OpenApiCredentialService(IOpenApiCredentialRepository creden
         if (credential is null) return null;
         var sameName = await credentialRepository.FindByNameAsync(name, ct);
         if (sameName is not null && sameName.Id != id) throw new InvalidOperationException("An Open API credential with this name already exists.");
-        credential.Update(name, expiresAt, isActive);
+        credential.Update(name, ToUtc(expiresAt), isActive);
         await credentialRepository.UpdateAsync(credential, ct);
         return Map(credential);
     }
@@ -46,4 +46,5 @@ public sealed class OpenApiCredentialService(IOpenApiCredentialRepository creden
         return true;
     }
     private static OpenApiCredentialSummary Map(OpenApiCredential item) => new(item.Id, item.Name, item.TargetType, item.Scopes, item.IsActive, item.ExpiresAt, item.LastUsedAt, item.CreatedAt, item.RevokedAt);
+    private static DateTimeOffset? ToUtc(DateTimeOffset? value) => value?.ToUniversalTime();
 }

@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using NexusAuth.Host.Authentication;
 using Xunit;
 
 namespace NexusAuth.Host.IntegrationTests;
@@ -114,6 +116,37 @@ public sealed class ProviderHostTests : IClassFixture<WebApplicationFactory<AppW
         var page = await response.Content.ReadAsStringAsync();
         Assert.Contains("/Account/Register", page);
         Assert.Contains("创建账号", page);
+    }
+
+    [Fact]
+    public async Task Login_page_hides_passkey_action_when_webauthn_is_disabled()
+    {
+        using var client = factory.CreateClient();
+
+        var page = await client.GetStringAsync("/account/login");
+
+        Assert.DoesNotContain("Sign in with a passkey", page);
+    }
+
+    [Fact]
+    public async Task Enabled_webauthn_shows_login_and_optional_enrollment_actions()
+    {
+        using var enabledFactory = factory.WithWebHostBuilder(builder =>
+            builder.UseSetting("WebAuthn:Enabled", "true"));
+        using var client = enabledFactory.CreateClient();
+
+        var loginPage = await client.GetStringAsync("/account/login");
+        Assert.Contains("Sign in with a passkey", loginPage);
+
+        var protector = enabledFactory.Services.GetRequiredService<WebAuthnEnrollmentStateProtector>();
+        var token = protector.Protect(
+            new WebAuthnEnrollmentState(Guid.NewGuid(), null),
+            TimeSpan.FromMinutes(5));
+        var enrollmentPage = await client.GetStringAsync(
+            $"/account/PasskeyEnrollment?token={Uri.EscapeDataString(token)}");
+
+        Assert.Contains("暂时跳过", enrollmentPage);
+        Assert.DoesNotContain("button.click()", enrollmentPage);
     }
 
     [Fact]

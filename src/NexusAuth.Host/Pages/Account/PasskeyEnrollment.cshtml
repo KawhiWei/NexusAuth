@@ -1,0 +1,89 @@
+@page
+@model NexusAuth.Host.Pages.Account.PasskeyEnrollmentModel
+@{ Layout = null; }
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>创建 Passkey - WebAuthn NexusAuth</title>
+    <style>
+        :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #f8fafc; color: #102030; }
+        body { display: grid; min-height: 100dvh; margin: 0; place-items: center; }
+        main { width: min(calc(100% - 48px), 460px); }
+        h1 { margin: 0; font-size: 30px; } p { color: #627282; line-height: 1.55; }
+        button { width: 100%; min-height: 50px; border: 0; border-radius: 6px; color: white; background: #2f8fe5; cursor: pointer; font: inherit; font-weight: 700; }
+        .skip { display: flex; min-height: 44px; align-items: center; justify-content: center; margin-top: 10px; color: #526577; font-size: 14px; font-weight: 600; text-decoration: none; }
+        .skip:hover { color: #102030; text-decoration: underline; }
+        button:disabled { cursor: wait; opacity: .65; } .error { display: none; margin-top: 16px; color: #9f1239; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <main>
+        @Html.AntiForgeryToken()
+        <h1>创建你的 Passkey</h1>
+        <p>使用设备的指纹、面容或屏幕锁定方式完成创建。Passkey 不会将你的生物识别信息发送给 NexusAuth。</p>
+        <button id="create-passkey" type="button">创建 Passkey</button>
+        <a class="skip" href="@Model.SkipUrl">暂时跳过</a>
+        <p id="error" class="error" role="alert"></p>
+    </main>
+    <script>
+        const enrollmentToken = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Token));
+        const button = document.getElementById('create-passkey');
+        const error = document.getElementById('error');
+
+        function decode(value) {
+            const padded = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
+            const binary = atob(padded);
+            return Uint8Array.from(binary, character => character.charCodeAt(0));
+        }
+        function encode(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            bytes.forEach(value => binary += String.fromCharCode(value));
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+        }
+        function createOptions(options) {
+            options.challenge = decode(options.challenge);
+            options.user.id = decode(options.user.id);
+            if (options.excludeCredentials) options.excludeCredentials.forEach(item => item.id = decode(item.id));
+            return options;
+        }
+        function serializeCreation(credential) {
+            return {
+                id: credential.id,
+                rawId: encode(credential.rawId),
+                type: credential.type,
+                response: {
+                    attestationObject: encode(credential.response.attestationObject),
+                    clientDataJSON: encode(credential.response.clientDataJSON),
+                    transports: credential.response.getTransports ? credential.response.getTransports() : []
+                },
+                clientExtensionResults: credential.getClientExtensionResults()
+            };
+        }
+        async function post(url, body) {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'RequestVerificationToken': token }, body: JSON.stringify(body) });
+            const responseText = await response.text();
+            let payload;
+            try { payload = responseText ? JSON.parse(responseText) : null; } catch (_) { payload = null; }
+            if (!response.ok) throw new Error(payload?.error_description || `Passkey request failed (${response.status}). Reload this page and try again.`);
+            if (!payload) throw new Error('Passkey request returned an empty response. Reload this page and try again.');
+            return payload;
+        }
+        button.addEventListener('click', async () => {
+            if (!window.PublicKeyCredential) { error.textContent = '当前浏览器不支持 Passkey。'; error.style.display = 'block'; return; }
+            button.disabled = true; error.style.display = 'none';
+            try {
+                const start = await post('/account/PasskeyEnrollment?handler=Options', { enrollmentToken });
+                const credential = await navigator.credentials.create({ publicKey: createOptions(start.publicKey) });
+                const complete = await post('/account/PasskeyEnrollment?handler=Verify', { flowToken: start.flowToken, credential: serializeCreation(credential), displayName: 'Passkey' });
+                window.location.assign(complete.redirectUrl);
+            } catch (exception) {
+                error.textContent = exception.message || '无法创建 Passkey。'; error.style.display = 'block'; button.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

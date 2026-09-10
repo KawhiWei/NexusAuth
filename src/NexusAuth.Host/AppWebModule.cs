@@ -49,6 +49,7 @@ public class AppWebModule : LuckAppModule
             .ValidateOnStart();
         services.AddSingleton<LoginFlowStateProtector>();
         services.AddSingleton<WebAuthnEnrollmentStateProtector>();
+        services.AddScoped<IWebSignInService, WebSignInService>();
         services.AddSingleton<Fido2>(serviceProvider =>
         {
             var options = serviceProvider.GetRequiredService<IOptions<WebAuthnOptions>>().Value;

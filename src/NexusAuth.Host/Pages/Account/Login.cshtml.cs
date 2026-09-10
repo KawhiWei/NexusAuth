@@ -1,8 +1,6 @@
-using System.Security.Claims;
 using System.Text.Json;
 using Fido2NetLib;
 using Fido2NetLib.Objects;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Options;
@@ -20,7 +18,7 @@ namespace NexusAuth.Host.Pages.Account;
 
 public class LoginModel(
     IUserService userService,
-    ISsoSessionService sessionService,
+    IWebSignInService webSignInService,
     ILoginAuditService loginAuditService,
     ISecurityPolicyService securityPolicyService,
     ITotpService totpService,
@@ -36,10 +34,6 @@ public class LoginModel(
     IWebAuthnService webAuthnService,
     IOptions<WebAuthnOptions> webAuthnOptions) : PageModel
 {
-    private const string AuthTimeClaimType = "auth_time";
-    private const string AmrClaimType = "amr";
-    private const string AcrClaimType = "acr";
-
     private readonly LoginFlowOptions _flowOptions = flowOptions.Value;
     private readonly SliderCaptchaOptions _sliderCaptchaOptions = sliderCaptchaOptions.Value;
     private readonly SelfRegistrationOptions _selfRegistrationOptions = selfRegistrationOptions.Value;
@@ -339,38 +333,15 @@ public class LoginModel(
         DateTimeOffset authenticatedAt,
         string authenticationMethods)
     {
-        var issuedAt = DateTimeOffset.UtcNow;
-        var authProperties = _flowOptions.CreateAuthenticationProperties(rememberMe, issuedAt);
-        var sessionId = await sessionService.CreateAsync(
-            user.Id,
-            authProperties.ExpiresUtc!.Value - issuedAt,
-            HttpContext.RequestAborted);
         Username = user.Username;
         await RecordLoginAsync(user.Id, true, null);
-
-        // Build claims and sign in
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(ClaimTypes.Name, user.Username),
-            new("sid", sessionId.ToString()),
-            // 中文注释：记录认证时间与认证方式，供 OIDC 的 max_age、auth_time、amr、acr 扩展使用。
-            new(AuthTimeClaimType, authenticatedAt.ToUnixTimeSeconds().ToString()),
-            new(AmrClaimType, authenticationMethods),
-            new(AcrClaimType, authenticationMethods.Contains("webauthn", StringComparison.Ordinal)
-                ? "urn:nexusauth:acr:webauthn-uv"
-                : authenticationMethods.Contains("otp", StringComparison.Ordinal)
-                    ? "urn:nexusauth:acr:mfa"
-                    : "urn:nexusauth:acr:pwd"),
-        };
-
-        var identity = new ClaimsIdentity(claims, AppWebModule.AuthenticationScheme);
-        var principal = new ClaimsPrincipal(identity);
-
-        await HttpContext.SignInAsync(
-            AppWebModule.AuthenticationScheme,
-            principal,
-            authProperties);
+        await webSignInService.SignInAsync(
+            HttpContext,
+            user,
+            rememberMe,
+            authenticatedAt,
+            authenticationMethods,
+            HttpContext.RequestAborted);
 
         if (!string.IsNullOrWhiteSpace(ReturnUrl) && Url.IsLocalUrl(ReturnUrl))
             return Redirect(ReturnUrl);

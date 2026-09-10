@@ -13,6 +13,7 @@ namespace NexusAuth.Host.Pages.Account;
 [IgnoreAntiforgeryToken]
 public sealed class RegisterModel(
     IUserService userService,
+    IWebSignInService webSignInService,
     IAntiforgery antiforgery,
     WebAuthnEnrollmentStateProtector enrollmentStateProtector,
     IOptions<SelfRegistrationOptions> selfRegistrationOptions,
@@ -98,7 +99,19 @@ public sealed class RegisterModel(
                 Email.Trim(),
                 ct: ct);
 
-            // Passkey 关闭时账号注册已经完成，直接回到原授权流程或登录页。
+            var user = await userService.FindByIdAsync(userId, ct)
+                ?? throw new InvalidOperationException("The registered account could not be loaded.");
+
+            // 注册表单已经验证了用户设置的密码，因此直接建立登录会话，无需再次输入密码。
+            await webSignInService.SignInAsync(
+                HttpContext,
+                user,
+                rememberMe: false,
+                DateTimeOffset.UtcNow,
+                authenticationMethods: "pwd",
+                ct);
+
+            // Passkey 关闭时账号注册已经完成，直接回到原授权流程或账号页。
             if (!webAuthn.Enabled)
                 return GetPostRegistrationRedirect();
 
@@ -130,7 +143,7 @@ public sealed class RegisterModel(
     private IActionResult GetPostRegistrationRedirect() =>
         !string.IsNullOrWhiteSpace(ReturnUrl)
             ? Redirect(ReturnUrl)
-            : RedirectToPage("/Account/Login", new { registered = 1 });
+            : Redirect("/account");
 
     private void ClearPasswords()
     {

@@ -16,19 +16,20 @@ Passkey 的私钥、生物识别模板和解锁信息均保留在用户的设备
 ## 账号注册与创建 Passkey
 
 1. 用户访问 `/Account/Register`，提交账号、昵称、邮箱和密码。
-2. `RegisterModel.OnPostAsync` 创建普通 NexusAuth 账号，然后生成有效期 15 分钟的受保护 enrollment token，并重定向到：
+2. `RegisterModel.OnPostAsync` 创建普通 NexusAuth 账号，通过 `IWebSignInService` 建立 SSO Session 并签发认证 Cookie。用户从此时起已经登录，不需要再次输入密码。
+3. Passkey 开启时，服务端生成有效期 15 分钟的受保护 enrollment token，并重定向到：
 
    ```text
    /Account/PasskeyEnrollment?token=...
    ```
 
-3. 创建页由用户选择 **创建 Passkey** 或 **暂时跳过**，不会自动弹出系统认证器。跳过后账号仍可使用密码登录。
-4. 浏览器向 `/account/PasskeyEnrollment?handler=Options` 发起 JSON `POST`；请求携带 enrollment token 和 Razor 防伪令牌 `RequestVerificationToken`。
-5. `PasskeyEnrollmentModel.OnPostOptionsAsync` 验证 enrollment token 和用户状态，排除已有凭据，为当前用户创建 `CredentialCreateOptions`。选项和随机 flow token 会写入 `webauthn_challenges`。
-6. 浏览器把 Base64URL 编码的数据还原为二进制，调用 `navigator.credentials.create({ publicKey })`。系统会显示指纹、面容或屏幕锁定对话框。
-7. 浏览器向 `/account/PasskeyEnrollment?handler=Verify` 提交 attestation、flow token 和防伪令牌。
-8. 服务端原子消费 challenge，用 Fido2NetLib 验证 attestation；验证成功后将 Credential ID、公钥 COSE、签名计数器、AAGUID、传输方式和备份状态保存到 `webauthn_credentials`。
-9. 页面跳转到 `/account/login?passkeyRegistered=1`，账号此时既可密码登录，也可 Passkey 登录。
+4. 创建页由用户选择 **创建 Passkey** 或 **暂时跳过**，不会自动弹出系统认证器。跳过后直接进入原授权流程或 `/account`，登录状态保持不变。
+5. 浏览器向 `/account/PasskeyEnrollment?handler=Options` 发起 JSON `POST`；请求携带 enrollment token 和 Razor 防伪令牌 `RequestVerificationToken`。
+6. `PasskeyEnrollmentModel.OnPostOptionsAsync` 验证 enrollment token 和用户状态，排除已有凭据，为当前用户创建 `CredentialCreateOptions`。选项和随机 flow token 会写入 `webauthn_challenges`。
+7. 浏览器把 Base64URL 编码的数据还原为二进制，调用 `navigator.credentials.create({ publicKey })`。系统会显示指纹、面容或屏幕锁定对话框。
+8. 浏览器向 `/account/PasskeyEnrollment?handler=Verify` 提交 attestation、flow token 和防伪令牌。
+9. 服务端原子消费 challenge，用 Fido2NetLib 验证 attestation；验证成功后将 Credential ID、公钥 COSE、签名计数器、AAGUID、传输方式和备份状态保存到 `webauthn_credentials`。
+10. 页面进入原授权流程或 `/account`。账号此时既可密码登录，也可 Passkey 登录。
 
 注册后创建 Passkey 是当前唯一的建档路径。因此一个完全不存在的账号，不能直接通过登录页的 Passkey 按钮注册；必须先完成普通注册。这样能保证账号的用户名、邮箱和初始身份验证责任明确。
 

@@ -21,7 +21,7 @@ public sealed class PasskeyEnrollmentModel(
     [BindProperty(SupportsGet = true)]
     public string? Token { get; set; }
 
-    public string SkipUrl { get; private set; } = "/account/login";
+    public string SkipUrl { get; private set; } = "/account";
 
     public IActionResult OnGet()
     {
@@ -118,12 +118,12 @@ public sealed class PasskeyEnrollmentModel(
 
         var redirectUrl = !string.IsNullOrWhiteSpace(state.ReturnUrl) && Url.IsLocalUrl(state.ReturnUrl)
             ? state.ReturnUrl
-            : "/account/login?passkeyRegistered=1";
+            : "/account?passkeyRegistered=1";
         return new JsonResult(new { redirectUrl });
     }
 
     private string GetPostRegistrationUrl(string? returnUrl) =>
         !string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl)
             ? returnUrl
-            : Url.Page("/Account/Login", new { registered = 1 }) ?? "/account/login";
+            : "/account";
 }

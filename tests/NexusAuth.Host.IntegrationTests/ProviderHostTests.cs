@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.DependencyInjection;
-using NexusAuth.Host.Authentication;
 using Xunit;
 
 namespace NexusAuth.Host.IntegrationTests;
@@ -129,24 +127,29 @@ public sealed class ProviderHostTests : IClassFixture<WebApplicationFactory<AppW
     }
 
     [Fact]
-    public async Task Enabled_webauthn_shows_login_and_optional_enrollment_actions()
+    public async Task Enabled_webauthn_shows_passkey_login_action()
     {
         using var enabledFactory = factory.WithWebHostBuilder(builder =>
             builder.UseSetting("WebAuthn:Enabled", "true"));
         using var client = enabledFactory.CreateClient();
 
         var loginPage = await client.GetStringAsync("/account/login");
+
         Assert.Contains("Sign in with a passkey", loginPage);
+    }
 
-        var protector = enabledFactory.Services.GetRequiredService<WebAuthnEnrollmentStateProtector>();
-        var token = protector.Protect(
-            new WebAuthnEnrollmentState(Guid.NewGuid(), null),
-            TimeSpan.FromMinutes(5));
-        var enrollmentPage = await client.GetStringAsync(
-            $"/account/PasskeyEnrollment?token={Uri.EscapeDataString(token)}");
+    [Fact]
+    public async Task Passkey_enrollment_requires_an_authenticated_session()
+    {
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+        });
 
-        Assert.Contains("暂时跳过", enrollmentPage);
-        Assert.DoesNotContain("button.click()", enrollmentPage);
+        var response = await client.GetAsync("/account/PasskeyEnrollment?token=invalid");
+
+        Assert.Equal(System.Net.HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/account/login", response.Headers.Location?.AbsolutePath);
     }
 
     [Fact]

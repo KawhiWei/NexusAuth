@@ -346,4 +346,53 @@ CREATE UNIQUE INDEX ix_open_api_credentials_name
 CREATE UNIQUE INDEX ix_open_api_credentials_token_hash
     ON nexusauth.open_api_credentials (token_hash);
 
+-- ============================================================
+-- webauthn_credentials
+-- Passkey 私钥始终保留在认证器中；服务端只保存凭据 ID、公钥和防克隆计数器。
+-- ============================================================
+CREATE TABLE nexusauth.webauthn_credentials (
+    id                  uuid         NOT NULL,
+    user_id             uuid         NOT NULL REFERENCES nexusauth.users(id) ON DELETE CASCADE,
+    credential_id       bytea        NOT NULL,
+    public_key_cose     bytea        NOT NULL,
+    signature_counter   bigint       NOT NULL DEFAULT 0,
+    aaguid              uuid         NOT NULL,
+    transports          jsonb        NOT NULL DEFAULT '[]'::jsonb,
+    is_backup_eligible  boolean      NOT NULL,
+    is_backed_up        boolean      NOT NULL,
+    display_name        varchar(128) NOT NULL,
+    created_at          timestamptz  NOT NULL,
+    last_used_at        timestamptz,
+    disabled_at         timestamptz,
+    CONSTRAINT pk_webauthn_credentials PRIMARY KEY (id),
+    CONSTRAINT ux_webauthn_credentials_credential_id UNIQUE (credential_id)
+);
+
+CREATE INDEX ix_webauthn_credentials_user_enabled
+    ON nexusauth.webauthn_credentials (user_id, disabled_at);
+
+-- ============================================================
+-- webauthn_challenges
+-- 注册和认证过程中的短期一次性状态，只保存 flow token 的 SHA-256 哈希。
+-- ============================================================
+CREATE TABLE nexusauth.webauthn_challenges (
+    id           uuid        NOT NULL,
+    token_hash   varchar(64) NOT NULL,
+    purpose      varchar(32) NOT NULL,
+    user_id      uuid REFERENCES nexusauth.users(id) ON DELETE CASCADE,
+    options_json jsonb       NOT NULL,
+    return_url   text,
+    remember_me  boolean     NOT NULL DEFAULT false,
+    expires_at   timestamptz NOT NULL,
+    consumed_at  timestamptz,
+    created_at   timestamptz NOT NULL,
+    CONSTRAINT pk_webauthn_challenges PRIMARY KEY (id),
+    CONSTRAINT ux_webauthn_challenges_token_hash UNIQUE (token_hash),
+    CONSTRAINT ck_webauthn_challenges_purpose
+        CHECK (purpose IN ('registration', 'authentication'))
+);
+
+CREATE INDEX ix_webauthn_challenges_purpose_expiry
+    ON nexusauth.webauthn_challenges (purpose, expires_at);
+
 COMMIT;

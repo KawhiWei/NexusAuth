@@ -16,6 +16,8 @@ services:
       timeout: 5s
       retries: 20
       start_period: 5s
+    ports:
+      - "127.0.0.1:33210:5432"
     restart: unless-stopped
 
   sso:

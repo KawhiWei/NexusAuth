@@ -1,8 +1,6 @@
-using Luck.Framework.Infrastructure.DependencyInjectionModule;
-
 namespace NexusAuth.Application.Services.Tokens;
 
-public interface ITokenService : IScopedDependency
+public interface ITokenService
 {
     Task<string> IssueAccessTokenAsync(
         string clientId,

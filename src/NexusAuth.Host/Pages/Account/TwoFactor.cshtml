@@ -18,8 +18,14 @@
         <div><h1 id="totp-title">身份验证器</h1><p>兼容支持 TOTP 的身份验证器应用。</p></div>
         <span class="status-chip"><span class="status-dot"></span>@(Model.IsEnabled ? "保护中" : "可配置")</span>
     </div>
-    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage)) { <div class="message error" role="alert">@Model.ErrorMessage</div> }
-    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage)) { <div class="message success" role="status">@Model.StatusMessage</div> }
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="message error" role="alert">@Model.ErrorMessage</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="message success" role="status">@Model.StatusMessage</div>
+    }
 
     @if (Model.IsEnrollmentPending)
     {
@@ -60,7 +66,10 @@
                         }
                     </div>
                 }
-                @if (!Model.CanDisable) { <p>当前登录流程强制要求 TOTP，因此不能由用户自行关闭。</p> }
+                @if (!Model.CanDisable)
+                {
+                    <p>当前登录流程强制要求 TOTP，因此不能由用户自行关闭。</p>
+                }
             </div>
         }
     }

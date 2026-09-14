@@ -3,7 +3,7 @@ namespace NexusAuth.Application.Users;
 /// <summary>
 /// TOTP enrollment and verification operations used by the login flow.
 /// </summary>
-public interface ITotpService : IScopedDependency
+public interface ITotpService
 {
     Task<TotpEnrollment> BeginEnrollmentAsync(Guid userId, CancellationToken ct = default);
 

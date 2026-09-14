@@ -68,7 +68,7 @@ public class OpenIdController(
                 "urn:ietf:params:oauth:grant-type:device_code",
             },
             subject_types_supported = new[] { "public" },
-            id_token_signing_alg_values_supported = new[] { "RS256" },
+            id_token_signing_alg_values_supported = new[] { _signingCredentialsProvider.Algorithm },
             token_endpoint_auth_methods_supported = new[] { "client_secret_post", "client_secret_basic", "client_secret_jwt", "private_key_jwt" },
             token_endpoint_auth_signing_alg_values_supported = new[] { "HS256", "RS256" },
             claims_supported = new[]
@@ -90,7 +90,7 @@ public class OpenIdController(
     [HttpGet("/.well-known/jwks.json")]
     public IActionResult Jwks()
     {
-        return Ok(new { keys = new[] { _signingCredentialsProvider.GetJwk() } });
+        return Ok(new { keys = _signingCredentialsProvider.GetJwks() });
     }
 
     /// <summary>

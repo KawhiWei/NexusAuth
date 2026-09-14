@@ -12,4 +12,6 @@ public interface ITokenSigningCredentialsProvider
         string? audience = null, bool validateLifetime = true);
 
     object GetJwk();
+
+    IReadOnlyList<object> GetJwks() => [GetJwk()];
 }

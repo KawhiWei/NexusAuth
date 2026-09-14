@@ -56,6 +56,13 @@ public interface IOidcWorkbenchService
     /// <returns>中文：包含 Provider 元数据和端点的发现文档。English: The discovery document containing Provider metadata and endpoints.</returns>
     Task<DiscoveryDocument> FetchDiscoveryAsync(CancellationToken ct);
 
+    /// <summary>Validates an ID token signature and OIDC claims using Provider JWKS.</summary>
+    Task<ValidatedIdToken> ValidateIdTokenAsync(
+        DiscoveryDocument discovery,
+        string idToken,
+        string expectedNonce,
+        CancellationToken ct);
+
     /// <summary>
     /// 中文：生成符合 PKCE 要求的高强度随机 code_verifier。
     /// English: Generates a cryptographically strong PKCE code_verifier.

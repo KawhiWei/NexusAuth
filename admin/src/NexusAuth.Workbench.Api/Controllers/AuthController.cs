@@ -85,7 +85,9 @@ public class AuthController : ControllerBase
             var tokenResult = await _oidcService.ExchangeCodeAsync(code, flow.CodeVerifier, ct);
             var idToken = tokenResult.IdToken
                 ?? throw new InvalidOperationException("The authorization response did not contain an ID token.");
-            var principal = WorkbenchPrincipalFactory.Create(idToken);
+            var discovery = await _oidcService.FetchDiscoveryAsync(ct);
+            var validatedIdToken = await _oidcService.ValidateIdTokenAsync(discovery, idToken, flow.Nonce, ct);
+            var principal = WorkbenchPrincipalFactory.Create(validatedIdToken);
             var now = DateTimeOffset.UtcNow;
             var expiresAt = now.AddSeconds(tokenResult.ExpiresIn);
             var properties = new AuthenticationProperties

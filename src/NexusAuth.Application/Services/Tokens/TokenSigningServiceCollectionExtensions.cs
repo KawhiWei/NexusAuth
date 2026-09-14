@@ -14,6 +14,7 @@ public static class TokenSigningServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(configuration);
 
         services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
+        services.AddScoped<ITokenService, TokenService>();
         services.AddSingleton<ITokenSigningCredentialsProvider, RsaTokenSigningCredentialsProvider>();
         services.AddHostedService<TokenSigningCredentialsValidationHostedService>();
 

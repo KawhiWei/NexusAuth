@@ -1,14 +1,17 @@
 using System.Text.Json;
 using Fido2NetLib;
 using Fido2NetLib.Objects;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Options;
 using NexusAuth.Application.Services.WebAuthn;
 using NexusAuth.Host.Authentication;
+using System.Security.Claims;
 
 namespace NexusAuth.Host.Pages.Account;
 
+[Authorize(AuthenticationSchemes = AppWebModule.AuthenticationScheme)]
 public sealed class PasskeyEnrollmentModel(
     WebAuthnEnrollmentStateProtector enrollmentStateProtector,
     Fido2 fido2,
@@ -29,6 +32,8 @@ public sealed class PasskeyEnrollmentModel(
         Response.Headers.Pragma = "no-cache";
         if (!enrollmentStateProtector.TryUnprotect(Token, out var enrollment) || enrollment is null)
             return RedirectToPage("/Account/Register");
+        if (!IsCurrentUser(enrollment.UserId))
+            return Forbid(AppWebModule.AuthenticationScheme);
 
         SkipUrl = GetPostRegistrationUrl(enrollment.ReturnUrl);
         if (!_webAuthnOptions.Enabled)
@@ -46,6 +51,8 @@ public sealed class PasskeyEnrollmentModel(
 
         if (!enrollmentStateProtector.TryUnprotect(request.EnrollmentToken, out var enrollment) || enrollment is null)
             return BadRequest(new { error = "invalid_enrollment", error_description = "The passkey enrollment has expired. Register again." });
+        if (!IsCurrentUser(enrollment.UserId))
+            return Forbid(AppWebModule.AuthenticationScheme);
 
         var user = await userService.FindByIdAsync(enrollment.UserId, ct);
         if (user is null || !user.IsActive)
@@ -86,6 +93,8 @@ public sealed class PasskeyEnrollmentModel(
             ct);
         if (state is null || !state.UserId.HasValue)
             return BadRequest(new { error = "invalid_challenge", error_description = "The passkey request expired or was already used." });
+        if (!IsCurrentUser(state.UserId.Value))
+            return Forbid(AppWebModule.AuthenticationScheme);
 
         var options = JsonSerializer.Deserialize<CredentialCreateOptions>(state.OptionsJson);
         if (options is null)
@@ -126,4 +135,8 @@ public sealed class PasskeyEnrollmentModel(
         !string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl)
             ? returnUrl
             : "/account";
+
+    private bool IsCurrentUser(Guid userId) =>
+        Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var currentUserId)
+        && currentUserId == userId;
 }

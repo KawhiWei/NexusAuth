@@ -23,6 +23,12 @@ public class FlowState(string codeVerifier, string nonce)
     public string Nonce { get; } = nonce;
 }
 
+/// <summary>Claims extracted only after an ID token has been cryptographically validated.</summary>
+public sealed record ValidatedIdToken(
+    string Subject,
+    string? Name,
+    string? PreferredUsername);
+
 /// <summary>
 /// 中文：表示从 OpenID Provider 发现端点返回的服务地址集合。
 /// English: Represents the service endpoints returned by the OpenID Provider discovery endpoint.

@@ -5,6 +5,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.IdentityModel.Tokens;
 
 namespace NexusAuth.Extension;
 
@@ -65,6 +67,75 @@ public class OidcWorkbenchService(
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<DiscoveryDocument>(cancellationToken: ct)
             ?? throw new InvalidOperationException("Unable to load OpenID Connect discovery document.");
+    }
+
+    public async Task<ValidatedIdToken> ValidateIdTokenAsync(
+        DiscoveryDocument discovery,
+        string idToken,
+        string expectedNonce,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(discovery);
+        ArgumentException.ThrowIfNullOrWhiteSpace(idToken);
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedNonce);
+
+        if (string.IsNullOrWhiteSpace(discovery.Issuer)
+            || string.IsNullOrWhiteSpace(discovery.JwksUri))
+            throw new SecurityTokenValidationException("Provider discovery metadata is incomplete.");
+
+        var expectedIssuer = Authority.TrimEnd('/');
+        if (!string.Equals(discovery.Issuer.TrimEnd('/'), expectedIssuer, StringComparison.Ordinal))
+            throw new SecurityTokenInvalidIssuerException("Provider issuer does not match the configured authority.");
+
+        var client = httpClientFactory.CreateClient();
+        var jwksResponse = await client.GetAsync(
+            ResolveBackchannelEndpoint(discovery.JwksUri),
+            ct);
+        jwksResponse.EnsureSuccessStatusCode();
+        var jwks = new JsonWebKeySet(await jwksResponse.Content.ReadAsStringAsync(ct));
+
+        var handler = new JwtSecurityTokenHandler { MapInboundClaims = false };
+        var principal = handler.ValidateToken(
+            idToken,
+            new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuer = expectedIssuer,
+                ValidateAudience = true,
+                ValidAudience = ClientId,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKeys = jwks.GetSigningKeys(),
+                RequireSignedTokens = true,
+                ValidateLifetime = true,
+                RequireExpirationTime = true,
+                ValidAlgorithms = [SecurityAlgorithms.RsaSha256],
+                ClockSkew = TimeSpan.FromSeconds(30),
+            },
+            out var validatedToken);
+
+        if (validatedToken is not JwtSecurityToken jwt
+            || !string.Equals(jwt.Header.Alg, SecurityAlgorithms.RsaSha256, StringComparison.Ordinal))
+            throw new SecurityTokenValidationException("The ID token uses an unsupported signing algorithm.");
+
+        var nonce = principal.FindFirst("nonce")?.Value;
+        if (!FixedTimeEquals(nonce, expectedNonce))
+            throw new SecurityTokenValidationException("OIDC nonce validation failed.");
+
+        var subject = principal.FindFirst("sub")?.Value;
+        if (string.IsNullOrWhiteSpace(subject))
+            throw new SecurityTokenValidationException("The ID token does not contain a subject.");
+
+        return new ValidatedIdToken(subject, principal.FindFirst("name")?.Value, principal.FindFirst("preferred_username")?.Value);
+    }
+
+    private static bool FixedTimeEquals(string? actual, string expected)
+    {
+        if (actual is null)
+            return false;
+        var actualBytes = Encoding.UTF8.GetBytes(actual);
+        var expectedBytes = Encoding.UTF8.GetBytes(expected);
+        return actualBytes.Length == expectedBytes.Length
+            && CryptographicOperations.FixedTimeEquals(actualBytes, expectedBytes);
     }
 
     /// <inheritdoc />

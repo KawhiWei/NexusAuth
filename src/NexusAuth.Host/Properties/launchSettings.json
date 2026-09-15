@@ -4,7 +4,13 @@
       "commandName": "Project",
       "applicationUrl": "http://localhost:5100",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "NEXUSAUTH_SELF_REGISTRATION_ENABLED": "true",
+        "NEXUSAUTH_WEBAUTHN_ENABLED": "true",
+        "NEXUSAUTH_WEBAUTHN_RP_ID": "localhost",
+        "NEXUSAUTH_WEBAUTHN_RP_NAME": "NexusAuth",
+        "NEXUSAUTH_WEBAUTHN_ORIGIN": "http://localhost:5100",
+        "NEXUSAUTH_WEBAUTHN_CHALLENGE_LIFETIME_SECONDS": "300"
       }
     }
   }

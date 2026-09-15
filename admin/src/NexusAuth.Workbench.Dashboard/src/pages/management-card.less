@@ -25,7 +25,7 @@
 
 .management-card-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -190,9 +190,12 @@
 }
 
 .management-card__footer .t-space {
-  flex-wrap: nowrap;
-  justify-content: flex-end;
-  white-space: nowrap;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  row-gap: 4px;
 }
 
 .management-card__footer .t-button {
@@ -205,10 +208,6 @@
   margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid var(--app-border);
-}
-
-@media (max-width: 1360px) {
-  .management-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 1024px) {

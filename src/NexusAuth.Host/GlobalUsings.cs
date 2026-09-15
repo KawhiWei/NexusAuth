@@ -1,5 +1,4 @@
 global using ITokenSigningCredentialsProvider = NexusAuth.Application.Services.Tokens.ITokenSigningCredentialsProvider;
-global using RsaTokenSigningCredentialsProvider = NexusAuth.Application.Services.Tokens.RsaTokenSigningCredentialsProvider;
 global using NexusAuth.Application.Services.Tokens;
 global using ITokenService = NexusAuth.Application.Services.Tokens.ITokenService;
 global using JwtOptions = NexusAuth.Application.Services.Tokens.JwtOptions;

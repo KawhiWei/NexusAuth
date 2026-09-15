@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using System.Text.Json;
 using Xunit;
 
 namespace NexusAuth.Host.IntegrationTests;
@@ -24,6 +25,22 @@ public sealed class ProviderHostTests : IClassFixture<WebApplicationFactory<AppW
         var response = await client.GetAsync("/.well-known/openid-configuration");
 
         response.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task Jwks_endpoint_publishes_public_signing_keys()
+    {
+        using var client = factory.CreateClient();
+
+        using var document = JsonDocument.Parse(await client.GetStringAsync("/.well-known/jwks.json"));
+        var keys = document.RootElement.GetProperty("keys");
+
+        Assert.NotEmpty(keys.EnumerateArray());
+        foreach (var key in keys.EnumerateArray())
+        {
+            Assert.True(key.TryGetProperty("kid", out _));
+            Assert.False(key.TryGetProperty("d", out _));
+        }
     }
 
     [Fact]

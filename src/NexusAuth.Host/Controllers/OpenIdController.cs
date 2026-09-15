@@ -8,6 +8,7 @@ namespace NexusAuth.Host.Controllers;
 [ApiController]
 public class OpenIdController(
     ITokenSigningCredentialsProvider signingCredentialsProvider,
+    IIdTokenHintValidator idTokenHintValidator,
     ITokenService tokenService,
     IUserService userService,
     IClientService clientService,
@@ -16,6 +17,7 @@ public class OpenIdController(
     IOptions<JwtOptions> jwtOptions) : ControllerBase
 {
     private readonly ITokenSigningCredentialsProvider _signingCredentialsProvider = signingCredentialsProvider;
+    private readonly IIdTokenHintValidator _idTokenHintValidator = idTokenHintValidator;
     private readonly ITokenService _tokenService = tokenService;
     private readonly IUserService _userService = userService;
     private readonly IClientService _clientService = clientService;
@@ -297,14 +299,19 @@ public class OpenIdController(
     {
         if (!string.IsNullOrWhiteSpace(idTokenHint))
         {
-            var introspection = await _tokenService.IntrospectAsync(idTokenHint, ct);
-            if (!introspection.Active || !string.Equals(introspection.TokenUse, "id_token", StringComparison.Ordinal))
+            var validation = _idTokenHintValidator.Validate(idTokenHint);
+            if (!validation.IsValid)
                 return BadRequest(new { error = "invalid_request", error_description = "id_token_hint is invalid." });
 
-            if (string.IsNullOrWhiteSpace(introspection.ClientId))
-                return BadRequest(new { error = "invalid_request", error_description = "id_token_hint does not identify a client." });
+            var currentSubject = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (!string.IsNullOrWhiteSpace(currentSubject)
+                && !string.IsNullOrWhiteSpace(validation.Subject)
+                && !string.Equals(currentSubject, validation.Subject, StringComparison.Ordinal))
+            {
+                return BadRequest(new { error = "invalid_request", error_description = "id_token_hint does not match the current session." });
+            }
 
-            var clientValidation = await _clientService.AuthenticateClientForPostLogoutAsync(introspection.ClientId, postLogoutRedirectUri, ct);
+            var clientValidation = await _clientService.AuthenticateClientForPostLogoutAsync(validation.ClientId!, postLogoutRedirectUri, ct);
             if (!clientValidation.IsSuccess)
                 return BadRequest(new { error = clientValidation.ErrorCode ?? "invalid_request", error_description = clientValidation.Error });
         }

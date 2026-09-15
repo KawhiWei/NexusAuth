@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AxiosError } from 'axios';
-import { Button, Card, Dialog, Drawer, Empty, Form, Input, Loading, MessagePlugin, Pagination, Select, Space, Switch, Textarea, Tooltip } from 'tdesign-react';
-import { AddIcon, DeleteIcon, EditIcon, ErrorCircleFilledIcon, RefreshIcon, SearchIcon, ViewListIcon } from 'tdesign-icons-react';
+import { Button, Card, Descriptions, Dialog, Drawer, Empty, Form, Input, Loading, MessagePlugin, Pagination, Select, Space, Switch, Tag, Textarea, Tooltip } from 'tdesign-react';
+import type { FormInstanceFunctions } from 'tdesign-react/es/form/type';
+import { AddIcon, ApiIcon, DeleteIcon, EditIcon, ErrorCircleFilledIcon, RefreshIcon, SearchIcon, ViewListIcon } from 'tdesign-icons-react';
 import {
   createApiResource,
   deleteApiResource,
@@ -69,7 +70,7 @@ const ApiResourceManagementPage = () => {
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(defaultFilters);
   const [current, setCurrent] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(6);
   const [loading, setLoading] = useState(false);
   const [sourceData, setSourceData] = useState<ApiResource[]>([]);
   const [total, setTotal] = useState(0);
@@ -80,11 +81,12 @@ const ApiResourceManagementPage = () => {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ApiResource | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const formRef = useRef<any>(null);
+  const formRef = useRef<FormInstanceFunctions<DialogFormData> | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [detailMode, setDetailMode] = useState(false);
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [detailResource, setDetailResource] = useState<ApiResource | null>(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const filter: { keyword?: string; isActive?: boolean; page: number; pageSize: number } = { page: current, pageSize };
@@ -99,7 +101,7 @@ const ApiResourceManagementPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [appliedFilters, current, pageSize]);
 
   const refreshAfterDelete = async () => {
     if (sourceData.length === 1 && current > 1) {
@@ -111,8 +113,8 @@ const ApiResourceManagementPage = () => {
   };
 
   useEffect(() => {
-    fetchData();
-  }, [appliedFilters, current, pageSize]);
+    void fetchData();
+  }, [fetchData]);
 
   useEffect(() => {
     if (!dialogVisible || loadingDetail) {
@@ -143,28 +145,26 @@ const ApiResourceManagementPage = () => {
     setCurrent(1);
   };
 
+  const applyStatusFilter = (value: unknown) => {
+    const isActive: FilterState['isActive'] = value === true || value === false ? value : '';
+    const next = { ...filters, isActive };
+    setFilters(next);
+    setAppliedFilters(next);
+    setCurrent(1);
+  };
+
   const showDialog = () => {
     setEditingResource(null);
     setFormData(defaultFormData);
-    setDetailMode(false);
     setDialogVisible(true);
   };
 
-  const loadResourceDetail = async (row: ApiResource, readOnly: boolean) => {
+  const handleView = async (row: ApiResource) => {
+    setDetailResource(row);
+    setDetailVisible(true);
     try {
       setLoadingDetail(true);
-      setDetailMode(readOnly);
-      const detail = await getApiResource(row.id);
-      const nextFormData = {
-        name: detail.name,
-        displayName: detail.displayName,
-        audience: detail.audience,
-        description: detail.description ?? '',
-        isActive: detail.isActive,
-      };
-
-      setEditingResource(detail);
-      setFormData(nextFormData);
+      setDetailResource(await getApiResource(row.id));
     } catch (error) {
       console.error('Failed to fetch api resource detail:', error);
       MessagePlugin.error(getRequestErrorMessage(error, '加载 API 资源详情失败'));
@@ -173,19 +173,26 @@ const ApiResourceManagementPage = () => {
     }
   };
 
-  const handleView = (row: ApiResource) => {
-    void loadResourceDetail(row, true);
-  };
-
-  const handleEdit = (row: ApiResource) => {
-    void loadResourceDetail(row, false);
-  };
-
-  useEffect(() => {
-    if (!loadingDetail && editingResource) {
+  const handleEdit = async (row: ApiResource) => {
+    try {
+      setLoadingDetail(true);
+      const detail = await getApiResource(row.id);
+      setEditingResource(detail);
+      setFormData({
+        name: detail.name,
+        displayName: detail.displayName,
+        audience: detail.audience,
+        description: detail.description ?? '',
+        isActive: detail.isActive,
+      });
       setDialogVisible(true);
+    } catch (error) {
+      console.error('Failed to fetch api resource detail:', error);
+      MessagePlugin.error(getRequestErrorMessage(error, '加载 API 资源详情失败'));
+    } finally {
+      setLoadingDetail(false);
     }
-  }, [loadingDetail, editingResource]);
+  };
 
   const handleDelete = (row: ApiResource) => {
     setDeleteTarget(row);
@@ -228,7 +235,6 @@ const ApiResourceManagementPage = () => {
     setDialogVisible(false);
     setEditingResource(null);
     setFormData(defaultFormData);
-    setDetailMode(false);
   };
 
   const handleSubmit = async () => {
@@ -238,7 +244,7 @@ const ApiResourceManagementPage = () => {
     }
 
     const results = await form.validate();
-    if (results.errors && Object.keys(results.errors).length > 0) {
+    if (results !== true) {
       return;
     }
 
@@ -295,8 +301,8 @@ const ApiResourceManagementPage = () => {
         visible={Boolean(deleteTarget)}
         header="删除服务资源"
         theme="danger"
-        confirmBtn={{ content: '删除', theme: 'danger' }}
-        cancelBtn="取消"
+        confirmBtn={{ content: '删除', theme: 'danger', size: 'small' }}
+        cancelBtn={{ content: '取消', size: 'small' }}
         confirmLoading={deleting}
         onClose={() => {
           if (!deleting) {
@@ -313,9 +319,40 @@ const ApiResourceManagementPage = () => {
       </Dialog>
 
       <Drawer
+        visible={detailVisible}
+        className="api-resource-detail-drawer"
+        header="服务资源详情"
+        onClose={() => setDetailVisible(false)}
+        footer={false}
+        destroyOnClose
+        size="680px"
+      >
+        <Loading loading={loadingDetail} className="api-resource-detail-drawer__loading">
+          {detailResource && (
+            <Descriptions
+              bordered
+              colon
+              column={1}
+              layout="vertical"
+              itemLayout="horizontal"
+              size="small"
+              items={[
+                { label: '显示名称', content: detailResource.displayName },
+                { label: '服务资源 Key', content: <code>{detailResource.name}</code> },
+                { label: 'Audience', content: <code>{detailResource.audience}</code> },
+                { label: '状态', content: <Tag size="small" theme={detailResource.isActive ? 'success' : 'default'} variant="light">{detailResource.isActive ? '启用' : '停用'}</Tag> },
+                { label: '描述', content: detailResource.description || '未填写描述' },
+                { label: '创建时间', content: new Date(detailResource.createdAt).toLocaleString('zh-CN') },
+              ]}
+            />
+          )}
+        </Loading>
+      </Drawer>
+
+      <Drawer
         visible={dialogVisible}
         className="api-resource-drawer"
-        header={detailMode ? '服务资源详情' : editingResource ? '编辑服务资源' : '新增服务资源'}
+        header={editingResource ? '编辑服务资源' : '新增服务资源'}
         onClose={handleCloseDialog}
         footer={false}
         size="min(520px, 100vw)"
@@ -338,7 +375,7 @@ const ApiResourceManagementPage = () => {
             <Input
               value={formData.name}
               placeholder="如: my-api"
-              disabled={Boolean(editingResource) || detailMode}
+              disabled={Boolean(editingResource)}
               onChange={(value) => setFormData((prev) => ({ ...prev, name: value }))}
             />
           </Form.FormItem>
@@ -350,7 +387,6 @@ const ApiResourceManagementPage = () => {
             <Input
               value={formData.displayName}
               placeholder="如: 我的 API"
-              disabled={detailMode}
               onChange={(value) => setFormData((prev) => ({ ...prev, displayName: value }))}
             />
           </Form.FormItem>
@@ -363,24 +399,23 @@ const ApiResourceManagementPage = () => {
             <Input
               value={formData.audience}
               placeholder="如: my-api"
-              disabled={detailMode}
               onChange={(value) => setFormData((prev) => ({ ...prev, audience: value }))}
             />
           </Form.FormItem>
-          <Form.FormItem label="状态" name="isActive">
-            <Switch
-              key={`api-resource-active-${editingResource?.id ?? 'new'}-${String(formData.isActive)}`}
-              value={Boolean(formData.isActive)}
-              label={({ value }) => value ? '启用' : '禁用'}
-              disabled={detailMode}
-              onChange={(value) => setFormData((prev) => ({ ...prev, isActive: Boolean(value) }))}
-            />
-          </Form.FormItem>
+          {editingResource && (
+            <Form.FormItem label="状态" name="isActive">
+              <Switch
+                key={`api-resource-active-${editingResource.id}-${String(formData.isActive)}`}
+                size="small"
+                value={Boolean(formData.isActive)}
+                onChange={(value) => setFormData((prev) => ({ ...prev, isActive: Boolean(value) }))}
+              />
+            </Form.FormItem>
+          )}
           <Form.FormItem label="描述" name="description">
             <Textarea
               value={formData.description}
               placeholder="请输入描述"
-              disabled={detailMode}
               onChange={(value) => setFormData((prev) => ({ ...prev, description: value }))}
             />
           </Form.FormItem>
@@ -389,87 +424,88 @@ const ApiResourceManagementPage = () => {
           <Button variant="base" onClick={handleCloseDialog} disabled={submitting || loadingDetail}>
             取消
           </Button>
-          {detailMode ? (
-            <Button theme="primary" icon={<EditIcon />} disabled={loadingDetail} onClick={() => setDetailMode(false)}>编辑</Button>
-          ) : (
-            <Button theme="primary" loading={submitting} disabled={loadingDetail} onClick={handleSubmit}>
-              {editingResource ? '保存' : '创建'}
-            </Button>
-          )}
+          <Button theme="primary" loading={submitting} disabled={loadingDetail} onClick={handleSubmit}>
+            {editingResource ? '保存' : '创建'}
+          </Button>
         </div>
       </Drawer>
 
-      <div className="management-card-page__toolbar">
+      <div className="api-resource-page__header">
+        <div>
+          <h1>服务资源</h1>
+          <p>集中管理受保护 API 的资源标识、Audience 与启停状态</p>
+        </div>
+        <Button size="small" theme="primary" icon={<AddIcon />} onClick={showDialog}>新增资源</Button>
+      </div>
+
+      <div className="management-card-page__toolbar api-resource-page__toolbar">
         <Form layout="inline" className="api-resource-filter-form">
-          <Form.FormItem label="关键词">
+          <Form.FormItem className="api-resource-page__search">
             <Input
+              size="small"
               clearable
               value={filters.keyword}
               prefixIcon={<SearchIcon />}
-              placeholder="名称、显示名称或 Audience"
-              style={{ width: 280 }}
+              placeholder="搜索显示名称、服务资源 Key 或 Audience"
               onChange={(value) => setFilters((prev) => ({ ...prev, keyword: value }))}
+              onEnter={handleQuery}
             />
           </Form.FormItem>
           <Form.FormItem>
             <Select
+              size="small"
               value={filters.isActive}
               options={statusOptions}
-              style={{ width: 140 }}
-              onChange={(value) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  isActive: value === true || value === false ? value : '',
-                }))
-              }
+              onChange={applyStatusFilter}
             />
           </Form.FormItem>
-          <Form.FormItem>
-            <Space>
-              <Button theme="primary" icon={<SearchIcon />} onClick={handleQuery}>
-                查询
-              </Button>
-              <Button variant="outline" icon={<RefreshIcon />} onClick={handleReset}>
-                重置
-              </Button>
-              <Button theme="primary" icon={<AddIcon />} onClick={showDialog}>
-                新增资源
-              </Button>
-            </Space>
+          <Form.FormItem className="api-resource-page__filter-actions">
+            <Button size="small" variant="text" theme="primary" icon={<RefreshIcon />} onClick={handleReset}>重置</Button>
           </Form.FormItem>
         </Form>
       </div>
 
       <Loading loading={loading} className="management-card-page__loading">
         {sourceData.length ? (
-          <div className="management-card-grid management-card-grid--resources">
+          <div className="management-card-grid management-card-grid--resources api-resource-grid">
             {sourceData.map((resource) => (
               <Card key={resource.id} className="management-card management-card--resource" bordered>
-                <div className="management-card__header">
-                  <div className="management-card__heading">
-                    <span className="management-card__title">{resource.displayName}</span>
-                    <code className="management-card__identifier">{resource.name}</code>
+                <div className="management-card__header api-resource-card__header">
+                  <div className="api-resource-card__identity">
+                    <span className="api-resource-card__icon"><ApiIcon /></span>
+                    <div className="management-card__heading">
+                      <span className="management-card__title" title={resource.displayName}>{resource.displayName}</span>
+                      <code className="management-card__identifier" title={resource.name}>{resource.name}</code>
+                    </div>
                   </div>
-                  <Switch value={resource.isActive} loading={togglingId === resource.id} onChange={() => void handleToggleActive(resource)} />
+                  <Tooltip content={resource.isActive ? '停用服务资源' : '启用服务资源'}>
+                    <Switch size="small" value={resource.isActive} loading={togglingId === resource.id} onChange={() => void handleToggleActive(resource)} />
+                  </Tooltip>
                 </div>
-                <div className="management-card__section management-card__section--primary">
-                  <span>Scope（唯一标识）</span>
-                  <code className="management-card__scope">{resource.name}</code>
+
+                <div className="api-resource-card__rows">
+                  <div className="api-resource-card__row">
+                    <span>服务资源 Key</span>
+                    <code title={resource.name}>{resource.name}</code>
+                  </div>
+                  <div className="api-resource-card__row">
+                    <span>Audience</span>
+                    <code title={resource.audience}>{resource.audience}</code>
+                  </div>
+                  <div className="api-resource-card__row">
+                    <span>描述</span>
+                    <span className="api-resource-card__description" title={resource.description || '未填写描述'}>{resource.description || '未填写描述'}</span>
+                  </div>
+                  <div className="api-resource-card__row">
+                    <span>创建时间</span>
+                    <span>{new Date(resource.createdAt).toLocaleDateString('zh-CN')}</span>
+                  </div>
                 </div>
-                <div className="management-card__section">
-                  <span>Audience</span>
-                  <code>{resource.audience}</code>
-                </div>
-                <div className="management-card__section management-card__section--description">
-                  <span>描述</span>
-                  <p>{resource.description || '未填写描述'}</p>
-                </div>
-                <div className="management-card__footer">
-                  <Space size="small">
-                    <Button variant="text" theme="primary" icon={<ViewListIcon />} onClick={() => handleView(resource)}>详情</Button>
-                    <Button variant="text" theme="primary" icon={<EditIcon />} onClick={() => handleEdit(resource)}>编辑</Button>
-                    <Button variant="text" theme="danger" icon={<DeleteIcon />} onClick={() => void handleDelete(resource)}>删除</Button>
-                  </Space>
+
+                <div className="management-card__footer api-resource-card__footer">
+                  <Button size="small" variant="outline" icon={<EditIcon />} onClick={() => void handleEdit(resource)}>编辑</Button>
+                  <Button size="small" variant="outline" icon={<ViewListIcon />} onClick={() => void handleView(resource)}>查看详情</Button>
+                  <Button size="small" variant="outline" theme="danger" icon={<DeleteIcon />} onClick={() => handleDelete(resource)}>删除</Button>
                 </div>
               </Card>
             ))}
@@ -477,12 +513,13 @@ const ApiResourceManagementPage = () => {
         ) : <Empty description="暂无服务资源" />}
       </Loading>
 
-      <div className="management-card-page__pagination">
+      <div className="management-card-page__pagination api-resource-page__pagination">
           <Pagination
+            size="small"
             total={total}
             current={current}
             pageSize={pageSize}
-            pageSizeOptions={[10, 20, 50]}
+            pageSizeOptions={[6, 12, 24]}
             showPageSize
             showJumper
             onCurrentChange={(next) => setCurrent(next)}

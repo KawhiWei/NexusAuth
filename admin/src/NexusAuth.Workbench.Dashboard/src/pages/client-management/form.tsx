@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { AxiosError } from 'axios';
-import { AddIcon, DeleteIcon } from 'tdesign-icons-react';
-import { Button, Form, Input, MessagePlugin, Select, Switch, Tag, Textarea, Tooltip } from 'tdesign-react';
+import { AddIcon, DeleteIcon, KeyIcon } from 'tdesign-icons-react';
+import { Button, Form, Input, MessagePlugin, Popconfirm, Select, Switch, Tag, Textarea, Tooltip } from 'tdesign-react';
+import type { FormInstanceFunctions } from 'tdesign-react/es/form/type';
 import {
   createClient,
-  generateClientCredential,
   getClient,
+  resetClientCredential,
   updateClient,
   type Client,
   type CreateClientRequest,
@@ -160,7 +161,7 @@ const ClientFormPage = ({ mode }: ClientFormPageProps) => {
   const [apiResources, setApiResources] = useState<ApiResource[]>([]);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [formData, setFormData] = useState<ClientFormData>(defaultFormData);
-  const formRef = useRef<any>(null);
+  const formRef = useRef<FormInstanceFunctions<ClientFormData> | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [loadingResources, setLoadingResources] = useState(false);
@@ -351,24 +352,24 @@ const ClientFormPage = ({ mode }: ClientFormPageProps) => {
     navigate('/oauth/client-management');
   };
 
-  const handleGenerateCredential = async () => {
+  const handleResetCredential = async () => {
     if (!editingClient) {
       return;
     }
 
     try {
       setSubmitting(true);
-      const result = await generateClientCredential(editingClient.id, {
+      const result = await resetClientCredential(editingClient.id, {
         tokenEndpointAuthMethod: formData.tokenEndpointAuthMethod,
         autoGenerateJwks: formData.tokenEndpointAuthMethod === 'private_key_jwt',
       });
       setEditingClient(result.client);
       setFormData(toFormData(result.client));
       setGeneratedCredential(result.generatedCredential ?? null);
-      MessagePlugin.success('已生成新凭据');
+      MessagePlugin.success('密钥已重置');
     } catch (error) {
-      console.error('Failed to generate client credential:', error);
-      MessagePlugin.error(getRequestErrorMessage(error, '生成应用凭据失败'));
+      console.error('Failed to reset client credential:', error);
+      MessagePlugin.error(getRequestErrorMessage(error, '重置应用密钥失败'));
     } finally {
       setSubmitting(false);
     }
@@ -379,7 +380,7 @@ const ClientFormPage = ({ mode }: ClientFormPageProps) => {
     if (!form) return;
 
     const results = await form.validate();
-    if (results.errors && Object.keys(results.errors).length > 0) {
+    if (results !== true) {
       return;
     }
 
@@ -525,8 +526,15 @@ const ClientFormPage = ({ mode }: ClientFormPageProps) => {
           <div className="client-form-header__description">配置 OAuth/OIDC 应用的基础信息、授权类型、回调地址和客户端认证方式。</div>
         </div>
         <div className="client-form-header__actions">
-          {isEditMode && editingClient && (
-            <Button variant="outline" loading={submitting} onClick={handleGenerateCredential}>生成新凭据</Button>
+          {isEditMode && editingClient && formData.tokenEndpointAuthMethod !== 'none' && (
+            <Popconfirm
+              content="重置后旧密钥将立即失效，新密钥只展示一次。确定继续吗？"
+              confirmBtn={{ content: '重置', theme: 'primary', size: 'small' }}
+              cancelBtn={{ content: '取消', size: 'small' }}
+              onConfirm={() => void handleResetCredential()}
+            >
+              <Button size="small" variant="outline" icon={<KeyIcon />} loading={submitting}>重置密钥</Button>
+            </Popconfirm>
           )}
           <Button variant="outline" onClick={handleBackToList} disabled={submitting}>返回列表</Button>
         </div>

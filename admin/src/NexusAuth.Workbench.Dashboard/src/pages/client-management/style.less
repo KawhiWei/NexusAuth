@@ -271,3 +271,303 @@
     align-items: flex-end;
   }
 }
+
+.client-management-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.client-management-page__header h1,
+.client-management-page__header p {
+  margin: 0;
+}
+
+.client-management-page__header h1 {
+  color: var(--app-text);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.client-management-page__header p {
+  margin-top: 4px;
+  color: var(--app-text-secondary);
+  font-size: 14px;
+}
+
+.client-management-page__header > .t-button {
+  min-width: 112px;
+  flex: 0 0 auto;
+}
+
+.client-management-page.client-management-page .client-management-page__toolbar {
+  margin-bottom: 24px;
+  padding: 12px 16px;
+  border-radius: 6px;
+}
+
+.client-management-page__toolbar .t-form {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 12px;
+}
+
+.client-management-page__toolbar .t-form__item {
+  flex: 0 0 150px;
+}
+
+.client-management-page__toolbar .client-management-page__search {
+  flex: 0 1 520px;
+}
+
+.client-management-page__toolbar .client-management-page__auth-filter {
+  flex-basis: 190px;
+}
+
+.client-management-page__toolbar .client-management-page__filter-actions {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.client-management-page__toolbar .t-input,
+.client-management-page__toolbar .t-select {
+  width: 100%;
+}
+
+.client-management-page .management-card-grid--clients {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.client-management-page .management-card--client {
+  border-radius: 6px;
+  box-shadow: var(--td-shadow-1);
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.client-management-page .management-card--client:hover {
+  border-color: var(--app-border-strong);
+  box-shadow: var(--td-shadow-2);
+  transform: translateY(-1px);
+}
+
+.client-management-page .management-card--client .t-card__body {
+  min-height: 300px;
+  padding: 14px;
+}
+
+.client-management-page .client-management-card__header {
+  min-height: 58px;
+  align-items: flex-start;
+}
+
+.client-management-card__identity {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.client-management-card__icon {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
+  font-size: 19px;
+}
+
+.client-management-page .management-card__title {
+  color: var(--app-text);
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.client-management-page .management-card__identifier {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.client-management-page .management-card__status {
+  gap: 5px;
+}
+
+.client-management-page .management-card__status .t-tag {
+  justify-content: center;
+  min-width: 48px;
+  white-space: nowrap;
+}
+
+.client-management-card__rows {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--app-border);
+}
+
+.client-management-card__row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  min-height: 34px;
+  align-items: start;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.client-management-card__row > span:first-child {
+  color: var(--app-text-muted);
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.client-management-card__row > code,
+.client-management-card__row > .management-card__empty {
+  min-width: 0;
+  color: var(--app-text);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.client-management-card__row:nth-child(3) .client-management-card__list {
+  color: var(--app-accent) !important;
+  font-weight: 600;
+}
+
+.client-management-card__list,
+.client-management-card__callback {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--app-text) !important;
+  font-size: 12px !important;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: normal !important;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.client-management-page .client-management-card__footer {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 10px;
+}
+
+.client-management-page .client-management-card__footer > .t-button,
+.client-management-page .client-management-card__footer > .t-popup,
+.client-management-page .client-management-card__footer > .t-popup > .t-button {
+  width: 0;
+  min-width: 0;
+  flex: 1 1 0;
+  white-space: nowrap;
+}
+
+.client-management-page .client-management-card__footer .t-button {
+  justify-content: center;
+  padding-right: 6px;
+  padding-left: 6px;
+}
+
+.client-management-page.client-management-page .client-management-page__pagination {
+  margin-top: 24px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.client-management-page__pagination .t-pagination {
+  width: 100%;
+}
+
+.client-detail-drawer .t-drawer__body {
+  color: var(--app-text);
+}
+
+.client-detail-drawer__loading {
+  min-height: 240px;
+}
+
+.client-detail-drawer .t-descriptions {
+  width: 100%;
+}
+
+.client-detail-drawer .t-descriptions__label {
+  width: 132px;
+  color: var(--app-text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.client-detail-drawer .t-descriptions__content {
+  min-width: 0;
+  color: var(--app-text);
+  overflow-wrap: anywhere;
+}
+
+.client-detail-drawer code,
+.client-detail-drawer .client-management-card__list {
+  color: var(--app-text) !important;
+  font-size: 13px !important;
+  white-space: normal !important;
+}
+
+@media (max-width: 980px) {
+  .client-management-page .management-card-grid--clients {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .client-management-page__toolbar .t-form {
+    flex-wrap: wrap;
+  }
+
+  .client-management-page__toolbar .client-management-page__filter-actions {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .client-management-page__header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .client-management-page__header h1 {
+    font-size: 24px;
+  }
+
+  .client-management-page__header > .t-button {
+    width: 100%;
+  }
+
+  .client-management-page__toolbar .t-form {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .client-management-page__toolbar .t-form__item {
+    width: 100%;
+  }
+
+  .client-management-page .management-card-grid--clients {
+    grid-template-columns: 1fr;
+  }
+}

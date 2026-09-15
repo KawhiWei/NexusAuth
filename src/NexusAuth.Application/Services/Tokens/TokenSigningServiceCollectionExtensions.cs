@@ -19,6 +19,7 @@ public static class TokenSigningServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ITokenSigningKeySource, CertificateTokenSigningKeySource>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ITokenSigningKeySource, RsaKeyFileTokenSigningKeySource>());
         services.AddSingleton<ITokenSigningCredentialsProvider, TokenSigningCredentialsProvider>();
+        services.AddSingleton<IIdTokenHintValidator, IdTokenHintValidator>();
         services.AddHostedService<TokenSigningCredentialsValidationHostedService>();
 
         return services;

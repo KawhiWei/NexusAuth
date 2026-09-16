@@ -41,6 +41,8 @@ static void AddSingleUnderscoreEnvironmentVariables(ConfigurationManager configu
         ["NEXUSAUTH_CONNECTION_STRINGS_DEFAULT"] = "ConnectionStrings:Default",
         ["NEXUSAUTH_JWT_ISSUER"] = "Jwt:Issuer",
         ["NEXUSAUTH_JWT_SIGNING_MODE"] = "Jwt:SigningMode",
+        ["NEXUSAUTH_JWT_SIGNING_PATH"] = "Jwt:SigningPath",
+        ["NEXUSAUTH_JWT_SIGNING_PASSWORD"] = "Jwt:SigningPassword",
         ["NEXUSAUTH_JWT_DEVELOPMENT_SIGNING_CERTIFICATE_PATH"] = "Jwt:DevelopmentSigningCertificatePath",
         ["NEXUSAUTH_JWT_DEVELOPMENT_SIGNING_CERTIFICATE_PASSWORD"] = "Jwt:DevelopmentSigningCertificatePassword",
         ["NEXUSAUTH_JWT_SIGNING_CERTIFICATE_PATH"] = "Jwt:SigningCertificatePath",

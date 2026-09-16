@@ -14,3 +14,5 @@ logs/
 *.suo
 *.swp
 *.log
+deploy/direct/*.env
+deploy/direct/signing/

@@ -18,14 +18,8 @@ public sealed class BootstrapAdminHostedService(
     {
         var hasUsername = !string.IsNullOrWhiteSpace(options.Username);
         var hasPassword = !string.IsNullOrWhiteSpace(options.Password);
-        if (!hasUsername && !hasPassword)
-        {
-            logger.LogInformation("Bootstrap administrator creation skipped because no credentials were configured.");
-            return;
-        }
-
         if (!hasUsername || !hasPassword)
-            throw new InvalidOperationException("BootstrapAdmin:Username and BootstrapAdmin:Password must be configured together.");
+            throw new InvalidOperationException("BootstrapAdmin:Username and BootstrapAdmin:Password are required and must be configured together.");
 
         using var scope = scopeFactory.CreateScope();
         var userRepository = scope.ServiceProvider.GetRequiredService<IUserRepository>();

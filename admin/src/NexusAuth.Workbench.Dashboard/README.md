@@ -39,7 +39,7 @@ npm run dev
 
 打开 `http://localhost:5273`。`vite.config.ts` 将 `/api` 代理到 `http://localhost:5051`，浏览器因此通过同源路径访问 BFF 并携带 Cookie。API Swagger 地址为 `http://localhost:5051/swagger`。
 
-本地启动前需要先初始化 PostgreSQL 的 `nexusauth` schema，并登记 `nexusauth.workbench` 客户端和 `workbench` API resource。完整数据库和 API 配置见 [Workbench 接入说明](../../../document/06-对接NexusAuth.Workbench.md)。
+本地启动前需要先初始化 PostgreSQL 的 `nexusauth` schema，并登记 `nexusauth.workbench` 客户端和 `workbench` API resource。完整数据库和 API 配置见 [Workbench 接入说明](../../../document/01-快速启动.md)。
 
 ## 登录流程
 
@@ -107,7 +107,7 @@ Dashboard Dockerfile 使用 Node 22 构建前端，再使用 Nginx 1.27 提供�
 ## 相关文档
 
 - [NexusAuth Admin 总览](../../README.md)
-- [Workbench API 接入说明](../../../document/06-对接NexusAuth.Workbench.md)
-- [高级配置](../../../document/08-高级配置.md)
-- [常见问题](../../../document/09-常见问题.md)
-- [完整使用手册](../../../document/12-使用手册.md)
+- [Workbench API 接入说明](../../../document/01-快速启动.md)
+- [高级配置](../../../document/01-快速启动.md)
+- [常见问题](../../../document/01-快速启动.md)
+- [完整使用手册](../../../document/01-快速启动.md)

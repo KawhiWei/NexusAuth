@@ -182,9 +182,9 @@ Compose 的 Dashboard 镜像从仓库根目录构建，使用 Node 22 生成静�
 
 ## 相关文档
 
-- [Workbench API 接入说明](../document/06-对接NexusAuth.Workbench.md)
+- [Workbench API 接入说明](../document/01-快速启动.md)
 - [Dashboard 使用说明](./src/NexusAuth.Workbench.Dashboard/README.md)
-- [高级配置](../document/08-高级配置.md)
-- [常见问题](../document/09-常见问题.md)
+- [高级配置](../document/01-快速启动.md)
+- [常见问题](../document/01-快速启动.md)
 - [OAuth/OIDC 协议设计](../document/11-OAuth-OIDC协议设计.md)
-- [完整使用手册](../document/12-使用手册.md)
+- [完整使用手册](../document/01-快速启动.md)

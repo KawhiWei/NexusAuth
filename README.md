@@ -13,8 +13,8 @@ NexusAuth 是一个基于 ASP.NET Core 和 .NET 10 的 OAuth 2.0 / OpenID Connec
 
 ## 文档与手册
 
-- [使用手册（中文）](./document/12-使用手册.md)：部署、管理台、OAuth/OIDC、SCIM 2.0 和生产运维的完整操作指引。
-- [APISIX Gateway 对接手册](./document/13-APISIX网关对接手册.md)：通过 APISIX 统一入口接入 NexusAuth、创建网关 client、绑定服务资源与前端迁移。
+- [快速启动](./document/01-快速启动.md)：统一入口，镜像打包与启动、全部环境变量、认证流程、管理操作、OAuth/OIDC、SCIM 和排错。
+- [Gateway 部署手册](./document/13-APISIX网关对接手册.md)：暂未整理，已有 APISIX 内容仅供参考。
 - [User Guide (English)](./docs/en/user-guide.md)：对应的英文使用手册。
 - [专题文档目录](./document/README.md)：快速开始、数据库、客户端接入、配置、Demo 和协议设计。
 
@@ -111,7 +111,7 @@ docker compose up --build
 - Workbench API：<http://localhost:5051>
 - NexusAuth Provider：<http://localhost:5100>
 
-Workbench 会跳转到 Provider 登录页，登录成功后回到 Dashboard。空数据库首次启动时，SQL 只创建数据库结构；Workbench API 随后根据环境变量幂等创建自身的 OAuth resource 和 client，SSO 则创建初始管理员，重复启动均不会覆盖已有用户密码。
+Workbench 会跳转到 Provider 登录页，登录成功后回到 Dashboard。空数据库首次启动时，SQL 只创建数据库结构；Workbench API 随后根据环境变量幂等创建自身的 OAuth resource 和 client，SSO 则创建初始管理员，重复启动均不会覆盖已有用户密码。网关及业务应用统一通过 Dashboard 登记。
 
 Compose 的本地默认管理员来自环境变量回退值：`admin / wzw0126..`。这仅用于本地开发；部署前必须显式配置以下变量，生产环境不得保留回退密码：
 
@@ -134,6 +134,8 @@ NEXUSAUTH_LOGIN_FLOW_REMEMBER_ME_LIFETIME_DAYS=3
 NEXUSAUTH_CONNECTION_STRINGS_DEFAULT="Host=db;Port=5432;Database=nexusauth;Username=nexusauth;Password=REPLACE_WITH_A_SECRET"
 NEXUSAUTH_WORKBENCH_AUTH_AUTHORITY=https://sso.example.com
 NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_NAME=nexusauth.workbench.api
+NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_DISPLAY_NAME="Workbench API"
+NEXUSAUTH_WORKBENCH_BOOTSTRAP_CLIENT_NAME="NexusAuth Workbench"
 ```
 
 Host 的登录页、登录流程、JWT、数据库连接和 Workbench API 配置均可通过对应的 `NEXUSAUTH_...` 单下划线变量设置。`NEXUSAUTH_LOGIN_FLOW_REMEMBER_ME_LIFETIME_DAYS` 控制勾选“几天内免登录”后的固定有效期，默认 `3`，范围为 `1`–`30`；修改后重启 Provider 生效。
@@ -143,10 +145,10 @@ Host 的登录页、登录流程、JWT、数据库连接和 Workbench API 配置
 ### 数据库脚本职责
 
 - [production-init.sql](./production-init.sql)：仅用于全新、空的 `nexusauth` 数据库，定义当前最终 schema；不删库、不含 `ALTER TABLE`，也不创建用户。
-- Workbench API 启动初始化器：根据 `NEXUSAUTH_WORKBENCH_AUTH_*` 与 `NEXUSAUTH_WORKBENCH_BOOTSTRAP_*` 环境变量登记 Workbench 所需的 scope、OAuth 客户端、关联和 BCrypt 客户端密钥。
+- Workbench API 启动初始化器：根据 `NEXUSAUTH_WORKBENCH_AUTH_*` 与 `NEXUSAUTH_WORKBENCH_BOOTSTRAP_*` 环境变量登记 Workbench 自身的 scope、OAuth 客户端、关联和 BCrypt 客户端密钥；网关和业务应用由 Dashboard 登记。
 - `demo/seed.sql`：只用于本地演示客户端和示例用户，禁止用于生产。
 
-本地 Compose 默认使用 Development 环境自动生成并持久化开发签名证书。生产环境必须设置 `NEXUSAUTH_SSO_ENVIRONMENT=Production`，挂载由证书管理系统提供的 PFX，并通过 `NEXUSAUTH_JWT_SIGNING_CERTIFICATE_PATH` 和 Secret 配置证书密码。生产环境不会自动生成开发证书。
+本地 Compose 默认使用 Development 环境自动生成并持久化开发签名证书。生产 Compose 必须设置 `NEXUSAUTH_SSO_ENVIRONMENT=Production`（裸进程使用 `ASPNETCORE_ENVIRONMENT=Production`），挂载由证书管理系统提供的 PFX，并通过 `NEXUSAUTH_JWT_SIGNING_PATH` 和 `NEXUSAUTH_JWT_SIGNING_PASSWORD` 配置证书。生产环境不会自动生成开发证书。
 
 要重新初始化本地数据库（会删除 Compose 数据卷，请确认数据可丢失）：
 
@@ -168,7 +170,7 @@ npm install
 npm run dev
 ```
 
-也可以使用两个解决方案：`NexusAuth.sln` 负责 Provider 和共享后端项目，`admin/NexusAuth.Admin.sln` 负责 Workbench。详细步骤见 [快速开始](./document/01-快速开始.md) 和 [环境准备](./document/02-环境准备.md)。
+也可以使用两个解决方案：`NexusAuth.sln` 负责 Provider 和共享后端项目，`admin/NexusAuth.Admin.sln` 负责 Workbench。详细步骤见 [快速开始](./document/01-快速启动.md) 和 [环境准备](./document/01-快速启动.md)。
 
 ### 日志记录
 
@@ -267,16 +269,8 @@ Workbench 解决方案引用根目录的共享项目，不复制领域、应用�
 | 文档 | 内容 |
 |------|------|
 | [文档总览](./document/README.md) | 能力、目录和完整导航 |
-| [快速开始](./document/01-快速开始.md) | 开发环境和启动步骤 |
-| [环境准备](./document/02-环境准备.md) | .NET、Node.js、PostgreSQL 和 Docker |
-| [数据库配置](./document/03-数据库配置.md) | 数据库和 seed |
-| [启动 Provider](./document/04-启动NexusAuth.Provider.md) | 单独启动 SSO |
-| [配置 OAuth 客户端](./document/05-配置OAuth客户端.md) | 客户端、PKCE、认证方式、curl 与 BFF |
-| [对接 Workbench](./document/06-对接NexusAuth.Workbench.md) | Workbench API 登录流程 |
-| [启动 Dashboard](./document/07-对接NexusAuth.Workbench.Dashboard.md) | Workbench 前端 |
-| [高级配置](./document/08-高级配置.md) | Token、证书、代理和安全配置 |
-| [常见问题](./document/09-常见问题.md) | 常见错误和排查 |
-| [Demo 详解](./document/10-Demo示例详解.md) | 仓库内 Demo |
+| [快速启动](./document/01-快速启动.md) | 镜像启动、环境变量、认证流程、管理与接入、开发和排错 |
+| [Gateway 对接](./document/13-APISIX网关对接手册.md) | 暂未整理，保留参考 |
 | [协议设计](./document/11-OAuth-OIDC协议设计.md) | 验证顺序、错误决策和扩展边界 |
 
 ## Demo 客户端
@@ -288,7 +282,7 @@ Workbench 解决方案引用根目录的共享项目，不复制领域、应用�
 | `demo-cc` | `private_key_jwt` | `client_credentials` | 机器到机器 |
 | `demo-device` | `private_key_jwt` | `device_code`, `refresh_token` | 设备授权 |
 
-这些是本地演示配置，不代表生产密钥或生产部署模板。Demo 说明见 [Demo 示例详解](./document/10-Demo示例详解.md)。
+这些是本地演示配置，不代表生产密钥或生产部署模板。Demo 说明见 [Demo 示例详解](./document/01-快速启动.md)。
 
 ## 生产注意事项
 

@@ -29,7 +29,6 @@ public sealed class WorkbenchClientCredentialHostedService(
         var clientSecret = configuration["Auth:ClientSecret"]?.Trim();
         var redirectUri = configuration["Auth:RedirectUri"]?.Trim();
         var postLogoutRedirectUri = configuration["Auth:PostLogoutRedirectUri"]?.Trim();
-        var requestedScopes = ParseScopes(configuration["Auth:Scope"]);
         var audience = configuration["Auth:Audience"]?.Trim();
         var options = bootstrapOptions.Value;
         var resourceName = options.ResourceName?.Trim();
@@ -38,17 +37,14 @@ public sealed class WorkbenchClientCredentialHostedService(
             || string.IsNullOrWhiteSpace(redirectUri) || string.IsNullOrWhiteSpace(postLogoutRedirectUri)
             || string.IsNullOrWhiteSpace(audience) || string.IsNullOrWhiteSpace(resourceName))
         {
-            logger.LogError("NexusAuth Workbench Initialization failed, environment variable has a configured value");
-            logger.LogError("NexusAuth Workbench 初始化失败，环境变量存在为配置的值。");
-            return;
+            throw new InvalidOperationException(
+                "Workbench initialization requires Auth:ClientId, Auth:ClientSecret, Auth:RedirectUri, " +
+                "Auth:PostLogoutRedirectUri, Auth:Audience and Bootstrap:ResourceName.");
         }
 
-        var configuredServiceScopes = string.IsNullOrWhiteSpace(options.AllowedScopes)
-            ? [audience]
-            : ParseScopes(options.AllowedScopes);
+        RequireValue(options.ResourceDisplayName, "Bootstrap:ResourceDisplayName");
+        RequireValue(options.ClientName, "Bootstrap:ClientName");
         var managedScopes = StaticClientScopes
-            .Concat(requestedScopes)
-            .Concat(configuredServiceScopes)
             .Append(audience)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
@@ -58,22 +54,13 @@ public sealed class WorkbenchClientCredentialHostedService(
         var resourceRepository = scope.ServiceProvider.GetRequiredService<IApiResourceRepository>();
         var clientResourceRepository = scope.ServiceProvider.GetRequiredService<IClientApiResourceRepository>();
 
-        await EnsureResourceAsync(
+        var resource = await EnsureResourceAsync(
             resourceRepository,
             resourceName,
             options.ResourceDisplayName,
             audience,
             options.ResourceDescription,
             cancellationToken);
-
-        var resources = await resourceRepository.FindByAudiencesAsync(configuredServiceScopes, cancellationToken);
-        var foundAudiences = resources.Select(resource => resource.Audience).ToHashSet(StringComparer.Ordinal);
-        var missingResourceScopes = configuredServiceScopes.Where(scope => !foundAudiences.Contains(scope)).ToArray();
-        if (missingResourceScopes.Length > 0)
-        {
-            throw new InvalidOperationException(
-                $"Bootstrap:AllowedScopes references service resources that do not exist: {string.Join(", ", missingResourceScopes)}.");
-        }
 
         var client = await clientRepository.FindByClientIdAsync(clientId, cancellationToken);
         if (client is null)
@@ -111,7 +98,7 @@ public sealed class WorkbenchClientCredentialHostedService(
 
         var associatedResourceIds = await clientResourceRepository.GetApiResourceIdsByClientIdsAsync([client.Id], cancellationToken);
         var existingResourceIds = associatedResourceIds.GetValueOrDefault(client.Id, []);
-        foreach (var resource in resources.Where(resource => !existingResourceIds.Contains(resource.Id)))
+        if (!existingResourceIds.Contains(resource.Id))
             await clientResourceRepository.AddAsync(ClientApiResource.Create(client.Id, resource.Id), cancellationToken);
 
         if (client.VerifyClientSecret(clientSecret))
@@ -153,14 +140,6 @@ public sealed class WorkbenchClientCredentialHostedService(
         resource.Update(normalizedDisplayName, audience, description, isActive: true);
         await repository.UpdateAsync(resource, cancellationToken);
         return resource;
-    }
-
-    private static string[] ParseScopes(string? scope)
-    {
-        return (scope ?? string.Empty)
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
     }
 
     private static string RequireValue(string? value, string configurationKey)

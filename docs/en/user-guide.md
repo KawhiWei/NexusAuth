@@ -48,7 +48,7 @@ docker compose up --build
 
 ### 2.3 Local Process Startup
 
-Prepare the database and schema as described in [Database Configuration](../../document/03-数据库配置.md), then run each service:
+Prepare the database and schema as described in [Database Configuration](../../document/01-快速启动.md), then run each service:
 
 ```bash
 dotnet run --project src/NexusAuth.Host
@@ -83,7 +83,7 @@ The console contains users, API resources, applications, and SCIM credentials. R
 
 ### Open API Directory Credentials
 
-The Host exposes read-only application and service-resource directory APIs under `/openapi/v1`. Create their bearer credentials in Workbench, not in a browser-facing application. An `application` credential grants only `GET /openapi/v1/applications`; a `service_resource` credential grants only `GET /openapi/v1/service-resources`. Raw tokens are returned once, stored hashed, and can be expired or revoked. See [Open API](../../document/10-开放API.md).
+The Host exposes read-only application and service-resource directory APIs under `/openapi/v1`. Create their bearer credentials in Workbench, not in a browser-facing application. An `application` credential grants only `GET /openapi/v1/applications`; a `service_resource` credential grants only `GET /openapi/v1/service-resources`. Raw tokens are returned once, stored hashed, and can be expired or revoked. See [Open API](../../document/01-快速启动.md).
 
 ### 4.1 User Management
 
@@ -198,7 +198,7 @@ This token does not represent an end user. The resource server must validate the
 
 A response includes a refresh token only when the client permits `refresh_token` and the authorization request includes `offline_access`. Refreshing rotates the token, so clients must replace the stored value atomically; concurrent reuse of the old token fails. Use `/connect/endsession` for user sign-out and `/connect/revocation` for revocation. Never write token contents to logs.
 
-Do not mix client-authentication sources. A conflict among Basic authentication, form credentials, shared-secret JWT assertions, and private-key JWT assertions returns `invalid_client` (HTTP 401 with `WWW-Authenticate`). See [OAuth Client Configuration](../../document/05-配置OAuth客户端.md) for detailed request examples.
+Do not mix client-authentication sources. A conflict among Basic authentication, form credentials, shared-secret JWT assertions, and private-key JWT assertions returns `invalid_client` (HTTP 401 with `WWW-Authenticate`). See [OAuth Client Configuration](../../document/01-快速启动.md) for detailed request examples.
 
 ## 6. SCIM 2.0 User Provisioning
 
@@ -268,9 +268,9 @@ View logs with `docker compose logs` or in `logs/sso` and `logs/workbench`. Use 
 
 ## 10. Related Documents
 
-- [Quick Start](../../document/01-快速开始.md), [Environment Preparation](../../document/02-环境准备.md), [Database Configuration](../../document/03-数据库配置.md)
-- [Starting the Provider](../../document/04-启动NexusAuth.Provider.md), [OAuth Client Configuration](../../document/05-配置OAuth客户端.md)
-- [Workbench API Integration](../../document/06-对接NexusAuth.Workbench.md), [Dashboard](../../document/07-对接NexusAuth.Workbench.Dashboard.md)
-- [Advanced Configuration](../../document/08-高级配置.md), [FAQ](../../document/09-常见问题.md)
-- [Demo](../../document/10-Demo示例详解.md), [OAuth/OIDC Protocol Design](../../document/11-OAuth-OIDC协议设计.md)
-- Chinese edition: [NexusAuth User Guide](../../document/12-使用手册.md)
+- [Quick Start](../../document/01-快速启动.md), [Environment Preparation](../../document/01-快速启动.md), [Database Configuration](../../document/01-快速启动.md)
+- [Starting the Provider](../../document/01-快速启动.md), [OAuth Client Configuration](../../document/01-快速启动.md)
+- [Workbench API Integration](../../document/01-快速启动.md), [Dashboard](../../document/01-快速启动.md)
+- [Advanced Configuration](../../document/01-快速启动.md), [FAQ](../../document/01-快速启动.md)
+- [Demo](../../document/01-快速启动.md), [OAuth/OIDC Protocol Design](../../document/11-OAuth-OIDC协议设计.md)
+- Chinese edition: [NexusAuth User Guide](../../document/01-快速启动.md)

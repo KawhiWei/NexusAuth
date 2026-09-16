@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 using Xunit;
 
@@ -14,7 +16,9 @@ public sealed class ProviderHostTests : IClassFixture<WebApplicationFactory<AppW
         this.factory = factory.WithWebHostBuilder(builder => builder
             .UseEnvironment("Development")
             .UseSetting("BootstrapAdmin:Username", string.Empty)
-            .UseSetting("BootstrapAdmin:Password", string.Empty));
+            .UseSetting("BootstrapAdmin:Password", string.Empty)
+            .ConfigureTestServices(services => services.Remove(
+                services.Single(descriptor => descriptor.ImplementationType == typeof(BootstrapAdminHostedService)))));
     }
 
     [Fact]

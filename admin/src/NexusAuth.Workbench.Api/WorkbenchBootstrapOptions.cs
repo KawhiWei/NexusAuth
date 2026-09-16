@@ -14,8 +14,6 @@ public sealed class WorkbenchBootstrapOptions
 
     public string? ResourceDescription { get; init; }
 
-    public string? AllowedScopes { get; init; }
-
     public string? ClientName { get; init; }
 
     public string? ClientDescription { get; init; }

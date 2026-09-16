@@ -13,6 +13,63 @@ namespace NexusAuth.Host.IntegrationTests;
 
 public sealed class TokenSigningProviderTests
 {
+    [Theory]
+    [InlineData(TokenSigningMode.Certificate, "signing.pfx")]
+    [InlineData(TokenSigningMode.RsaKeyFile, "signing.json")]
+    public void Unified_path_is_used_in_development_and_production(TokenSigningMode mode, string filename)
+    {
+        var directory = CreateTemporaryDirectory();
+        try
+        {
+            var options = Options.Create(new JwtOptions
+            {
+                SigningMode = mode,
+                SigningPath = Path.Combine(directory, filename),
+                SigningPassword = "test-password",
+                DevelopmentSigningCertificatePath = "unused-development.pfx",
+                SigningCertificatePath = "unused-production.pfx",
+                DevelopmentSigningKeyPath = "unused-development.json",
+                SigningKeyPath = "unused-production.json",
+            });
+            ITokenSigningKeySource[] sources = [new CertificateTokenSigningKeySource(), new RsaKeyFileTokenSigningKeySource()];
+            using var development = new TokenSigningCredentialsProvider(
+                new TestHostEnvironment { EnvironmentName = "Development", ContentRootPath = directory }, options, sources);
+            Assert.True(File.Exists(options.Value.SigningPath));
+            using var production = new TokenSigningCredentialsProvider(
+                new TestHostEnvironment { EnvironmentName = "Production", ContentRootPath = directory }, options, sources);
+            Assert.Equal(development.KeyId, production.KeyId);
+            Assert.NotNull(production.GetSigningCredentials());
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(TokenSigningMode.Certificate)]
+    [InlineData(TokenSigningMode.RsaKeyFile)]
+    public void Unified_path_does_not_generate_missing_files_in_production(TokenSigningMode mode)
+    {
+        var directory = CreateTemporaryDirectory();
+        try
+        {
+            var options = Options.Create(new JwtOptions
+            {
+                SigningMode = mode,
+                SigningPath = Path.Combine(directory, "missing.pfx"),
+            });
+            Assert.Throws<FileNotFoundException>(() => new TokenSigningCredentialsProvider(
+                new TestHostEnvironment { EnvironmentName = "Production", ContentRootPath = directory }, options,
+                [new CertificateTokenSigningKeySource(), new RsaKeyFileTokenSigningKeySource()]));
+            Assert.False(File.Exists(options.Value.SigningPath));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [Fact]
     public void Certificate_source_can_publish_a_public_only_previous_certificate()
     {

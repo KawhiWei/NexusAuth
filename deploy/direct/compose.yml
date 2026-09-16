@@ -1,0 +1,67 @@
+name: nexusauth-direct
+
+services:
+  db:
+    image: postgres:16-alpine
+    env_file:
+      - path: ./postgres.env
+        format: raw
+    volumes:
+      - database:/var/lib/postgresql/data
+      - type: bind
+        source: ./production-init.sql
+        target: /docker-entrypoint-initdb.d/001-schema.sql
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  sso:
+    image: nexusauth-host:latest
+    env_file:
+      - path: ./sso.env
+        format: raw
+    ports:
+      - "5100:8080"
+    volumes:
+      - signing-data:/app/App_Data
+      - sso-protection:/root/.aspnet/DataProtection-Keys
+      - ./signing:/run/secrets:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  admin-api:
+    image: nexusauth-workbench-api:latest
+    env_file:
+      - path: ./workbench.env
+        format: raw
+    volumes:
+      - workbench-protection:/root/.aspnet/DataProtection-Keys
+    depends_on:
+      db:
+        condition: service_healthy
+      sso:
+        condition: service_healthy
+    restart: unless-stopped
+
+  dashboard:
+    image: nexusauth-workbench-dashboard:latest
+    ports:
+      - "5560:80"
+    depends_on:
+      admin-api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  database:
+  signing-data:
+  sso-protection:
+  workbench-protection:

@@ -121,6 +121,7 @@ public sealed class OpenApiFactory : WebApplicationFactory<AppWebModule>
             .UseSetting("BootstrapAdmin:Password", string.Empty)
             .ConfigureTestServices(services =>
             {
+                services.Remove(services.Single(descriptor => descriptor.ImplementationType == typeof(BootstrapAdminHostedService)));
                 services.RemoveAll<IOpenApiCredentialService>();
                 services.RemoveAll<IClientService>();
                 services.RemoveAll<IApiResourceService>();

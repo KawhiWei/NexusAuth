@@ -14,6 +14,10 @@ public class JwtOptions
 
     public TokenSigningMode SigningMode { get; set; } = TokenSigningMode.Certificate;
 
+    public string SigningPath { get; set; } = string.Empty;
+
+    public string? SigningPassword { get; set; }
+
     public string SigningCertificatePath { get; set; } = string.Empty;
 
     public string SigningCertificatePassword { get; set; } = string.Empty;

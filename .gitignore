@@ -290,3 +290,6 @@ __pycache__/
 *.pyc
 ./.github
 signing-key.json
+deploy/direct/*.env
+deploy/direct/signing/
+deploy/direct/production-init.sql

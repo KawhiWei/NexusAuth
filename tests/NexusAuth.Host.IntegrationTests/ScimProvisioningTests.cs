@@ -197,6 +197,7 @@ public sealed class ScimProvisioningFactory : WebApplicationFactory<AppWebModule
             .UseSetting("BootstrapAdmin:Password", string.Empty)
             .ConfigureTestServices(services =>
             {
+                services.Remove(services.Single(descriptor => descriptor.ImplementationType == typeof(BootstrapAdminHostedService)));
                 services.RemoveAll<IUserRepository>();
                 services.RemoveAll<IRefreshTokenRepository>();
                 services.RemoveAll<ISsoSessionService>();

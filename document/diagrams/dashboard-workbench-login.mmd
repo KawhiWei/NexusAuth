@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant D as Dashboard / 浏览器
+    participant W as Workbench API
+    participant P as Provider / 登录服务
+    D->>W: 1. GET /api/auth/login
+    Note over W: 保存 state、nonce、PKCE verifier
+    W-->>D: JSON authorizeUrl
+    D->>P: 2. 跳转 /connect/authorize
+    Note over D,P: /account/login 完成密码 / TOTP 或 Passkey 认证
+    P-->>D: 跳转 /signin-oidc?code=...&state=...
+    D->>W: 3. nginx 转发 /signin-oidc 回调
+    Note over W: 校验并消费 state
+    W->>P: POST /connect/token<br/>client_secret_basic + code + PKCE verifier
+    P-->>W: access token / refresh token / ID Token
+    Note over W: 校验签名、issuer、audience、nonce<br/>签发受保护的 HttpOnly Cookie
+    W-->>D: 4. Set-Cookie + 重定向 /auth/callback
+    D->>W: GET /api/auth/me，携带 Cookie
+    W-->>D: 已登录用户，进入 Dashboard

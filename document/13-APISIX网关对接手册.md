@@ -1,6 +1,8 @@
 # APISIX Dashboard 手工配置 NexusAuth OIDC 手册
 
-本文只通过 APISIX Dashboard 配置网关，不使用 bootstrap 脚本或自动创建路由。`docker-compose.apisix.yml` 只负责启动 APISIX、etcd 和 APISIX Dashboard。
+> 状态：暂未整理。本手册当前不作为推荐部署流程；非 Gateway 部署请先阅读 [快速启动](./01-快速启动.md)。以下 APISIX 操作内容暂保留，仅供需要网关接入的场景参考。
+
+本文只通过 APISIX Dashboard 配置网关，不使用 NexusAuth 启动初始化自动创建网关应用或路由。`docker-compose.apisix.yml` 只负责启动 APISIX、etcd 和 APISIX Dashboard。请先在 NexusAuth Dashboard 创建网关 OAuth 应用并生成密钥；Workbench API 重启不会修改已有网关应用。
 
 ## 1. 最终访问关系
 
@@ -57,7 +59,7 @@ docker compose -f docker-compose.apisix.yml ps
 
 ## 3. NexusAuth Client 前置检查
 
-先打开 Workbench：`http://localhost:5560`，进入应用管理，检查已有 Client `nexusauth.apisix.gateway`。
+先打开 Workbench：`http://localhost:5560`，进入应用管理。若不存在 Client `nexusauth.apisix.gateway`，先在 Dashboard 创建一个 Confidential client、生成密钥并登记回调；不要依赖 Workbench API 启动初始化创建网关应用。已有网关应用不会因 API 重启而修改。
 
 必须满足以下条件：
 

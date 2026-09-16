@@ -10,10 +10,7 @@
         "ASPNETCORE_ENVIRONMENT": "Development",
         "NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_NAME": "nexusauth.workbench.api",
         "NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_DISPLAY_NAME": "NexusAuth Workbench API",
-        "NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_DESCRIPTION": "NexusAuth Workbench API scope",
-        "NEXUSAUTH_WORKBENCH_BOOTSTRAP_ALLOWED_SCOPES": "",
-        "NEXUSAUTH_WORKBENCH_BOOTSTRAP_CLIENT_NAME": "NexusAuth Workbench",
-        "NEXUSAUTH_WORKBENCH_BOOTSTRAP_CLIENT_DESCRIPTION": "NexusAuth Workbench Dashboard and API (client_secret_basic)"
+        "NEXUSAUTH_WORKBENCH_BOOTSTRAP_CLIENT_NAME": "NexusAuth Workbench"
       }
     }
   }

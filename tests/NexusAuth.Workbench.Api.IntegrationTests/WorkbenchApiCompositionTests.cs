@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using NexusAuth.Application.Users;
 using NexusAuth.Workbench.Api;
 using Xunit;
@@ -13,7 +14,17 @@ public sealed class WorkbenchApiCompositionTests : IClassFixture<WebApplicationF
 
     public WorkbenchApiCompositionTests(WebApplicationFactory<WorkbenchApiModule> factory)
     {
-        this.factory = factory.WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        this.factory = factory.WithWebHostBuilder(builder => builder.UseEnvironment("Testing")
+            .UseSetting("Auth:ClientSecret", "test-only-client-secret"));
+    }
+
+    [Fact]
+    public void Host_registers_only_the_workbench_resource_initializer()
+    {
+        var hostedServices = factory.Services.GetServices<IHostedService>().ToArray();
+
+        Assert.Single(hostedServices.OfType<WorkbenchClientCredentialHostedService>());
+        Assert.DoesNotContain(hostedServices, service => service.GetType().Name == "GatewayClientCredentialHostedService");
     }
 
     [Fact]

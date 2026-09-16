@@ -13,13 +13,13 @@ namespace NexusAuth.Workbench.Api.IntegrationTests;
 public sealed class BootstrapAdminHostedServiceTests
 {
     [Fact]
-    public async Task StartAsync_skips_when_no_bootstrap_credentials_are_configured()
+    public async Task StartAsync_fails_when_no_bootstrap_credentials_are_configured()
     {
         var repository = new InMemoryUserRepository();
         var scopeFactory = new TestServiceScopeFactory(repository);
         var service = CreateService(scopeFactory, new BootstrapAdminOptions());
 
-        await service.StartAsync(CancellationToken.None);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.StartAsync(CancellationToken.None));
 
         Assert.Equal(0, scopeFactory.CreateScopeCalls);
         Assert.Empty(repository.Users);

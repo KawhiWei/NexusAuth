@@ -109,18 +109,21 @@ public class TokenSigningCredentialsProvider : ITokenSigningCredentialsProvider,
             return options.SigningKeys;
 
         var isDevelopment = environment.IsDevelopment();
+        var isCertificate = options.SigningMode == TokenSigningMode.Certificate;
+        var legacyPath = isCertificate
+            ? (isDevelopment ? options.DevelopmentSigningCertificatePath : options.SigningCertificatePath)
+            : (isDevelopment ? options.DevelopmentSigningKeyPath : options.SigningKeyPath);
+        var legacyPassword = isDevelopment
+            ? options.DevelopmentSigningCertificatePassword
+            : options.SigningCertificatePassword;
         return
         [
             new TokenSigningKeyOptions
             {
                 Source = options.SigningMode.ToString(),
                 IsActive = true,
-                Path = options.SigningMode == TokenSigningMode.Certificate
-                    ? isDevelopment ? options.DevelopmentSigningCertificatePath : options.SigningCertificatePath
-                    : isDevelopment ? options.DevelopmentSigningKeyPath : options.SigningKeyPath,
-                Password = options.SigningMode == TokenSigningMode.Certificate
-                    ? isDevelopment ? options.DevelopmentSigningCertificatePassword : options.SigningCertificatePassword
-                    : null,
+                Path = string.IsNullOrWhiteSpace(options.SigningPath) ? legacyPath : options.SigningPath,
+                Password = isCertificate ? options.SigningPassword ?? legacyPassword : null,
                 CreateIfMissing = isDevelopment,
             },
         ];

@@ -126,9 +126,7 @@ public class WorkbenchApiModule : LuckAppModule
 
         services.AddAuthorization();
         services.Configure<WorkbenchBootstrapOptions>(configuration.GetSection(WorkbenchBootstrapOptions.SectionName));
-        services.Configure<GatewayBootstrapOptions>(configuration.GetSection(GatewayBootstrapOptions.SectionName));
         services.AddHostedService<WorkbenchClientCredentialHostedService>();
-        services.AddHostedService<GatewayClientCredentialHostedService>();
 
         base.ConfigureServices(context);
     }

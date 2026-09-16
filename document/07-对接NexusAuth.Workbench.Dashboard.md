@@ -105,7 +105,7 @@ Workbench API 已提供以下管理资源，前端 API 模块均通过相对路�
 npm --prefix admin/src/NexusAuth.Workbench.Dashboard run build
 ```
 
-Compose 使用 `admin/src/NexusAuth.Workbench.Dashboard/Dockerfile` 构建静态文件，再由 nginx 监听容器 80 端口。`nginx.conf` 将 `/api` 转发到 `admin-api:8080`，其余路径回退到 `index.html`，因此外部地址仍是 http://localhost:5273。
+Compose 使用 `admin/src/NexusAuth.Workbench.Dashboard/Dockerfile` 构建静态文件，再由 nginx 监听容器 80 端口。`nginx.conf` 将 `/api` 转发到 `admin-api:8080`，其余路径回退到 `index.html`，Compose 外部地址是 http://localhost:5560。
 
 若单独部署 Dashboard，请确保：
 

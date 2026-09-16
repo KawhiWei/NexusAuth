@@ -1,0 +1,27 @@
+apisix:
+  node_listen: [9180, 5100]
+  enable_admin: true
+  # Local development only: Dashboard 3.0 writes directly to etcd and does
+  # not encrypt plugin fields such as openid-connect.client_secret.
+  data_encryption:
+    enable_encrypt_fields: false
+
+deployment:
+  role: traditional
+  role_traditional:
+    config_provider: etcd
+  admin:
+    admin_listen:
+      ip: 0.0.0.0
+      port: 9181
+    allow_admin:
+      - 0.0.0.0/0
+    admin_key:
+      - name: admin
+        key: "${{APISIX_ADMIN_KEY}}"
+        role: admin
+  etcd:
+    host:
+      - "http://apisix-etcd:2379"
+    prefix: "/apisix"
+    timeout: 30

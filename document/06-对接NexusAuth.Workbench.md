@@ -19,7 +19,7 @@ dotnet run --project admin/src/NexusAuth.Workbench.Api
 
 API 默认监听 http://localhost:5051。Swagger 位于 http://localhost:5051/swagger。
 
-再按 [Dashboard 文档](./07-对接NexusAuth.Workbench.Dashboard.md) 启动前端，或直接访问 Compose 的 http://localhost:5273。
+再按 [Dashboard 文档](./07-对接NexusAuth.Workbench.Dashboard.md) 启动前端，或直接访问 Compose 的 http://localhost:5560。
 
 ## 2. 配置 Workbench API
 
@@ -36,7 +36,7 @@ API 默认监听 http://localhost:5051。Swagger 位于 http://localhost:5051/sw
     "ClientId": "nexusauth.workbench",
     "ClientSecret": "REPLACE_WITH_WORKBENCH_CLIENT_SECRET",
     "RedirectUri": "http://localhost:5051/signin-oidc",
-    "PostLogoutRedirectUri": "http://localhost:5273/",
+    "PostLogoutRedirectUri": "http://localhost:5560/",
     "Scope": "openid profile nexusauth.workbench.api offline_access",
     "Audience": "nexusauth.workbench.api",
     "RequireHttpsMetadata": false,

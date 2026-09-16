@@ -65,7 +65,7 @@ Docker Compose 仅在全新的 PostgreSQL 数据卷上执行数据库初始化�
 |------|--------|
 | Provider | `http://localhost:5100` |
 | Workbench API | `http://localhost:5051` |
-| Workbench Dashboard | `http://localhost:5273` |
+| Workbench Dashboard（Compose） | `http://localhost:5560` |
 | PostgreSQL | `localhost:5432` |
 | access token | 60 分钟 |
 | refresh token | 43200 分钟 |

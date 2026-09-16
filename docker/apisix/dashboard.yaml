@@ -1,0 +1,54 @@
+conf:
+  listen:
+    host: 0.0.0.0
+    port: 9000
+  etcd:
+    endpoints:
+      - "http://apisix-etcd:2379"
+
+authentication:
+  secret: "nexusauth-apisix-dashboard-development-secret"
+  expire_time: 3600
+  users:
+    - username: admin
+      password: admin
+
+# Dashboard uses this allowlist to render the Plugin System page. Keep it in
+# sync with the APISIX image plugins that operators may configure.
+plugins:
+  - api-breaker
+  - authz-casbin
+  - authz-casdoor
+  - authz-keycloak
+  - basic-auth
+  - consumer-restriction
+  - cors
+  - csrf
+  - file-logger
+  - forward-auth
+  - gzip
+  - hmac-auth
+  - http-logger
+  - ip-restriction
+  - jwt-auth
+  - key-auth
+  - limit-conn
+  - limit-count
+  - limit-req
+  - openid-connect
+  - opa
+  - prometheus
+  - proxy-cache
+  - proxy-rewrite
+  - public-api
+  - real-ip
+  - redirect
+  - referer-restriction
+  - request-id
+  - request-validation
+  - response-rewrite
+  - server-info
+  - traffic-split
+  - ua-restriction
+  - uri-blocker
+  - wolf-rbac

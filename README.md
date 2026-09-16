@@ -14,6 +14,7 @@ NexusAuth 是一个基于 ASP.NET Core 和 .NET 10 的 OAuth 2.0 / OpenID Connec
 ## 文档与手册
 
 - [使用手册（中文）](./document/12-使用手册.md)：部署、管理台、OAuth/OIDC、SCIM 2.0 和生产运维的完整操作指引。
+- [APISIX Gateway 对接手册](./document/13-APISIX网关对接手册.md)：通过 APISIX 统一入口接入 NexusAuth、创建网关 client、绑定服务资源与前端迁移。
 - [User Guide (English)](./docs/en/user-guide.md)：对应的英文使用手册。
 - [专题文档目录](./document/README.md)：快速开始、数据库、客户端接入、配置、Demo 和协议设计。
 
@@ -106,7 +107,7 @@ docker compose up --build
 
 启动后访问：
 
-- Workbench Dashboard：<http://localhost:5273>
+- Workbench Dashboard（Compose）：<http://localhost:5560>
 - Workbench API：<http://localhost:5051>
 - NexusAuth Provider：<http://localhost:5100>
 
@@ -256,7 +257,7 @@ curl http://localhost:5100/.well-known/openid-configuration
 | 目录 | 说明 | 端口 |
 |------|------|------|
 | `admin/src/NexusAuth.Workbench.Api` | BFF 后端 | 5051 |
-| `admin/src/NexusAuth.Workbench.Dashboard` | React 管理界面 | 5273 |
+| `admin/src/NexusAuth.Workbench.Dashboard` | React 管理界面 | 5560（Compose）/ 5273（开发服务器） |
 | `admin/src/NexusAuth.Extension` | Workbench OIDC 客户端扩展 | - |
 
 Workbench 解决方案引用根目录的共享项目，不复制领域、应用或数据访问代码。

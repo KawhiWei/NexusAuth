@@ -5,7 +5,6 @@ import { MoonIcon, SunnyIcon } from 'tdesign-icons-react';
 import { useEffect, useState } from 'react';
 
 import { checkAuthenticated, setCachedAuthStatus } from '../../router/auth';
-import { startLogin } from '../../api/login';
 import { applyThemeMode, getThemeMode } from '../../theme';
 import BrandComponent from '../../components/brand';
 
@@ -33,18 +32,10 @@ const Login = () => {
   };
 
   const handleLogin = async () => {
-    try {
-      setLoading(true);
-      const result = await startLogin();
-      
-      if (result.authorizeUrl) {
-        window.location.href = result.authorizeUrl;
-      }
-    } catch (error) {
-      MessagePlugin.error(error instanceof Error ? error.message : '登录失败');
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true);
+    // APISIX owns the OIDC redirect and callback flow. This must be a top-level
+    // navigation rather than an XHR request so the browser can follow the SSO redirect.
+    window.location.assign('/workbenchproxy/login');
   };
 
   return (

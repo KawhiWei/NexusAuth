@@ -1,0 +1,64 @@
+name: nexusauth-apisix
+
+services:
+  apisix:
+    image: apache/apisix:3.11.0-debian
+    environment:
+      TZ: Asia/Shanghai
+      APISIX_ADMIN_KEY: ${APISIX_ADMIN_KEY:?Set APISIX_ADMIN_KEY to a long random value.}
+    volumes:
+      - ./docker/apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+    depends_on:
+      apisix-etcd:
+        condition: service_healthy
+    ports:
+      # The configured APISIX data plane listens on 9180. Its Admin API is internal on 9181.
+      - "9180:9180"
+    networks:
+      nexusauth-gateway:
+        aliases:
+          - apisix
+    restart: unless-stopped
+
+  apisix-etcd:
+    image: quay.io/coreos/etcd:v3.5.17
+    command:
+      - /usr/local/bin/etcd
+      - --name=apisix-etcd
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://apisix-etcd:2379
+    volumes:
+      - nexusauth-apisix-manual-etcd-data:/etcd-data
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/etcdctl", "endpoint", "health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      nexusauth-gateway:
+        aliases:
+          - apisix-etcd
+    restart: unless-stopped
+
+  apisix-dashboard:
+    image: apache/apisix-dashboard:3.0.1-alpine
+    volumes:
+      - ./docker/apisix/dashboard.yaml:/usr/local/apisix-dashboard/conf/conf.yaml:ro
+    depends_on:
+      apisix-etcd:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:9000:9000"
+    networks:
+      nexusauth-gateway:
+    restart: unless-stopped
+
+volumes:
+  nexusauth-apisix-manual-etcd-data:
+    name: nexusauth-apisix-manual-etcd-data
+
+networks:
+  nexusauth-gateway:
+    name: nexusauth-gateway
+    external: true

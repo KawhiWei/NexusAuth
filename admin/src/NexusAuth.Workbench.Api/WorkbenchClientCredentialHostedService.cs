@@ -30,24 +30,29 @@ public sealed class WorkbenchClientCredentialHostedService(
         var redirectUri = configuration["Auth:RedirectUri"]?.Trim();
         var postLogoutRedirectUri = configuration["Auth:PostLogoutRedirectUri"]?.Trim();
         var audience = configuration["Auth:Audience"]?.Trim();
+        var gatewayEnabled = configuration.IsWorkbenchGatewayEnabled();
         var options = bootstrapOptions.Value;
         var resourceName = options.ResourceName?.Trim();
 
         if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret)
-            || string.IsNullOrWhiteSpace(redirectUri) || string.IsNullOrWhiteSpace(postLogoutRedirectUri)
+            || (!gatewayEnabled && (string.IsNullOrWhiteSpace(redirectUri) || string.IsNullOrWhiteSpace(postLogoutRedirectUri)))
             || string.IsNullOrWhiteSpace(audience) || string.IsNullOrWhiteSpace(resourceName))
         {
             throw new InvalidOperationException(
                 "Workbench initialization requires Auth:ClientId, Auth:ClientSecret, Auth:RedirectUri, " +
-                "Auth:PostLogoutRedirectUri, Auth:Audience and Bootstrap:ResourceName.");
+                "Auth:PostLogoutRedirectUri (non-gateway mode), Auth:Audience and Bootstrap:ResourceName.");
         }
 
         RequireValue(options.ResourceDisplayName, "Bootstrap:ResourceDisplayName");
         RequireValue(options.ClientName, "Bootstrap:ClientName");
-        var managedScopes = StaticClientScopes
+        var managedScopes = (gatewayEnabled ? Array.Empty<string>() : StaticClientScopes)
             .Append(audience)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
+        string[] redirectUris = gatewayEnabled ? [] : [redirectUri!];
+        string[] postLogoutRedirectUris = gatewayEnabled ? [] : [postLogoutRedirectUri!];
+        // The gateway owns its login client; keep this application's registration without enabling new grants.
+        string[] grantTypes = gatewayEnabled ? [] : ["authorization_code", "refresh_token"];
 
         using var scope = scopeFactory.CreateScope();
         var clientRepository = scope.ServiceProvider.GetRequiredService<IOAuthClientRepository>();
@@ -69,10 +74,10 @@ public sealed class WorkbenchClientCredentialHostedService(
                 clientId,
                 RequireValue(options.ClientName, "Bootstrap:ClientName"),
                 options.ClientDescription,
-                [redirectUri],
-                [postLogoutRedirectUri],
+                redirectUris,
+                postLogoutRedirectUris,
                 managedScopes,
-                ["authorization_code", "refresh_token"],
+                grantTypes,
                 requirePkce: true,
                 tokenEndpointAuthMethod: OAuthClient.TokenEndpointAuthMethodClientSecretBasic);
             await clientRepository.AddAsync(client, cancellationToken);
@@ -83,10 +88,10 @@ public sealed class WorkbenchClientCredentialHostedService(
             client.Update(
                 RequireValue(options.ClientName, "Bootstrap:ClientName"),
                 options.ClientDescription,
-                [redirectUri],
-                [postLogoutRedirectUri],
+                redirectUris,
+                postLogoutRedirectUris,
                 managedScopes,
-                ["authorization_code", "refresh_token"],
+                grantTypes,
                 requirePkce: true,
                 isActive: true,
                 tokenEndpointAuthMethod: OAuthClient.TokenEndpointAuthMethodClientSecretBasic,

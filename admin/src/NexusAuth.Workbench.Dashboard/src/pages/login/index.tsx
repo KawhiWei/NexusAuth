@@ -1,10 +1,11 @@
 import './style.less';
 
-import { Button, MessagePlugin, Tooltip } from 'tdesign-react';
+import { Button, Tooltip } from 'tdesign-react';
 import { MoonIcon, SunnyIcon } from 'tdesign-icons-react';
 import { useEffect, useState } from 'react';
 
 import { checkAuthenticated, setCachedAuthStatus } from '../../router/auth';
+import { startLogin } from '../../api/login';
 import { applyThemeMode, getThemeMode } from '../../theme';
 import BrandComponent from '../../components/brand';
 
@@ -33,9 +34,12 @@ const Login = () => {
 
   const handleLogin = async () => {
     setLoading(true);
-    // APISIX owns the OIDC redirect and callback flow. This must be a top-level
-    // navigation rather than an XHR request so the browser can follow the SSO redirect.
-    window.location.assign('/workbenchproxy/login');
+    try {
+      const { authorizeUrl } = await startLogin();
+      window.location.assign(authorizeUrl);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

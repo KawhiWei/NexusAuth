@@ -20,6 +20,7 @@ public class WorkbenchApiModule : LuckAppModule
     {
         var services = context.Services;
         var configuration = services.GetConfiguration();
+        var gatewayEnabled = configuration.IsWorkbenchGatewayEnabled();
 
         var authority = configuration["Auth:Authority"];
         var backchannelAuthority = configuration["Auth:BackchannelAuthority"];
@@ -41,50 +42,61 @@ public class WorkbenchApiModule : LuckAppModule
             clientSecret,
             redirectUri,
             postLogoutRedirectUri,
-            scope);
+            scope,
+            audience,
+            gatewayEnabled);
 
-        services.AddNexusAuth(options =>
+        if (!gatewayEnabled)
         {
-            options.Authority = requiredAuthConfiguration.Authority;
-            options.BackchannelAuthority = string.IsNullOrWhiteSpace(backchannelAuthority)
-                ? null
-                : backchannelAuthority;
-            options.ClientId = requiredAuthConfiguration.ClientId;
-            options.ClientSecret = requiredAuthConfiguration.ClientSecret;
-            options.RedirectUri = requiredAuthConfiguration.RedirectUri;
-            options.PostLogoutRedirectUri = requiredAuthConfiguration.PostLogoutRedirectUri;
-            options.Scope = requiredAuthConfiguration.Scope;
-            options.SignOutProvider = signOutProvider;
-        });
-        services.AddScoped<WorkbenchCookieAuthenticationEvents>();
-
-        services.AddAuthentication(WorkbenchAuthenticationDefaults.Scheme)
-            .AddPolicyScheme(WorkbenchAuthenticationDefaults.Scheme, "Cookie or Bearer", options =>
+            services.AddNexusAuth(options =>
             {
-                options.ForwardDefaultSelector = context =>
+                options.Authority = requiredAuthConfiguration.Authority;
+                options.BackchannelAuthority = string.IsNullOrWhiteSpace(backchannelAuthority)
+                    ? null
+                    : backchannelAuthority;
+                options.ClientId = requiredAuthConfiguration.ClientId;
+                options.ClientSecret = requiredAuthConfiguration.ClientSecret;
+                options.RedirectUri = requiredAuthConfiguration.RedirectUri;
+                options.PostLogoutRedirectUri = requiredAuthConfiguration.PostLogoutRedirectUri;
+                options.Scope = requiredAuthConfiguration.Scope;
+                options.SignOutProvider = signOutProvider;
+            });
+            services.AddScoped<WorkbenchCookieAuthenticationEvents>();
+        }
+
+        var authentication = services.AddAuthentication(gatewayEnabled
+            ? WorkbenchAuthenticationDefaults.BearerScheme
+            : WorkbenchAuthenticationDefaults.Scheme);
+        if (!gatewayEnabled)
+        {
+            authentication
+                .AddPolicyScheme(WorkbenchAuthenticationDefaults.Scheme, "Cookie or Bearer", options =>
                 {
-                    var authorization = context.Request.Headers.Authorization.ToString();
-                    if (!string.IsNullOrWhiteSpace(authorization)
-                        && authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                    options.ForwardDefaultSelector = context =>
                     {
-                        return WorkbenchAuthenticationDefaults.BearerScheme;
-                    }
+                        var authorization = context.Request.Headers.Authorization.ToString();
+                        if (!string.IsNullOrWhiteSpace(authorization)
+                            && authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return WorkbenchAuthenticationDefaults.BearerScheme;
+                        }
 
-                    return WorkbenchAuthenticationDefaults.CookieScheme;
-                };
-            })
-            .AddCookie(WorkbenchAuthenticationDefaults.CookieScheme, options =>
-            {
-                options.Cookie.Name = ".NexusAuth.Workbench";
-                options.Cookie.HttpOnly = true;
-                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-                options.Cookie.SameSite = SameSiteMode.Lax;
-                options.LoginPath = "/api/auth/login";
-                options.SlidingExpiration = true;
-                options.ExpireTimeSpan = TimeSpan.FromHours(24);
-                options.EventsType = typeof(WorkbenchCookieAuthenticationEvents);
-            })
-            .AddJwtBearer(WorkbenchAuthenticationDefaults.BearerScheme, options =>
+                        return WorkbenchAuthenticationDefaults.CookieScheme;
+                    };
+                })
+                .AddCookie(WorkbenchAuthenticationDefaults.CookieScheme, options =>
+                {
+                    options.Cookie.Name = ".NexusAuth.Workbench";
+                    options.Cookie.HttpOnly = true;
+                    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                    options.Cookie.SameSite = SameSiteMode.Lax;
+                    options.LoginPath = "/api/auth/login";
+                    options.SlidingExpiration = true;
+                    options.ExpireTimeSpan = TimeSpan.FromHours(24);
+                    options.EventsType = typeof(WorkbenchCookieAuthenticationEvents);
+                });
+        }
+        authentication.AddJwtBearer(WorkbenchAuthenticationDefaults.BearerScheme, options =>
             {
                 var normalizedAuthority = requiredAuthConfiguration.Authority.TrimEnd('/');
                 var normalizedBackchannelAuthority = string.IsNullOrWhiteSpace(backchannelAuthority)
@@ -103,7 +115,7 @@ public class WorkbenchApiModule : LuckAppModule
                 {
                     ValidateIssuer = true,
                     ValidIssuer = normalizedAuthority,
-                    ValidateAudience = !string.IsNullOrWhiteSpace(audience),
+                    ValidateAudience = true,
                     ValidAudience = audience,
                     ValidateLifetime = true,
                     NameClaimType = "name",
@@ -137,21 +149,28 @@ public class WorkbenchApiModule : LuckAppModule
         string? clientSecret,
         string? redirectUri,
         string? postLogoutRedirectUri,
-        string? scope)
+        string? scope,
+        string? audience,
+        bool gatewayEnabled)
     {
         var errors = new List<string>();
         if (string.IsNullOrWhiteSpace(authority))
-            errors.Add("Authority is required.");
+            errors.Add("Auth:Authority (NEXUSAUTH_WORKBENCH_AUTH_AUTHORITY) is required.");
+        if (string.IsNullOrWhiteSpace(audience))
+            errors.Add("Auth:Audience (NEXUSAUTH_WORKBENCH_AUTH_AUDIENCE) is required.");
         if (string.IsNullOrWhiteSpace(clientId))
-            errors.Add("ClientId is required.");
+            errors.Add("Auth:ClientId (NEXUSAUTH_WORKBENCH_AUTH_CLIENT_ID) is required for initialization.");
         if (string.IsNullOrWhiteSpace(clientSecret))
-            errors.Add("ClientSecret is required.");
-        if (string.IsNullOrWhiteSpace(redirectUri))
-            errors.Add("RedirectUri is required.");
-        if (string.IsNullOrWhiteSpace(postLogoutRedirectUri))
-            errors.Add("PostLogoutRedirectUri is required.");
-        if (string.IsNullOrWhiteSpace(scope))
-            errors.Add("Scope is required.");
+            errors.Add("Auth:ClientSecret (NEXUSAUTH_WORKBENCH_AUTH_CLIENT_SECRET) is required for initialization.");
+        if (!gatewayEnabled && string.IsNullOrWhiteSpace(redirectUri))
+            errors.Add("Auth:RedirectUri (NEXUSAUTH_WORKBENCH_AUTH_REDIRECT_URI) is required in non-gateway mode.");
+        if (!gatewayEnabled && string.IsNullOrWhiteSpace(postLogoutRedirectUri))
+            errors.Add("Auth:PostLogoutRedirectUri (NEXUSAUTH_WORKBENCH_AUTH_POST_LOGOUT_REDIRECT_URI) is required in non-gateway mode.");
+        if (!gatewayEnabled && string.IsNullOrWhiteSpace(scope))
+            errors.Add("Auth:Scope (NEXUSAUTH_WORKBENCH_AUTH_SCOPE) is required in non-gateway mode.");
+        if (!Uri.TryCreate(authority, UriKind.Absolute, out var authorityUri)
+            || (authorityUri.Scheme != Uri.UriSchemeHttp && authorityUri.Scheme != Uri.UriSchemeHttps))
+            errors.Add("Auth:Authority (NEXUSAUTH_WORKBENCH_AUTH_AUTHORITY) must be an absolute HTTP(S) URI.");
 
         if (errors.Count > 0)
             throw new InvalidOperationException(string.Join(" ", errors));
@@ -160,9 +179,9 @@ public class WorkbenchApiModule : LuckAppModule
             authority ?? throw new InvalidOperationException("Authority is required."),
             clientId ?? throw new InvalidOperationException("ClientId is required."),
             clientSecret ?? throw new InvalidOperationException("ClientSecret is required."),
-            redirectUri ?? throw new InvalidOperationException("RedirectUri is required."),
-            postLogoutRedirectUri ?? throw new InvalidOperationException("PostLogoutRedirectUri is required."),
-            scope ?? throw new InvalidOperationException("Scope is required."));
+            redirectUri ?? string.Empty,
+            postLogoutRedirectUri ?? string.Empty,
+            scope ?? string.Empty);
     }
 
     private static string? EnsureWorkbenchResourceScope(string? scope, string? resourceName)

@@ -11,14 +11,11 @@ export default defineConfig({
     port: 5273,
     proxy: {
       '/api': {
-        target: 'http://localhost:9180',
+        target: 'http://localhost:5051',
         changeOrigin: true,
-        rewrite: (path) => `/workbenchproxy${path}`,
       },
-      // The APISIX OIDC callback lands here so its session cookie is issued
-      // for the local Vite origin, not for the gateway's port directly.
-      '/workbenchproxy': {
-        target: 'http://localhost:9180',
+      '/signin-oidc': {
+        target: 'http://localhost:5051',
         changeOrigin: true,
       },
     },

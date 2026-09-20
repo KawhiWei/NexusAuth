@@ -15,6 +15,7 @@ public sealed class WorkbenchEnvironmentConfigurationTests
     {
         var values = new Dictionary<string, string>
         {
+            ["NEXUSAUTH_WORKBENCH_GATEWAY_ENABLED"] = "true",
             ["NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_NAME"] = "nexusauth.workbench.api",
             ["NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_DISPLAY_NAME"] = "Workbench API",
             ["NEXUSAUTH_WORKBENCH_BOOTSTRAP_CLIENT_NAME"] = "Workbench",
@@ -28,6 +29,7 @@ public sealed class WorkbenchEnvironmentConfigurationTests
                 Environment.SetEnvironmentVariable(name, value);
             using var configuration = new ConfigurationManager();
             configuration.AddWorkbenchEnvironmentVariables();
+            Assert.True(configuration.IsWorkbenchGatewayEnabled());
 
             var options = configuration.GetSection("Bootstrap").Get<WorkbenchBootstrapOptions>();
 

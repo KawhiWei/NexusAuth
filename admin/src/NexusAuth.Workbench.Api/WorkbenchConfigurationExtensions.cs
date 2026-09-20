@@ -7,6 +7,7 @@ public static class WorkbenchConfigurationExtensions
     private static readonly IReadOnlyDictionary<string, string> SingleUnderscoreEnvironmentVariables =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
+            ["NEXUSAUTH_WORKBENCH_GATEWAY_ENABLED"] = "Gateway:Enabled",
             ["NEXUSAUTH_WORKBENCH_CONNECTION_STRINGS_DEFAULT"] = "ConnectionStrings:Default",
             ["NEXUSAUTH_WORKBENCH_AUTH_AUTHORITY"] = "Auth:Authority",
             ["NEXUSAUTH_WORKBENCH_AUTH_BACKCHANNEL_AUTHORITY"] = "Auth:BackchannelAuthority",
@@ -46,5 +47,16 @@ public static class WorkbenchConfigurationExtensions
             configuration.AddInMemoryCollection(values);
 
         return configuration;
+    }
+
+    public static bool IsWorkbenchGatewayEnabled(this IConfiguration configuration)
+    {
+        var value = configuration["Gateway:Enabled"];
+        if (value is null)
+            return false;
+        if (bool.TryParse(value, out var enabled))
+            return enabled;
+        throw new InvalidOperationException(
+            "Gateway:Enabled (NEXUSAUTH_WORKBENCH_GATEWAY_ENABLED) must be true or false.");
     }
 }

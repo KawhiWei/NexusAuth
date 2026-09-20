@@ -125,24 +125,6 @@ public class AuthController : ControllerBase
         return Redirect(providerErrorUrl);
     }
 
-    [HttpGet("/api/auth/me")]
-    [AllowAnonymous]
-    public IActionResult Me()
-    {
-        if (User.Identity?.IsAuthenticated != true)
-            return Unauthorized(new { isAuthenticated = false });
-
-        return Ok(new
-        {
-            isAuthenticated = true,
-            user = new
-            {
-                id = User.FindFirstValue(ClaimTypes.NameIdentifier),
-                name = User.Identity.Name
-            }
-        });
-    }
-
     [HttpPost("/api/auth/logout")]
     [Authorize]
     public async Task<IActionResult> Logout(CancellationToken ct)

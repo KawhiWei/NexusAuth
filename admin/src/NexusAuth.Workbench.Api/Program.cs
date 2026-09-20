@@ -14,6 +14,11 @@ try
     builder.Services.AddApiResult();
 
     builder.Services.AddControllers()
+        .ConfigureApplicationPartManager(manager =>
+        {
+            if (builder.Configuration.IsWorkbenchGatewayEnabled())
+                manager.FeatureProviders.Add(new GatewayControllerFeatureProvider());
+        })
         .AddJsonOptions(options =>
         {
             options.JsonSerializerOptions.Converters.Add(new SystemTextJsonConvert.DateTimeConverter());

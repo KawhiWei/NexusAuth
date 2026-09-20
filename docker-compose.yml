@@ -71,11 +71,6 @@ services:
       retries: 20
       start_period: 20s
     restart: unless-stopped
-    networks:
-      default:
-      nexusauth-gateway:
-        aliases:
-          - sso
 
   admin-api:
     build:
@@ -86,6 +81,7 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       NEXUSAUTH_WORKBENCH_CONNECTION_STRINGS_DEFAULT: Host=db;Port=5432;Database=nexusauth;Username=${POSTGRES_USER:-nexusauth};Password=${POSTGRES_PASSWORD:-nexusauth_dev_password};Search Path=nexusauth
       NEXUSAUTH_WORKBENCH_AUTH_AUTHORITY: ${NEXUSAUTH_JWT_ISSUER:-http://localhost:5100}
+      NEXUSAUTH_WORKBENCH_GATEWAY_ENABLED: ${NEXUSAUTH_WORKBENCH_GATEWAY_ENABLED:-false}
       NEXUSAUTH_WORKBENCH_AUTH_BACKCHANNEL_AUTHORITY: http://sso:8080
       NEXUSAUTH_WORKBENCH_AUTH_CLIENT_SECRET: ${WORKBENCH_CLIENT_SECRET:-c57cf0e110c54ad2ac5591b99801b852}
       NEXUSAUTH_WORKBENCH_AUTH_REDIRECT_URI: ${NEXUSAUTH_WORKBENCH_AUTH_REDIRECT_URI:-http://localhost:5560/signin-oidc}
@@ -108,11 +104,6 @@ services:
       retries: 20
       start_period: 20s
     restart: unless-stopped
-    networks:
-      default:
-      nexusauth-gateway:
-        aliases:
-          - admin-api
 
   dashboard:
     build:
@@ -140,8 +131,3 @@ volumes:
   nexusauth-signing-key:
   nexusauth-sso-keys:
   nexusauth-admin-keys:
-
-networks:
-  nexusauth-gateway:
-    name: nexusauth-gateway
-    external: true

@@ -17,6 +17,11 @@ public sealed class SsoSessionService(ISsoSessionRepository sessionRepository) :
         return await sessionRepository.FindActiveAsync(sessionId, userId, DateTimeOffset.UtcNow, ct) is not null;
     }
 
+    public Task RevokeAsync(Guid sessionId, Guid userId, CancellationToken ct = default)
+    {
+        return sessionRepository.RevokeAsync(sessionId, userId, DateTimeOffset.UtcNow, ct);
+    }
+
     public Task RevokeAllForUserAsync(Guid userId, CancellationToken ct = default)
     {
         return sessionRepository.RevokeAllForUserAsync(userId, DateTimeOffset.UtcNow, ct);

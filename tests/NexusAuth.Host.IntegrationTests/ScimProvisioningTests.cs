@@ -336,6 +336,7 @@ public sealed class NoOpSsoSessionService : ISsoSessionService
 {
     public Task<Guid> CreateAsync(Guid userId, TimeSpan lifetime, CancellationToken ct = default) => Task.FromResult(Guid.NewGuid());
     public Task<bool> IsActiveAsync(Guid sessionId, Guid userId, CancellationToken ct = default) => Task.FromResult(true);
+    public Task RevokeAsync(Guid sessionId, Guid userId, CancellationToken ct = default) => Task.CompletedTask;
     public Task RevokeAllForUserAsync(Guid userId, CancellationToken ct = default) => Task.CompletedTask;
 }
 

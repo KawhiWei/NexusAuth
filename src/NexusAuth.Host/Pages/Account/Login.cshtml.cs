@@ -85,7 +85,7 @@ public class LoginModel(
 
     public int SliderCaptchaTolerancePixels => _sliderCaptchaOptions.TolerancePixels;
 
-    public int SliderCaptchaTargetOffsetPixels { get; private set; }
+    public string SliderCaptchaImageDataUrl { get; private set; } = string.Empty;
 
     /// <summary>
     /// 渲染登录页，并清理已有外部认证 Cookie。
@@ -401,6 +401,9 @@ public class LoginModel(
 
     private void RefreshSliderCaptchaChallenge()
     {
+        ModelState.Remove(nameof(SliderCaptchaToken));
+        ModelState.Remove(nameof(SliderCaptchaOffset));
+
         if (!SliderCaptchaEnabled)
         {
             SliderCaptchaToken = string.Empty;
@@ -410,7 +413,7 @@ public class LoginModel(
 
         var challenge = sliderCaptchaChallengeProtector.CreateChallenge();
         SliderCaptchaToken = challenge.Token;
-        SliderCaptchaTargetOffsetPixels = challenge.TargetOffsetPixels;
+        SliderCaptchaImageDataUrl = challenge.ImageDataUrl;
         SliderCaptchaOffset = null;
     }
 

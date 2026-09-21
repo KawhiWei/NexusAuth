@@ -12,10 +12,10 @@ deployment:
     config_provider: etcd
   admin:
     admin_listen:
-      ip: 0.0.0.0
+      ip: 127.0.0.1
       port: 9181
     allow_admin:
-      - 0.0.0.0/0
+      - 127.0.0.1/32
     admin_key:
       - name: admin
         key: "${{APISIX_ADMIN_KEY}}"

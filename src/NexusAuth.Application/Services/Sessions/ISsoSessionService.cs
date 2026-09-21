@@ -8,5 +8,7 @@ public interface ISsoSessionService : IScopedDependency
 
     Task<bool> IsActiveAsync(Guid sessionId, Guid userId, CancellationToken ct = default);
 
+    Task RevokeAsync(Guid sessionId, Guid userId, CancellationToken ct = default);
+
     Task RevokeAllForUserAsync(Guid userId, CancellationToken ct = default);
 }

@@ -30,6 +30,15 @@ public sealed class SsoSessionRepository(IUnitOfWork unitOfWork)
             .FirstOrDefaultAsync(ct);
     }
 
+    public async Task RevokeAsync(Guid sessionId, Guid userId, DateTimeOffset now, CancellationToken ct = default)
+    {
+        await dbContext.Set<SsoSession>()
+            .Where(session => session.Id == sessionId
+                && session.UserId == userId
+                && session.RevokedAt == null)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(session => session.RevokedAt, now), ct);
+    }
+
     public async Task RevokeAllForUserAsync(Guid userId, DateTimeOffset now, CancellationToken ct = default)
     {
         await dbContext.Set<SsoSession>()

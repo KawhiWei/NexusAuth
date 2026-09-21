@@ -8,12 +8,14 @@ services:
       APISIX_ADMIN_KEY: ${APISIX_ADMIN_KEY:?Set APISIX_ADMIN_KEY to a long random value.}
     volumes:
       - ./docker/apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ./docker/apisix/backchannel-route.json:/usr/local/apisix/conf/backchannel-route.json:ro
+      - ./docker/apisix/put-backchannel-route.pl:/usr/local/apisix/conf/put-backchannel-route.pl:ro
     depends_on:
       apisix-etcd:
         condition: service_healthy
     ports:
       # The configured APISIX data plane listens on 9180. Its Admin API is internal on 9181.
-      - "9180:9180"
+      - "127.0.0.1:9180:9180"
     networks:
       nexusauth-gateway:
         aliases:
@@ -60,5 +62,5 @@ volumes:
 
 networks:
   nexusauth-gateway:
-    name: nexusauth-gateway
+    name: nexusauth_default
     external: true

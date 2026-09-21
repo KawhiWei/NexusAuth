@@ -330,7 +330,15 @@ public class AuthorizeController(
         string description,
         string? state)
     {
-        return AuthorizationError(error, description);
+        return BuildAuthorizationResponse(
+            redirectUri,
+            responseMode ?? "query",
+            new Dictionary<string, string?>
+            {
+                ["error"] = error,
+                ["error_description"] = description,
+                ["state"] = state,
+            });
     }
 
     private IActionResult BuildAuthorizationResponse(

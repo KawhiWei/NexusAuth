@@ -16,11 +16,14 @@ public sealed class RegisterModel(
     IWebSignInService webSignInService,
     IAntiforgery antiforgery,
     WebAuthnEnrollmentStateProtector enrollmentStateProtector,
+    SliderCaptchaChallengeProtector sliderCaptchaChallengeProtector,
+    IOptions<SliderCaptchaOptions> sliderCaptchaOptions,
     IOptions<SelfRegistrationOptions> selfRegistrationOptions,
     IOptions<WebAuthnOptions> webAuthnOptions) : PageModel
 {
     private readonly SelfRegistrationOptions selfRegistration = selfRegistrationOptions.Value;
     private readonly WebAuthnOptions webAuthn = webAuthnOptions.Value;
+    private readonly SliderCaptchaOptions sliderCaptcha = sliderCaptchaOptions.Value;
 
     [BindProperty]
     [Required(ErrorMessage = "请输入登录账号。")]
@@ -52,6 +55,18 @@ public sealed class RegisterModel(
     [BindProperty(SupportsGet = true)]
     public string? ReturnUrl { get; set; }
 
+    [BindProperty]
+    public string SliderCaptchaToken { get; set; } = string.Empty;
+
+    [BindProperty]
+    public int? SliderCaptchaOffset { get; set; }
+
+    public bool SliderCaptchaEnabled => sliderCaptcha.Enabled;
+
+    public int SliderCaptchaTrackWidthPixels => sliderCaptcha.TrackWidthPixels;
+
+    public string SliderCaptchaImageDataUrl { get; private set; } = string.Empty;
+
     public string? ErrorMessage { get; private set; }
 
     public bool SelfRegistrationEnabled => selfRegistration.Enabled;
@@ -65,6 +80,7 @@ public sealed class RegisterModel(
             return Redirect("/account");
 
         ReturnUrl = GetLocalReturnUrl(ReturnUrl);
+        RefreshSliderCaptchaChallenge();
         return Page();
     }
 
@@ -84,9 +100,19 @@ public sealed class RegisterModel(
             return BadRequest();
         }
 
+        if (SliderCaptchaEnabled
+            && !sliderCaptchaChallengeProtector.TryValidate(SliderCaptchaToken, SliderCaptchaOffset))
+        {
+            ErrorMessage = "请完成拼图验证。";
+            ClearPasswords();
+            RefreshSliderCaptchaChallenge();
+            return Page();
+        }
+
         if (!ModelState.IsValid)
         {
             ClearPasswords();
+            RefreshSliderCaptchaChallenge();
             return Page();
         }
 
@@ -130,6 +156,7 @@ public sealed class RegisterModel(
         }
 
         ClearPasswords();
+        RefreshSliderCaptchaChallenge();
         return Page();
     }
 
@@ -159,5 +186,24 @@ public sealed class RegisterModel(
 
         foreach (var error in confirmationErrors)
             ModelState.AddModelError(nameof(ConfirmPassword), error);
+    }
+
+    private void RefreshSliderCaptchaChallenge()
+    {
+        ModelState.Remove(nameof(SliderCaptchaToken));
+        ModelState.Remove(nameof(SliderCaptchaOffset));
+
+        if (!SliderCaptchaEnabled)
+        {
+            SliderCaptchaToken = string.Empty;
+            SliderCaptchaOffset = null;
+            SliderCaptchaImageDataUrl = string.Empty;
+            return;
+        }
+
+        var challenge = sliderCaptchaChallengeProtector.CreateChallenge();
+        SliderCaptchaToken = challenge.Token;
+        SliderCaptchaOffset = null;
+        SliderCaptchaImageDataUrl = challenge.ImageDataUrl;
     }
 }

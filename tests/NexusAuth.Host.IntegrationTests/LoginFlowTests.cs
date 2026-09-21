@@ -161,6 +161,21 @@ public sealed class LoginFlowTests
     }
 
     [Fact]
+    public void Slider_captcha_challenge_exposes_a_png_instead_of_the_target_coordinate()
+    {
+        var protector = new SliderCaptchaChallengeProtector(new EphemeralDataProtectionProvider());
+
+        var challenge = protector.CreateChallenge();
+
+        const string prefix = "data:image/png;base64,";
+        Assert.StartsWith(prefix, challenge.ImageDataUrl);
+        var image = Convert.FromBase64String(challenge.ImageDataUrl[prefix.Length..]);
+        Assert.Equal(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }, image[..8]);
+        Assert.InRange(image.Length, 1, 100_000);
+        Assert.False(string.IsNullOrWhiteSpace(challenge.Token));
+    }
+
+    [Fact]
     public void Slider_captcha_rejects_a_tampered_token_or_an_offset_outside_tolerance()
     {
         var protector = new SliderCaptchaChallengeProtector(new EphemeralDataProtectionProvider());

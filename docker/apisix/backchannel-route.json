@@ -1,0 +1,10 @@
+{
+  "name": "NexusAuth SSO backchannel",
+  "uri": "/*",
+  "vars": [["server_port", "==", "5100"]],
+  "priority": 100,
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": { "sso:8080": 1 }
+  }
+}

@@ -2,7 +2,12 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using System.Net;
+using System.Text.RegularExpressions;
 using System.Text.Json;
+using NexusAuth.Application.Users;
+using NexusAuth.Domain.AggregateRoots.Users;
 using Xunit;
 
 namespace NexusAuth.Host.IntegrationTests;
@@ -123,6 +128,67 @@ public sealed class ProviderHostTests : IClassFixture<WebApplicationFactory<AppW
     }
 
     [Fact]
+    public async Task Enabled_slider_captcha_registration_page_contains_png_challenge_without_target_coordinate()
+    {
+        using var enabledFactory = factory.WithWebHostBuilder(builder => builder
+            .UseSetting("SelfRegistration:Enabled", "true")
+            .UseSetting("SliderCaptcha:Enabled", "true"));
+        using var client = enabledFactory.CreateClient();
+
+        var page = await client.GetStringAsync("/account/register");
+
+        Assert.Contains("data:image/png;base64,", page);
+        Assert.Contains("name=\"SliderCaptchaToken\"", page);
+        Assert.Contains("name=\"SliderCaptchaOffset\"", page);
+        Assert.DoesNotContain("data-target=", page);
+        Assert.DoesNotContain("dataset.target", page);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Missing_or_invalid_registration_captcha_does_not_create_user(bool submitInvalidCaptcha)
+    {
+        var users = new RecordingRegistrationUserService();
+        using var enabledFactory = factory.WithWebHostBuilder(builder => builder
+            .UseSetting("SelfRegistration:Enabled", "true")
+            .UseSetting("SliderCaptcha:Enabled", "true")
+            .ConfigureTestServices(services =>
+            {
+                services.RemoveAll<IUserService>();
+                services.AddSingleton<IUserService>(users);
+            }));
+        using var client = enabledFactory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = true,
+        });
+        var registrationPage = await client.GetStringAsync("/account/register");
+        var antiforgeryToken = ExtractHiddenInput(registrationPage, "__RequestVerificationToken");
+        var form = new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = antiforgeryToken,
+            ["Username"] = "captcha-user",
+            ["Nickname"] = "Captcha User",
+            ["Email"] = "captcha@example.com",
+            ["Password"] = "Password123!",
+            ["ConfirmPassword"] = "Password123!",
+        };
+        if (submitInvalidCaptcha)
+        {
+            form["SliderCaptchaToken"] = "invalid-token";
+            form["SliderCaptchaOffset"] = "120";
+        }
+
+        var response = await client.PostAsync("/account/register", new FormUrlEncodedContent(form));
+
+        response.EnsureSuccessStatusCode();
+        var page = WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync());
+        Assert.Contains("请完成拼图验证。", page);
+        Assert.Equal(0, users.RegisterCount);
+    }
+
+    [Fact]
     public async Task Login_page_shows_registration_link_when_self_registration_is_enabled()
     {
         using var enabledFactory = factory.WithWebHostBuilder(builder => builder
@@ -160,6 +226,20 @@ public sealed class ProviderHostTests : IClassFixture<WebApplicationFactory<AppW
     }
 
     [Fact]
+    public async Task Enabled_slider_captcha_does_not_publish_its_target_coordinate()
+    {
+        using var enabledFactory = factory.WithWebHostBuilder(builder =>
+            builder.UseSetting("SliderCaptcha:Enabled", "true"));
+        using var client = enabledFactory.CreateClient();
+
+        var loginPage = await client.GetStringAsync("/account/login");
+
+        Assert.Contains("data:image/png;base64,", loginPage);
+        Assert.DoesNotContain("data-target=", loginPage);
+        Assert.DoesNotContain("dataset.target", loginPage);
+    }
+
+    [Fact]
     public async Task Passkey_enrollment_requires_an_authenticated_session()
     {
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -188,4 +268,42 @@ public sealed class ProviderHostTests : IClassFixture<WebApplicationFactory<AppW
         Assert.StartsWith("/oauth/error", location);
         Assert.Contains("error=invalid_request", location);
     }
+
+    private static string ExtractHiddenInput(string html, string name)
+    {
+        var match = Regex.Match(
+            html,
+            $"<input[^>]*name=\"{Regex.Escape(name)}\"[^>]*value=\"(?<value>[^\"]+)\"[^>]*>",
+            RegexOptions.IgnoreCase);
+        Assert.True(match.Success, $"Hidden input '{name}' was not found.");
+        return WebUtility.HtmlDecode(match.Groups["value"].Value);
+    }
+}
+
+internal sealed class RecordingRegistrationUserService : IUserService
+{
+    public int RegisterCount { get; private set; }
+
+    public Task<Guid> RegisterAsync(
+        string username,
+        string rawPassword,
+        string nickname,
+        string? email = null,
+        string? phoneNumber = null,
+        Gender gender = Gender.Unknown,
+        string? ethnicity = null,
+        CancellationToken ct = default)
+    {
+        RegisterCount++;
+        return Task.FromResult(Guid.NewGuid());
+    }
+
+    public Task<User?> ValidateCredentialsAsync(string identifier, string rawPassword, CancellationToken ct = default) =>
+        Task.FromResult<User?>(null);
+
+    public Task<User?> FindByIdAsync(Guid id, CancellationToken ct = default) =>
+        Task.FromResult<User?>(null);
+
+    public Task ChangePasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken ct = default) =>
+        throw new NotSupportedException();
 }

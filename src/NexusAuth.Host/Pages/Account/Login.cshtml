@@ -118,10 +118,9 @@
         .captcha-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
         .captcha-header h2 { margin: 0; color: var(--form-heading); font-family: Geist, sans-serif; font-size: 18px; } .captcha-header p { margin: 5px 0 0; color: var(--form-muted); font-size: 14px; }
         .captcha-close { border: 0; color: var(--form-muted); background: transparent; font-size: 24px; cursor: pointer; }
-        .slider-captcha-scene { position: relative; width: 100%; height: 160px; overflow: hidden; border: 1px solid #ffffff33; border-radius: 6px; background: linear-gradient(125deg, #2f8fe5eb, #2563ebcc), repeating-linear-gradient(45deg, #ffffff24 0 2px, transparent 2px 14px); }
-        .captcha-stars { position: absolute; inset: 0; opacity: .4; background-image: radial-gradient(circle at 16% 25%, white 0 2px, transparent 3px), radial-gradient(circle at 75% 72%, white 0 3px, transparent 4px), linear-gradient(135deg, transparent 42%, #ffffff6b 43% 47%, transparent 48%); }
-        .captcha-gap, .slider-captcha-piece { position: absolute; top: 52px; width: 44px; height: 44px; border-radius: 6px; }
-        .captcha-gap { border: 2px dashed #ffffffcc; background: #0003; }
+        .slider-captcha-scene { position: relative; width: 100%; height: 160px; overflow: hidden; border: 1px solid #ffffff33; border-radius: 6px; background: #2563eb; }
+        .captcha-image { display: block; width: 100%; height: 100%; object-fit: fill; }
+        .slider-captcha-piece { position: absolute; top: 52px; width: 44px; height: 44px; border-radius: 6px; }
         .slider-captcha-piece { left: 0; border: 1px solid #ffffffcc; background: #ffffff59; box-shadow: 0 8px 18px #00000047; backdrop-filter: blur(4px); will-change: transform; }
         .captcha-track { position: relative; height: 48px; margin-top: 20px; border-radius: 6px; overflow: hidden; background: color-mix(in srgb, var(--field-bg) 75%, var(--border)); user-select: none; }
         .captcha-progress { position: absolute; inset: 0 auto 0 0; border-radius: 6px; background: color-mix(in srgb, var(--brand-blue) 30%, transparent); transform-origin: left center; will-change: transform; }
@@ -204,7 +203,7 @@
                     @if (Model.SliderCaptchaEnabled)
                     {
                         <div id="slider-captcha-dialog" class="slider-captcha-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="slider-captcha-title">
-                            <div class="captcha-card"><div class="captcha-header"><div><h2 id="slider-captcha-title">安全验证</h2><p>拖动滑块，将拼图移动到缺口位置。</p></div><button id="slider-captcha-close" type="button" class="captcha-close" aria-label="关闭验证">&times;</button></div><div id="slider-captcha-scene" class="slider-captcha-scene" data-target="@Model.SliderCaptchaTargetOffsetPixels" data-tolerance="@Model.SliderCaptchaTolerancePixels" data-track-width="@Model.SliderCaptchaTrackWidthPixels"><div class="captcha-stars"></div><div id="slider-captcha-gap" class="captcha-gap" aria-hidden="true"></div><div id="slider-captcha-piece" class="slider-captcha-piece" aria-hidden="true"></div></div><div id="slider-captcha-track" class="captcha-track" aria-label="拖动完成安全验证"><div id="slider-captcha-progress" class="captcha-progress"></div><span class="captcha-instruction">按住滑块向右拖动</span><button id="slider-captcha-handle" type="button" class="captcha-handle" aria-label="拖动滑块"><span aria-hidden="true">&raquo;</span></button></div><p id="slider-captcha-status" class="captcha-status" aria-live="polite"></p></div>
+                            <div class="captcha-card"><div class="captcha-header"><div><h2 id="slider-captcha-title">安全验证</h2><p>拖动滑块，将拼图移动到缺口位置。</p></div><button id="slider-captcha-close" type="button" class="captcha-close" aria-label="关闭验证">&times;</button></div><div id="slider-captcha-scene" class="slider-captcha-scene" data-track-width="@Model.SliderCaptchaTrackWidthPixels"><img class="captcha-image" src="@Model.SliderCaptchaImageDataUrl" alt="滑块验证码背景" draggable="false" /><div id="slider-captcha-piece" class="slider-captcha-piece" aria-hidden="true"></div></div><div id="slider-captcha-track" class="captcha-track" aria-label="拖动完成安全验证"><div id="slider-captcha-progress" class="captcha-progress"></div><span class="captcha-instruction">按住滑块向右拖动</span><button id="slider-captcha-handle" type="button" class="captcha-handle" aria-label="拖动滑块"><span aria-hidden="true">&raquo;</span></button></div><p id="slider-captcha-status" class="captcha-status" aria-live="polite"></p></div>
                         </div>
                     }
                 }
@@ -244,7 +243,6 @@
             if (!form || !dialog) return;
             document.body.appendChild(dialog);
             const scene = document.getElementById('slider-captcha-scene');
-            const gap = document.getElementById('slider-captcha-gap');
             const piece = document.getElementById('slider-captcha-piece');
             const track = document.getElementById('slider-captcha-track');
             const handle = document.getElementById('slider-captcha-handle');
@@ -268,8 +266,6 @@
             function queuePosition(offset) { pendingOffset = offset; if (animationFrame) return; animationFrame = window.requestAnimationFrame(function () { animationFrame = 0; setPosition(pendingOffset); }); }
             function prepare() {
                 verified = false; offsetInput.value = ''; status.textContent = ''; measure(); piece.style.left = '0px'; setPosition(0);
-                const configuredWidth = Number(scene.dataset.trackWidth);
-                gap.style.left = `${Number(scene.dataset.target) / configuredWidth * (scene.clientWidth - gap.clientWidth)}px`;
             }
             function openDialog() { dialog.classList.remove('hidden'); window.requestAnimationFrame(function () { prepare(); handle.focus(); }); }
             function closeDialog() { dialog.classList.add('hidden'); }
@@ -280,9 +276,7 @@
                 if (!dragging) return; dragging = false; handle.releasePointerCapture(event.pointerId);
                 if (animationFrame) { window.cancelAnimationFrame(animationFrame); animationFrame = 0; }
                 setPosition(event.clientX - startX);
-                const passed = Math.abs(Number(offsetInput.value) - Number(scene.dataset.target)) <= Number(scene.dataset.tolerance);
-                if (passed) { verified = true; status.textContent = '验证通过，正在提交...'; window.setTimeout(function () { closeDialog(); form.requestSubmit(); }, 180); return; }
-                status.textContent = '请将拼图对准缺口后重试。'; window.setTimeout(function () { setPosition(0); }, 300);
+                verified = true; status.textContent = '正在验证...'; window.setTimeout(function () { closeDialog(); form.requestSubmit(); }, 180);
             });
             close.addEventListener('click', closeDialog);
             window.addEventListener('resize', function () { if (!dialog.classList.contains('hidden')) prepare(); });

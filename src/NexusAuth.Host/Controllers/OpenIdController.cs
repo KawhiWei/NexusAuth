@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using NexusAuth.Application.Services;
@@ -14,6 +15,7 @@ public class OpenIdController(
     IClientService clientService,
     IDeviceAuthorizationService deviceAuthorizationService,
     ISsoSessionService sessionService,
+    IAntiforgery antiforgery,
     IOptions<JwtOptions> jwtOptions) : ControllerBase
 {
     private readonly ITokenSigningCredentialsProvider _signingCredentialsProvider = signingCredentialsProvider;
@@ -23,6 +25,7 @@ public class OpenIdController(
     private readonly IClientService _clientService = clientService;
     private readonly IDeviceAuthorizationService _deviceAuthorizationService = deviceAuthorizationService;
     private readonly ISsoSessionService _sessionService = sessionService;
+    private readonly IAntiforgery _antiforgery = antiforgery;
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
     private static readonly HashSet<string> BaseUserInfoClaims =
     [
@@ -297,38 +300,45 @@ public class OpenIdController(
         [FromQuery] string? state = null,
         CancellationToken ct = default)
     {
-        if (!string.IsNullOrWhiteSpace(idTokenHint))
-        {
-            var validation = _idTokenHintValidator.Validate(idTokenHint);
-            if (!validation.IsValid)
-                return BadRequest(new { error = "invalid_request", error_description = "id_token_hint is invalid." });
+        var validationError = await ValidateEndSessionRequestAsync(idTokenHint, postLogoutRedirectUri, ct);
+        if (validationError is not null)
+            return validationError;
 
-            var currentSubject = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            if (!string.IsNullOrWhiteSpace(currentSubject)
-                && !string.IsNullOrWhiteSpace(validation.Subject)
-                && !string.Equals(currentSubject, validation.Subject, StringComparison.Ordinal))
-            {
-                return BadRequest(new { error = "invalid_request", error_description = "id_token_hint does not match the current session." });
-            }
+        Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+        Response.Headers.Pragma = "no-cache";
+        var tokens = _antiforgery.GetAndStoreTokens(HttpContext);
+        return Content(
+            BuildEndSessionConfirmationPage(
+                tokens.FormFieldName,
+                tokens.RequestToken!,
+                idTokenHint,
+                postLogoutRedirectUri,
+                state),
+            "text/html; charset=utf-8");
+    }
 
-            var clientValidation = await _clientService.AuthenticateClientForPostLogoutAsync(validation.ClientId!, postLogoutRedirectUri, ct);
-            if (!clientValidation.IsSuccess)
-                return BadRequest(new { error = clientValidation.ErrorCode ?? "invalid_request", error_description = clientValidation.Error });
-        }
-        else if (!string.IsNullOrWhiteSpace(postLogoutRedirectUri))
-        {
-            return BadRequest(new { error = "invalid_request", error_description = "id_token_hint is required when post_logout_redirect_uri is provided." });
-        }
+    [HttpPost("/connect/endsession")]
+    [Consumes("application/x-www-form-urlencoded")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ConfirmEndSession(
+        [FromForm(Name = "id_token_hint")] string? idTokenHint = null,
+        [FromForm(Name = "post_logout_redirect_uri")] string? postLogoutRedirectUri = null,
+        [FromForm] string? state = null,
+        CancellationToken ct = default)
+    {
+        var validationError = await ValidateEndSessionRequestAsync(idTokenHint, postLogoutRedirectUri, ct);
+        if (validationError is not null)
+            return validationError;
 
-        if (Guid.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var currentUserId))
-        {
-            await _tokenService.RevokeAllUserTokensAsync(currentUserId, ct);
-            await _sessionService.RevokeAllForUserAsync(currentUserId, ct);
-        }
+        var subject = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var sid = User.FindFirst("sid")?.Value;
+        if (Guid.TryParse(subject, out var currentUserId) && Guid.TryParse(sid, out var currentSessionId))
+            await _sessionService.RevokeAsync(currentSessionId, currentUserId, ct);
 
         await HttpContext.SignOutAsync(AppWebModule.AuthenticationScheme);
 
-        if (!string.IsNullOrWhiteSpace(postLogoutRedirectUri) && Uri.TryCreate(postLogoutRedirectUri, UriKind.Absolute, out _))
+        if (!string.IsNullOrWhiteSpace(postLogoutRedirectUri)
+            && Uri.TryCreate(postLogoutRedirectUri, UriKind.Absolute, out _))
         {
             var redirectUri = postLogoutRedirectUri;
             if (!string.IsNullOrWhiteSpace(state))
@@ -338,6 +348,70 @@ public class OpenIdController(
         }
 
         return Redirect("/");
+    }
+
+    private async Task<IActionResult?> ValidateEndSessionRequestAsync(
+        string? idTokenHint,
+        string? postLogoutRedirectUri,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(idTokenHint))
+        {
+            return string.IsNullOrWhiteSpace(postLogoutRedirectUri)
+                ? null
+                : BadRequest(new { error = "invalid_request", error_description = "id_token_hint is required when post_logout_redirect_uri is provided." });
+        }
+
+        var validation = _idTokenHintValidator.Validate(idTokenHint);
+        if (!validation.IsValid)
+            return BadRequest(new { error = "invalid_request", error_description = "id_token_hint is invalid." });
+
+        var currentSubject = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!string.IsNullOrWhiteSpace(currentSubject)
+            && !string.IsNullOrWhiteSpace(validation.Subject)
+            && !string.Equals(currentSubject, validation.Subject, StringComparison.Ordinal))
+        {
+            return BadRequest(new { error = "invalid_request", error_description = "id_token_hint does not match the current session." });
+        }
+
+        var clientValidation = await _clientService.AuthenticateClientForPostLogoutAsync(
+            validation.ClientId!,
+            postLogoutRedirectUri,
+            ct);
+        return clientValidation.IsSuccess
+            ? null
+            : BadRequest(new { error = clientValidation.ErrorCode ?? "invalid_request", error_description = clientValidation.Error });
+    }
+
+    private static string BuildEndSessionConfirmationPage(
+        string antiforgeryFieldName,
+        string antiforgeryToken,
+        string? idTokenHint,
+        string? postLogoutRedirectUri,
+        string? state)
+    {
+        static string Encode(string? value) => System.Net.WebUtility.HtmlEncode(value ?? string.Empty);
+
+        return $"""
+            <!doctype html>
+            <html lang="zh-CN">
+            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>退出登录 - NexusAuth</title></head>
+            <body style="margin:0;font-family:system-ui,sans-serif;background:#f4f6f8;color:#18212f">
+              <main style="max-width:480px;margin:12vh auto;padding:28px;border:1px solid #d8dee8;border-radius:8px;background:#fff">
+                <h1 style="margin:0 0 12px;font-size:24px">退出 NexusAuth？</h1>
+                <p style="margin:0 0 24px;color:#526071;line-height:1.6">确认后将结束当前浏览器中的单点登录会话。</p>
+                <form method="post" action="/connect/endsession">
+                  <input type="hidden" name="{Encode(antiforgeryFieldName)}" value="{Encode(antiforgeryToken)}">
+                  <input type="hidden" name="id_token_hint" value="{Encode(idTokenHint)}">
+                  <input type="hidden" name="post_logout_redirect_uri" value="{Encode(postLogoutRedirectUri)}">
+                  <input type="hidden" name="state" value="{Encode(state)}">
+                  <button type="submit" style="border:0;border-radius:6px;padding:11px 18px;background:#1769e0;color:#fff;font-weight:600;cursor:pointer">确认退出</button>
+                  <a href="/" style="margin-left:12px;color:#42526a;text-decoration:none">取消</a>
+                </form>
+              </main>
+            </body>
+            </html>
+            """;
     }
 
     private string GetIssuer()

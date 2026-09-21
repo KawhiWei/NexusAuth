@@ -2,6 +2,8 @@
 
 > 状态：暂未整理。本手册当前不作为推荐部署流程；非 Gateway 部署请先阅读 [快速启动](./01-快速启动.md)。以下 APISIX 操作内容暂保留，仅供需要网关接入的场景参考。
 
+当前本地已有的网关 OIDC 路由为 `http://localhost:9180/auth/me`，回调为 `http://localhost:9180/auth/callback`，进入时会跳转到 `http://localhost:5100` 登录。下文 `/api/*` 是另建路由的手工示例，并非当前已部署路由。根 Compose 必须先运行；本地启动使用 `./docker/apisix/start-local.sh`。APISIX 的 9180 和 Dashboard 的 9000 都只绑定宿主机回环地址。
+
 本文只通过 APISIX Dashboard 配置网关，不使用 NexusAuth 启动初始化自动创建网关应用或路由。`docker-compose.apisix.yml` 只负责启动 APISIX、etcd 和 APISIX Dashboard。请先在 NexusAuth Dashboard 创建网关 OAuth 应用并生成密钥；Workbench API 重启不会修改已有网关应用。
 
 ## 1. 最终访问关系
@@ -27,28 +29,23 @@
 
 ## 2. 启动基础容器
 
-项目根目录 `.env` 至少配置 APISIX Admin API 密钥：
-
-```dotenv
-APISIX_ADMIN_KEY=replace-with-a-long-random-admin-key
-```
-
-首次使用时创建应用和网关之间的共享网络，然后分别启动两套 Compose：
+本地环境先启动根目录的 NexusAuth Compose，再启动 APISIX。启动脚本会生成并复用忽略提交的 `.env.apisix.local` 管理密钥，并自动创建 `localhost:5100` 的内部回源路由：
 
 ```bash
-docker network create nexusauth-gateway
 docker compose up -d
-docker compose -f docker-compose.apisix.yml up -d
+./docker/apisix/start-local.sh
 ```
 
-如果网络已经存在，`docker network create` 返回已存在即可忽略。
+APISIX 直接加入根 Compose 已创建的 `nexusauth_default` 网络，能通过 `sso:8080` 与 `admin-api:8080` 访问内部服务。无需手工创建 `nexusauth-gateway` 网络。如果要自行设置管理密钥，可在执行脚本前设置至少 32 字符的 `APISIX_ADMIN_KEY` 环境变量；不要把密钥提交到仓库。现有 `/auth/*` OIDC 路由的客户端密钥保存在 etcd 卷中，启动脚本不会创建或重置它；全新部署需先在 Workbench 创建 Client、密钥与路由。
 
 检查状态：
 
 ```bash
 docker compose ps
-docker compose -f docker-compose.apisix.yml ps
+docker ps --filter name=nexusauth-apisix
 ```
+
+如果自行设置了环境变量而未生成 `.env.apisix.local`，检查状态时继续使用同一个变量。
 
 打开 APISIX Dashboard：`http://127.0.0.1:9000`
 
@@ -87,7 +84,7 @@ Client secret 只填写到 APISIX Dashboard 的 OIDC 配置中，不写入前端
 
 NexusAuth discovery 的 issuer 和端点是 `http://localhost:5100`。浏览器访问这个地址时直接进入 SSO 容器；但 APISIX 容器访问 `localhost:5100` 时，localhost 指向 APISIX 自己。因此 APISIX 配置为在容器内部监听 `5100`，需要一条仅匹配该端口的回源路由。
 
-在 APISIX Dashboard 进入 **Routes -> Create**，填写：
+`start-local.sh` 会自动写入这条路由，不需要手工创建。若需要在 APISIX Dashboard 检查，进入 **Routes**，应看到：
 
 | 字段 | 值 |
 | --- | --- |

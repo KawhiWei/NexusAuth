@@ -10,5 +10,7 @@ public interface ISsoSessionRepository : IEntityRepository<SsoSession, Guid>, IS
 
     Task<SsoSession?> FindActiveAsync(Guid sessionId, Guid userId, DateTimeOffset now, CancellationToken ct = default);
 
+    Task RevokeAsync(Guid sessionId, Guid userId, DateTimeOffset now, CancellationToken ct = default);
+
     Task RevokeAllForUserAsync(Guid userId, DateTimeOffset now, CancellationToken ct = default);
 }

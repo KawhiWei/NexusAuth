@@ -6,7 +6,7 @@
 
 ## 0. 端点总览
 
-Provider 默认地址为 `http://localhost:5100`；生产环境应使用 HTTPS Issuer。`/connect/token`、`/connect/deviceauthorization`、`/connect/introspect` 和 `/connect/revocation` 这几个 POST 端点要求 `application/x-www-form-urlencoded`；授权、登出等 GET 端点使用查询参数，UserInfo 使用 Bearer 头，并在需要客户端身份的端点提供已登记的客户端认证。
+Provider 默认地址为 `http://localhost:5100`；生产环境应使用 HTTPS Issuer。`/connect/token`、`/connect/deviceauthorization`、`/connect/introspect` 和 `/connect/revocation` 这几个 POST 端点要求 `application/x-www-form-urlencoded`；授权和登出确认入口使用 GET 查询参数，登出执行使用带防伪令牌的 POST，UserInfo 使用 Bearer 头，并在需要客户端身份的端点提供已登记的客户端认证。
 
 | 方法 | 端点 | 用途 | 客户端认证 |
 |---|---|---|---|
@@ -18,7 +18,7 @@ Provider 默认地址为 `http://localhost:5100`；生产环境应使用 HTTPS I
 | POST | `/connect/deviceauthorization` | 创建设备授权请求 | 是 |
 | POST | `/connect/introspect` | 检查 access token 或 ID token 状态 | 是 |
 | POST | `/connect/revocation` | 撤销 access token 或 refresh token | 是 |
-| GET | `/connect/endsession` | OIDC RP-Initiated Logout | 按 `id_token_hint` 校验 |
+| GET/POST | `/connect/endsession` | OIDC RP-Initiated Logout 确认/执行 | 按 `id_token_hint` 校验，POST 要求防伪令牌 |
 | GET/POST | `/device` | 用户输入设备码并批准/拒绝 | Provider Cookie |
 | GET/POST | `/account/login` | Provider 用户登录 | Provider Cookie |
 
@@ -207,9 +207,9 @@ OIDC Discovery 通过 `/.well-known/openid-configuration` 发布授权、token�
 
 ### RP-Initiated Logout
 
-客户端调用 `/connect/endsession` 时，如果提供 `post_logout_redirect_uri`，必须同时提供有效的 `id_token_hint`。Provider 会根据 ID Token 识别客户端，并要求登出回调地址与客户端登记值精确匹配；验证通过后：
+客户端通过 GET 调用 `/connect/endsession` 时，如果提供 `post_logout_redirect_uri`，必须同时提供有效的 `id_token_hint`。Provider 会根据 ID Token 识别客户端，并要求登出回调地址与客户端登记值精确匹配。GET 只显示确认页，不修改 Cookie、会话或 Token；用户提交带防伪令牌的 POST 后：
 
-1. 撤销当前用户的 token 和 SSO session；
+1. 按 Cookie 中的 `sid` 撤销当前 SSO session，不影响同一用户的其他设备和 OAuth Token；
 2. 清除 Provider 登录 Cookie；
 3. 将可选的 `state` 追加到已验证的登出回调地址并重定向。
 

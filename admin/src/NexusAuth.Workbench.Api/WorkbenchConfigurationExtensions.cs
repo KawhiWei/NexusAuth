@@ -10,7 +10,6 @@ public static class WorkbenchConfigurationExtensions
             ["NEXUSAUTH_WORKBENCH_GATEWAY_ENABLED"] = "Gateway:Enabled",
             ["NEXUSAUTH_WORKBENCH_CONNECTION_STRINGS_DEFAULT"] = "ConnectionStrings:Default",
             ["NEXUSAUTH_WORKBENCH_AUTH_AUTHORITY"] = "Auth:Authority",
-            ["NEXUSAUTH_WORKBENCH_AUTH_BACKCHANNEL_AUTHORITY"] = "Auth:BackchannelAuthority",
             ["NEXUSAUTH_WORKBENCH_AUTH_CLIENT_ID"] = "Auth:ClientId",
             ["NEXUSAUTH_WORKBENCH_AUTH_CLIENT_SECRET"] = "Auth:ClientSecret",
             ["NEXUSAUTH_WORKBENCH_AUTH_REDIRECT_URI"] = "Auth:RedirectUri",

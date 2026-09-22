@@ -11,6 +11,26 @@ public sealed class WorkbenchEnvironmentCollection;
 public sealed class WorkbenchEnvironmentConfigurationTests
 {
     [Fact]
+    public void Legacy_backchannel_authority_environment_variable_is_ignored()
+    {
+        const string variable = "NEXUSAUTH_WORKBENCH_AUTH_BACKCHANNEL_AUTHORITY";
+        var originalValue = Environment.GetEnvironmentVariable(variable);
+        try
+        {
+            Environment.SetEnvironmentVariable(variable, "http://legacy-internal-provider:8080");
+            using var configuration = new ConfigurationManager();
+
+            configuration.AddWorkbenchEnvironmentVariables();
+
+            Assert.Null(configuration["Auth:BackchannelAuthority"]);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(variable, originalValue);
+        }
+    }
+
+    [Fact]
     public void Independent_bootstrap_variables_bind_to_the_workbench_options()
     {
         var values = new Dictionary<string, string>

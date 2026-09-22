@@ -105,12 +105,6 @@ public class WorkbenchAuthOptions
     public required string Authority { get; set; }
 
     /// <summary>
-    /// 中文：获取或设置服务端反向通道使用的 Provider 地址；未设置时使用 <see cref="Authority"/>。
-    /// English: Gets or sets the Provider URL used for server-side backchannel calls; <see cref="Authority"/> is used when omitted.
-    /// </summary>
-    public string? BackchannelAuthority { get; set; }
-
-    /// <summary>
     /// 中文：获取或设置已注册的 OIDC 客户端标识。
     /// English: Gets or sets the registered OIDC client identifier.
     /// </summary>

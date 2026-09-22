@@ -62,8 +62,7 @@ public class OidcWorkbenchService(
     public async Task<DiscoveryDocument> FetchDiscoveryAsync(CancellationToken ct)
     {
         var client = httpClientFactory.CreateClient();
-        var discoveryAuthority = GetBackchannelAuthority();
-        var response = await client.GetAsync($"{discoveryAuthority}/.well-known/openid-configuration", ct);
+        var response = await client.GetAsync($"{Authority.TrimEnd('/')}/.well-known/openid-configuration", ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<DiscoveryDocument>(cancellationToken: ct)
             ?? throw new InvalidOperationException("Unable to load OpenID Connect discovery document.");
@@ -89,7 +88,7 @@ public class OidcWorkbenchService(
 
         var client = httpClientFactory.CreateClient();
         var jwksResponse = await client.GetAsync(
-            ResolveBackchannelEndpoint(discovery.JwksUri),
+            new Uri(discovery.JwksUri, UriKind.Absolute),
             ct);
         jwksResponse.EnsureSuccessStatusCode();
         var jwks = new JsonWebKeySet(await jwksResponse.Content.ReadAsStringAsync(ct));
@@ -187,7 +186,7 @@ public class OidcWorkbenchService(
             ["code_verifier"] = codeVerifier,
         };
 
-        var tokenEndpoint = ResolveBackchannelEndpoint(discovery.TokenEndpoint);
+        var tokenEndpoint = new Uri(discovery.TokenEndpoint, UriKind.Absolute);
         var response = await client.PostAsync(tokenEndpoint, new FormUrlEncodedContent(form), ct);
         var json = await response.Content.ReadAsStringAsync(ct);
 
@@ -214,7 +213,7 @@ public class OidcWorkbenchService(
             ["refresh_token"] = refreshToken,
         };
 
-        var tokenEndpoint = ResolveBackchannelEndpoint(discovery.TokenEndpoint);
+        var tokenEndpoint = new Uri(discovery.TokenEndpoint, UriKind.Absolute);
         var response = await client.PostAsync(tokenEndpoint, new FormUrlEncodedContent(form), ct);
         var json = await response.Content.ReadAsStringAsync(ct);
 
@@ -236,7 +235,7 @@ public class OidcWorkbenchService(
         var client = httpClientFactory.CreateClient();
         await ApplyClientAuthenticationAsync(client);
         var response = await client.PostAsync(
-            ResolveBackchannelEndpoint(discovery.IntrospectionEndpoint),
+            new Uri(discovery.IntrospectionEndpoint, UriKind.Absolute),
             new FormUrlEncodedContent(new Dictionary<string, string> { ["token"] = accessToken }),
             ct);
         response.EnsureSuccessStatusCode();
@@ -287,38 +286,6 @@ public class OidcWorkbenchService(
             throw new InvalidOperationException("Invalid expires_in");
 
         return new WorkbenchTokenResult(accessToken, refreshToken, idToken, expiresIn);
-    }
-
-    /// <summary>
-    /// 中文：获取服务端反向通道使用的 Provider 基础地址。
-    /// English: Gets the Provider base URL used for server-side backchannel requests.
-    /// </summary>
-    /// <returns>中文：不包含末尾斜杠的反向通道地址。English: The backchannel URL without a trailing slash.</returns>
-    private string GetBackchannelAuthority()
-    {
-        var authority = string.IsNullOrWhiteSpace(_options.BackchannelAuthority)
-            ? Authority
-            : _options.BackchannelAuthority;
-
-        return authority.TrimEnd('/');
-    }
-
-    /// <summary>
-    /// 中文：将发现文档中的公开端点映射到可选的反向通道地址。
-    /// English: Maps a public endpoint from the discovery document to the optional backchannel authority.
-    /// </summary>
-    /// <param name="endpoint">中文：发现文档提供的绝对端点地址。English: The absolute endpoint URL supplied by the discovery document.</param>
-    /// <returns>中文：服务端应调用的端点地址。English: The endpoint URL that the server should call.</returns>
-    private Uri ResolveBackchannelEndpoint(string endpoint)
-    {
-        if (string.IsNullOrWhiteSpace(_options.BackchannelAuthority))
-            return new Uri(endpoint, UriKind.Absolute);
-
-        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri))
-            throw new InvalidOperationException("OpenID Connect token endpoint is not an absolute URI.");
-
-        var authority = new Uri(GetBackchannelAuthority(), UriKind.Absolute);
-        return new Uri(authority, endpointUri.PathAndQuery.TrimStart('/'));
     }
 
     /// <summary>

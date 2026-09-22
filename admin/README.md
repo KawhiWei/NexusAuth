@@ -55,7 +55,6 @@ Compose 会启动 PostgreSQL、Provider、Workbench API 和 Nginx Dashboard；De
 {
   "Auth": {
     "Authority": "https://sso.example.com",
-    "BackchannelAuthority": "http://sso:8080",
     "ClientId": "nexusauth.workbench",
     "ClientSecret": "从 Secret 注入",
     "RedirectUri": "https://api.example.com/signin-oidc",
@@ -71,7 +70,6 @@ Compose 会启动 PostgreSQL、Provider、Workbench API 和 Nginx Dashboard；De
 | 配置 | 作用 |
 |---|---|
 | `Authority` | Provider 的公开 Issuer，用于浏览器跳转和 JWT issuer 校验 |
-| `BackchannelAuthority` | API 从网络内部访问 Discovery、token、introspection 等端点的地址；Compose 内为 `http://sso:8080` |
 | `ClientId` | Workbench OAuth 客户端 ID；启动初始化器会创建或更新它。 |
 | `ClientSecret` | Workbench API 兑换授权码、刷新和 introspection 所需的机密；必须与 Provider 数据库中的客户端密钥一致 |
 | `RedirectUri` | Provider 登记的 OIDC 回调，必须逐字符匹配 |
@@ -90,7 +88,6 @@ Workbench API 使用带 `NEXUSAUTH_WORKBENCH_` 前缀的单下划线变量覆盖
 ```bash
 NEXUSAUTH_WORKBENCH_CONNECTION_STRINGS_DEFAULT="Host=db;Port=5432;Database=nexusauth;Username=nexusauth;Password=REPLACE_WITH_A_SECRET;Search Path=nexusauth"
 NEXUSAUTH_WORKBENCH_AUTH_AUTHORITY=https://sso.example.com
-NEXUSAUTH_WORKBENCH_AUTH_BACKCHANNEL_AUTHORITY=http://sso:8080
 NEXUSAUTH_WORKBENCH_AUTH_CLIENT_ID=nexusauth.workbench
 NEXUSAUTH_WORKBENCH_AUTH_CLIENT_SECRET=REPLACE_WITH_A_LONG_RANDOM_SECRET
 NEXUSAUTH_WORKBENCH_AUTH_REDIRECT_URI=https://api.example.com/signin-oidc
@@ -174,7 +171,7 @@ Compose 的 Dashboard 镜像从仓库根目录构建，使用 Node 22 生成静�
 生产部署至少应确认：
 
 - Provider 中登记的 `RedirectUri` 和 `PostLogoutRedirectUri` 与 API 配置逐字符一致；
-- `Authority` 使用公网 HTTPS，`BackchannelAuthority` 只解决容器内部寻址，不改变 token 的 `iss`；
+- `Authority` 使用 Workbench 进程可访问的公网 HTTPS 地址，并与 token 的 `iss` 保持一致；
 - `Audience` 与 Workbench API resource 的 `audience` 一致；
 - Dashboard/API 反向代理保留 Cookie、`X-Forwarded-Proto` 和 `X-Forwarded-Host`；
 - 多副本 API 共享 Data Protection key ring，数据库使用持久卷并有备份；

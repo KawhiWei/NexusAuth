@@ -332,8 +332,11 @@ public class OpenIdController(
 
         var subject = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         var sid = User.FindFirst("sid")?.Value;
-        if (Guid.TryParse(subject, out var currentUserId) && Guid.TryParse(sid, out var currentSessionId))
-            await _sessionService.RevokeAsync(currentSessionId, currentUserId, ct);
+        if (Guid.TryParse(subject, out var currentUserId) && Guid.TryParse(sid, out _))
+        {
+            await _tokenService.RevokeAllUserTokensAsync(currentUserId, ct);
+            await _sessionService.RevokeAllForUserAsync(currentUserId, ct);
+        }
 
         await HttpContext.SignOutAsync(AppWebModule.AuthenticationScheme);
 
@@ -399,7 +402,7 @@ public class OpenIdController(
             <body style="margin:0;font-family:system-ui,sans-serif;background:#f4f6f8;color:#18212f">
               <main style="max-width:480px;margin:12vh auto;padding:28px;border:1px solid #d8dee8;border-radius:8px;background:#fff">
                 <h1 style="margin:0 0 12px;font-size:24px">退出 NexusAuth？</h1>
-                <p style="margin:0 0 24px;color:#526071;line-height:1.6">确认后将结束当前浏览器中的单点登录会话。</p>
+                <p style="margin:0 0 24px;color:#526071;line-height:1.6">确认后将退出该账号在所有设备上的单点登录会话，并撤销所有应用的刷新令牌。部分应用已签发的访问令牌可能在到期前仍有效。</p>
                 <form method="post" action="/connect/endsession">
                   <input type="hidden" name="{Encode(antiforgeryFieldName)}" value="{Encode(antiforgeryToken)}">
                   <input type="hidden" name="id_token_hint" value="{Encode(idTokenHint)}">

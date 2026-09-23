@@ -212,6 +212,9 @@ public class TokenService(
         if (user is null || !user.IsActive)
             return RefreshFailure(clientId ?? existingToken.ClientId, "UserInactive", "The user account is no longer active.");
 
+        if (user.TokenInvalidBefore.HasValue && existingToken.CreatedAt <= user.TokenInvalidBefore.Value)
+            return RefreshFailure(clientId ?? existingToken.ClientId, "RefreshTokenRevoked", "Refresh token has been revoked.");
+
         if (!string.IsNullOrWhiteSpace(clientId)
             && !string.Equals(existingToken.ClientId, clientId, StringComparison.Ordinal))
         {

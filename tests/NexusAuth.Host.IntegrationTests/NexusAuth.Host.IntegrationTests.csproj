@@ -12,4 +12,8 @@
   <ItemGroup>
     <ProjectReference Include="../../src/NexusAuth.Host/NexusAuth.Host.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="smtp.qq.local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('smtp.qq.local.json')" />
+  </ItemGroup>
 </Project>

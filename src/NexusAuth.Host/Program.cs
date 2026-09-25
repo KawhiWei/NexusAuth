@@ -39,6 +39,14 @@ static void AddSingleUnderscoreEnvironmentVariables(ConfigurationManager configu
     var keyMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         ["NEXUSAUTH_CONNECTION_STRINGS_DEFAULT"] = "ConnectionStrings:Default",
+        ["NEXUSAUTH_SMTP_ENABLED"] = "Smtp:Enabled",
+        ["NEXUSAUTH_SMTP_HOST"] = "Smtp:Host",
+        ["NEXUSAUTH_SMTP_PORT"] = "Smtp:Port",
+        ["NEXUSAUTH_SMTP_SECURITY"] = "Smtp:Security",
+        ["NEXUSAUTH_SMTP_USERNAME"] = "Smtp:Username",
+        ["NEXUSAUTH_SMTP_PASSWORD"] = "Smtp:Password",
+        ["NEXUSAUTH_SMTP_FROM_ADDRESS"] = "Smtp:FromAddress",
+        ["NEXUSAUTH_SMTP_FROM_NAME"] = "Smtp:FromName",
         ["NEXUSAUTH_JWT_ISSUER"] = "Jwt:Issuer",
         ["NEXUSAUTH_JWT_SIGNING_MODE"] = "Jwt:SigningMode",
         ["NEXUSAUTH_JWT_SIGNING_PATH"] = "Jwt:SigningPath",

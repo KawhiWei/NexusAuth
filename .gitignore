@@ -23,6 +23,7 @@ bld/
 [Ll]ogs/
 # Runtime Serilog files (SSO and Workbench)
 logs/
+tests/NexusAuth.Host.IntegrationTests/smtp.qq.local.json
 
 # Visual Studio 2015 cache/options directory
 .vs/

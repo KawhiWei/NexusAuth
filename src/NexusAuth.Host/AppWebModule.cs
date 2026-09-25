@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 using NexusAuth.Application.Users;
 using System.Threading.RateLimiting;
 using Fido2NetLib;
+using NexusAuth.Host.Email;
 
 namespace NexusAuth.Host;
 
@@ -31,6 +32,12 @@ public class AppWebModule : LuckAppModule
         var configuration = services.GetConfiguration();
 
         services.AddNexusAuthTokenSigning(configuration);
+        services.AddOptions<SmtpOptions>()
+            .Bind(configuration.GetSection(SmtpOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<SmtpOptions>, SmtpOptionsValidator>();
+        services.AddTransient<ISmtpTransport, MailKitSmtpTransport>();
+        services.AddTransient<IEmailSender, SmtpEmailSender>();
         services.Configure<NexusAuthSecurityOptions>(configuration.GetSection("Security"));
         services.AddOptions<LoginFlowOptions>()
             .Bind(configuration.GetSection(LoginFlowOptions.SectionName))

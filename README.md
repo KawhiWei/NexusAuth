@@ -224,6 +224,25 @@ MVC 请求使用控制器名作为 `Module`、Action 名作为 `Category`；`Sub
 
 Docker Compose 会把宿主机的 `./logs/sso` 和 `./logs/workbench` 分别挂载到容器的 `/app/logs`。`logs/` 已加入 `.gitignore`，运行时文件不会提交到 Git。日志中不要写入 client secret、授权码、access token、refresh token、private key、密码或完整 Cookie；应用显式提供 `TraceId` 时可用它关联请求，需要排查身份时只记录脱敏后的 client id 或用户标识。
 
+## SMTP 发信试验
+
+Provider 内置 MailKit 发信服务，默认关闭，目前仅提供内部 `IEmailSender`，尚未接入注册验证或密码找回，也未开放 HTTP 发信接口。启用时设置以下环境变量（Docker Compose 的 `sso` 服务也接受相同变量）：
+
+| 变量 | QQ 邮箱示例 | 163 邮箱示例 |
+|------|-------------|--------------|
+| `NEXUSAUTH_SMTP_ENABLED` | `true` | `true` |
+| `NEXUSAUTH_SMTP_HOST` | `smtp.qq.com` | `smtp.163.com` |
+| `NEXUSAUTH_SMTP_PORT` | `465` | `465` |
+| `NEXUSAUTH_SMTP_SECURITY` | `SslOnConnect` | `SslOnConnect` |
+| `NEXUSAUTH_SMTP_USERNAME` | 完整 QQ 邮箱地址 | 完整 163 邮箱地址 |
+| `NEXUSAUTH_SMTP_PASSWORD` | SMTP 授权码 | SMTP 授权码 |
+| `NEXUSAUTH_SMTP_FROM_ADDRESS` | 与登录账号一致的邮箱 | 与登录账号一致的邮箱 |
+| `NEXUSAUTH_SMTP_FROM_NAME` | `NexusAuth` | `NexusAuth` |
+
+也支持 `587` + `StartTls`，前提是所用邮箱提供该端口。先在邮箱后台开启 SMTP 并生成授权码，不要使用邮箱登录密码。将授权码放在运行环境的 Secret 中，不要写进仓库或镜像。需从部署环境向 SMTP 服务器开放出站连接。
+
+本地可先运行离线单元测试：`dotnet test tests/NexusAuth.Host.IntegrationTests/NexusAuth.Host.IntegrationTests.csproj --filter FullyQualifiedName~SmtpEmailSenderTests`。QQ 真实试发读取被 Git 忽略的 `tests/NexusAuth.Host.IntegrationTests/smtp.qq.local.json`，将其中 `Username` 改成你的完整 QQ 邮箱地址，并将 `AuthorizationCode` 填成 QQ 邮箱后台生成的 SMTP 授权码。服务器固定为 `smtp.qq.com:465`（SSL/TLS），收件人固定为 `18790997531@163.com`。然后运行 `dotnet test tests/NexusAuth.Host.IntegrationTests/NexusAuth.Host.IntegrationTests.csproj --filter FullyQualifiedName~Configured_live_qq_smtp_can_send_test_message --logger "console;verbosity=detailed"`。未填写账号或授权码时测试输出“未发送”，不会对外发信；不要将授权码提交到 Git。
+
 ## 发现文档和最小接入
 
 Provider 启动后先读取发现文档：

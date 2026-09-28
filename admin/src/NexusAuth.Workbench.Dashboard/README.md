@@ -39,7 +39,7 @@ npm run dev
 
 打开 `http://localhost:5273`。`vite.config.ts` 将 `/api` 代理到 `http://localhost:5051`，浏览器因此通过同源路径访问 BFF 并携带 Cookie。API Swagger 地址为 `http://localhost:5051/swagger`。
 
-本地启动前需要先初始化 PostgreSQL 的 `nexusauth` schema，并登记 `nexusauth.workbench` 客户端和 `workbench` API resource。完整数据库和 API 配置见 [Workbench 接入说明](../../../document/01-快速启动.md)。
+本地启动前需要先初始化 PostgreSQL 的 `nexusauth` schema，并配置 Workbench API 的认证密钥与 Bootstrap 资源信息。API 启动时会登记自身客户端和服务资源，不需要手工创建。完整数据库和 API 配置见 [Workbench 接入说明](../../../document/01-快速启动.md)。
 
 ## 登录流程
 
@@ -95,17 +95,19 @@ Compose 方式：
 docker compose up --build
 ```
 
-Dashboard Dockerfile 使用 Node 22 构建前端，再使用 Nginx 1.27 提供静态文件。宿主机端口 `5273` 映射到容器端口 `80`；Nginx 将 `/api` 代理到 `admin-api:8080`，其余路由回退到 `index.html`，因此 React 路由刷新可以正常工作。
+Dashboard Dockerfile 使用 Node 22 构建前端，再使用 Nginx 1.27 提供静态文件。根目录 Compose 将宿主机 `5560` 映射到容器端口 `80`；`5273` 是本地 Vite 开发服务器端口。Nginx 将 `/api` 和 `/signin-oidc` 代理到 `admin-api:8080`，其余路由回退到 `index.html`，因此 React 路由刷新可以正常工作。
 
 生产反向代理必须：
 
 - 将 `/api` 转发到 Workbench API，并保留 `Host`、`X-Forwarded-Proto`、`X-Forwarded-Host` 和 Cookie；
 - 使用 HTTPS，确保 Cookie 的 Secure、HttpOnly 和 SameSite 策略符合部署域名；
-- 将 Provider 登记的 OIDC 回调设置为 API 地址的 `/signin-oidc`，不要设置成 Dashboard 地址；
+- 将 Provider 登记的 OIDC 回调设置为实际对外提供 `/signin-oidc` 的地址，并由反向代理转发至 Workbench API；根目录 Compose 使用 Dashboard 域名下的该路径；
 - 通过 Workbench API 的环境变量注入客户端密钥，Dashboard 不需要也不应该读取该密钥。
 
 ## 相关文档
 
+- [Workbench Dashboard 统一登录接入模板](../../../document/Workbench-Dashboard统一登录接入模板.md)
+- [Workbench API 统一登录接入模板](../../../document/Workbench-API统一登录接入模板.md)
 - [NexusAuth Admin 总览](../../README.md)
 - [Workbench API 接入说明](../../../document/01-快速启动.md)
 - [高级配置](../../../document/01-快速启动.md)

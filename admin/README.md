@@ -96,10 +96,10 @@ NEXUSAUTH_WORKBENCH_AUTH_SCOPE="openid profile nexusauth.workbench.api offline_a
 NEXUSAUTH_WORKBENCH_AUTH_AUDIENCE=nexusauth.workbench.api
 NEXUSAUTH_WORKBENCH_AUTH_REQUIRE_HTTPS_METADATA=true
 NEXUSAUTH_WORKBENCH_AUTH_SIGN_OUT_PROVIDER=true
+NEXUSAUTH_WORKBENCH_GATEWAY_ENABLED=false
 NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_NAME=nexusauth.workbench.api
 NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_DISPLAY_NAME="Workbench API"
 NEXUSAUTH_WORKBENCH_BOOTSTRAP_RESOURCE_DESCRIPTION="NexusAuth Workbench API scope"
-NEXUSAUTH_WORKBENCH_BOOTSTRAP_ALLOWED_SCOPES="nexusauth.workbench.api"
 NEXUSAUTH_WORKBENCH_BOOTSTRAP_CLIENT_NAME="NexusAuth Workbench"
 NEXUSAUTH_WORKBENCH_BOOTSTRAP_CLIENT_DESCRIPTION="NexusAuth Workbench Dashboard and API (client_secret_basic)"
 ```
@@ -115,7 +115,13 @@ Workbench API 启动时会根据 `Auth` 与 `Bootstrap` 配置登记：
 - 客户端与 API resource 的映射；
 - authorization code + PKCE 和 refresh token grant 的允许范围。
 
-`openid`、`profile`、`offline_access` 是客户端静态 AllowScope，不会创建为 API resource。初始化器会先创建或更新 Workbench 服务资源，再读取 `Bootstrap:AllowedScopes` 查询资源 GUID 并建立关联；留空时只关联当前 Workbench 服务资源。最后会写入或轮换 `Auth:ClientSecret`。配置不完整、服务 Scope 未对应资源或同步失败会阻止 API 正常启动。
+`openid`、`profile`、`offline_access` 是客户端静态 AllowScope，不会创建为 API resource。初始化器只关联自身的 Workbench 服务资源，并写入或轮换 `Auth:ClientSecret`。配置不完整或同步失败会阻止 API 正常启动；其他应用和资源通过 Dashboard 登记。
+
+### 网关模式
+
+设置 `NEXUSAUTH_WORKBENCH_GATEWAY_ENABLED=true` 后，API 只接受已验证的 Bearer access token，不再注册 OIDC 登录、回调、Cookie 或刷新服务。`/api/auth/me` 仍可用；`/api/auth/config`、`/api/auth/login`、`/signin-oidc` 和 `/api/auth/logout` 返回 404。网关必须负责浏览器登录、回调、刷新及登出，并向 API 转发 `Authorization: Bearer <access_token>`；单独切换这个开关不会改变 Dashboard 的登录入口。
+
+自身资源、客户端及密钥仍在启动时初始化，但默认客户端在网关模式下不开放 grant 或登录回调。网关登录客户端须另行在 Dashboard 创建，不能复用 Workbench 默认客户端。`Auth:Authority`、`Auth:Audience`、`Auth:ClientId`、`Auth:ClientSecret` 和 Bootstrap 名称仍需配置；`Auth:RedirectUri`、`Auth:PostLogoutRedirectUri`、`Auth:Scope` 在网关模式下可留空。切回非网关模式会恢复默认客户端的授权码和 refresh token 配置。部署前参见[快速启动中的网关模式边界](../document/01-快速启动.md#44-workbench-api认证和自身初始化)；完整网关部署手册尚未整理。
 
 ## 登录、会话与登出
 
@@ -149,6 +155,7 @@ Workbench Cookie 名为 `.NexusAuth.Workbench`，HttpOnly、SameSite=Lax，默�
 | `/api/client-metadata` | 客户端元数据查询 |
 | `/api/login-audits` | 登录审计查询 |
 | `/api/scim-credentials` | SCIM 凭证查询、创建、更新和撤销 |
+| `/api/open-api-credentials` | Host 只读目录 API 的凭证查询、创建、更新和撤销；令牌明文仅创建时返回 |
 | `/api/auth/config` | 返回可公开的 Provider、client ID 和回调配置 |
 | `/api/auth/login`、`/signin-oidc`、`/api/auth/me`、`/api/auth/logout` | BFF 登录生命周期 |
 
@@ -166,7 +173,7 @@ npm --prefix admin/src/NexusAuth.Workbench.Dashboard run lint
 
 Dashboard 的 `npm run build` 会先执行 `tsc -b`，再执行 Vite build；没有单独的 `npm run typecheck` 脚本。
 
-Compose 的 Dashboard 镜像从仓库根目录构建，使用 Node 22 生成静态资源，再由 Nginx 1.27 提供服务。宿主机 `5273:80`，Nginx 将 `/api` 代理到 `admin-api:8080`，其余路径回退到 `index.html`。
+Compose 的 Dashboard 镜像从仓库根目录构建，使用 Node 22 生成静态资源，再由 Nginx 1.27 提供服务。根目录 Compose 映射 `5560:80`；`5273` 是本地 Vite 端口。Nginx 将 `/api` 和 `/signin-oidc` 代理到 `admin-api:8080`，其余路径回退到 `index.html`。
 
 生产部署至少应确认：
 
@@ -179,6 +186,8 @@ Compose 的 Dashboard 镜像从仓库根目录构建，使用 Node 22 生成静�
 
 ## 相关文档
 
+- [Workbench API 统一登录接入模板](../document/Workbench-API统一登录接入模板.md)
+- [Workbench Dashboard 统一登录接入模板](../document/Workbench-Dashboard统一登录接入模板.md)
 - [Workbench API 接入说明](../document/01-快速启动.md)
 - [Dashboard 使用说明](./src/NexusAuth.Workbench.Dashboard/README.md)
 - [高级配置](../document/01-快速启动.md)
